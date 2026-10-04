@@ -66,8 +66,11 @@ async function resetDatabase() {
     console.log('==============================================');
   } catch (err) {
     console.error('❌ Error resetting database:', err);
+    if (client) client.release();
+    await pool.end();
+    process.exit(1);
   } finally {
-    client.release();
+    if (client) client.release();
     await pool.end();
     process.exit(0);
   }

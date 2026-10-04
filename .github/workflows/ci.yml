@@ -42,14 +42,14 @@ jobs:
       - name: Setup Node.js Runtime
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install Monorepo Dependencies
         run: |
           npm install
-          npm --prefix backend install
-          npm --prefix Dashboard install
-          npm --prefix WebLogin install
+          (cd backend && npm install)
+          (cd Dashboard && npm install)
+          (cd WebLogin && npm install)
 
       - name: Build Production Frontend Bundles (Vite)
         run: |

@@ -156,17 +156,96 @@ export async function initDatabase() {
 
       INSERT INTO services (id, category_id, title, short_description, short_desc, base_price, starting_price, original_price, duration_minutes, warranty_days, badge_label, badge, is_popular, min_quote_price, max_quote_price) VALUES
         ('switchboard-socket-repair',  'electrician', 'Switchboard, Socket & Power Point Repair',            'Burnt switch replacement, loose contact fix, 16A heavy power points for AC/Geysers.', 'Burnt switch replacement, loose contact fix, 16A heavy power points for AC/Geysers.', 149.00, 149.00, 249.00, 30, 90, 'Express 30 Mins', 'Express 30 Mins', true,  100.00,  500.00),
+        ('mcb-repair',                 'electrician', 'Switchboard Sparks, Sockets & MCB Diagnostics',       'Burnt switch replacement, loose contact fix, 16A heavy power points for AC/Geysers.', 'Burnt switch replacement, loose contact fix, 16A heavy power points for AC/Geysers.', 149.00, 149.00, 249.00, 30, 90, 'Express 30 Mins', 'Express 30 Mins', true,  100.00,  500.00),
         ('mcb-fuse-short-circuit',     'electrician', 'MCB Tripping, Short-Circuit & Fuse Diagnostics',      'High-precision multimeter short-circuit detection, faulty MCB/RCCB replacement & load balancing.', 'High-precision multimeter short-circuit detection, faulty MCB/RCCB replacement & load balancing.', 199.00, 199.00, 350.00, 40, 90, 'Emergency Safe',  'Emergency Safe',  true,  150.00,  800.00),
         ('fan-chandelier-install',     'electrician', 'Ceiling Fan, Chandelier & Light Fixture Installation', 'Heavy chandelier mounting, smart ceiling fan installation, concealed spot lighting.', 'Heavy chandelier mounting, smart ceiling fan installation, concealed spot lighting.', 179.00, 179.00, 299.00, 35, 90, 'Popular',         'Popular',         true,  120.00,  600.00),
         ('inverter-wiring-setup',      'electrician', 'Home Inverter, Battery & Heavy Wiring Setup',          'Sine-wave inverter battery wiring, changeover switch installation, dedicated earthing test.', 'Sine-wave inverter battery wiring, changeover switch installation, dedicated earthing test.', 349.00, 349.00, 599.00, 60, 180,'Heavy Duty',      'Heavy Duty',      false, 250.00, 1200.00),
         ('tap-faucet-mixer-repair',    'plumber',     'Tap, Faucet & Diverter Mixer Valve Repair',            'Dripping tap repair, cartridge replacement, wall-mounted quarter-turn mixer installation.', 'Dripping tap repair, cartridge replacement, wall-mounted quarter-turn mixer installation.', 129.00, 129.00, 199.00, 25, 90, 'Express 30 Mins', 'Express 30 Mins', true,   80.00,  400.00),
         ('drain-pipe-blockage-clear',  'plumber',     'Drain Blockage & Clogged Sewer Line Clearance',        'High-pressure mechanized rotary snake unclogging for kitchen sinks, bathroom floor traps & main lines.', 'High-pressure mechanized rotary snake unclogging for kitchen sinks, bathroom floor traps & main lines.', 249.00, 249.00, 450.00, 45, 90, 'Instant Relief',  'Instant Relief',  true,  150.00,  700.00),
         ('toilet-commode-cistern-fix', 'plumber',     'Western / Indian Commode & Flush Tank Repair',         'Concealed dual-flush cistern repair, leaking inlet ball valve fix, wax ring seal replacement.', 'Concealed dual-flush cistern repair, leaking inlet ball valve fix, wax ring seal replacement.', 199.00, 199.00, 349.00, 35, 90, 'Hygienic Pro',    'Hygienic Pro',    false, 120.00,  600.00),
-        ('overhead-tank-water-pump',   'plumber',     'Water Tank, Motor Pump & Pressure Booster Setup',      'Automatic water level float switch, 1HP booster pump setup, concealed CPVC main pipeline leak fix.', 'Automatic water level float switch, 1HP booster pump setup, concealed CPVC main pipeline leak fix.', 399.00, 399.00, 699.00, 60, 180,'Heavy Duty',      'Heavy Duty',      false, 250.00, 1500.00)
+        ('overhead-tank-water-pump',   'plumber',     'Water Tank, Motor Pump & Pressure Booster Setup',      'Automatic water level float switch, 1HP booster pump setup, concealed CPVC main pipeline leak fix.', 'Automatic water level float switch, 1HP booster pump setup, concealed CPVC main pipeline leak fix.', 399.00, 399.00, 699.00, 60, 180,'Heavy Duty',      'Heavy Duty',      false, 250.00, 1500.00),
+        ('general-service',            'plumber',     'General Inspection, Diagnostics & On-Demand Repair',   'Comprehensive on-site diagnosis and repair by certified multi-trade technicians.', 'Comprehensive on-site diagnosis and repair by certified multi-trade technicians.', 149.00, 149.00, 249.00, 30, 30, 'Standard',        'Standard',        false,  50.00,  2000.00)
       ON CONFLICT (id) DO UPDATE SET
         title = EXCLUDED.title,
         base_price = EXCLUDED.base_price,
         starting_price = EXCLUDED.starting_price;
+    `);
+
+    // 4.1 Core Auth Tables: user_login & agent_login
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_login (
+        id                SERIAL PRIMARY KEY,
+        name              VARCHAR(150) NOT NULL,
+        email             VARCHAR(150) UNIQUE NOT NULL,
+        phone             VARCHAR(25),
+        dob               VARCHAR(50),
+        state             VARCHAR(100),
+        city              VARCHAR(100),
+        address           TEXT,
+        password          VARCHAR(255),
+        auth_provider     VARCHAR(50) DEFAULT 'email',
+        google_id         VARCHAR(150),
+        avatar_url        TEXT,
+        is_verified       BOOLEAN DEFAULT true,
+        is_phone_verified BOOLEAN DEFAULT false,
+        last_login_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_login_email ON user_login(email);
+
+      CREATE TABLE IF NOT EXISTS agent_login (
+        id                  SERIAL PRIMARY KEY,
+        partner_id          VARCHAR(50) UNIQUE NOT NULL,
+        name                VARCHAR(150) NOT NULL,
+        email               VARCHAR(150) UNIQUE NOT NULL,
+        phone               VARCHAR(25),
+        trade               VARCHAR(50) DEFAULT 'both',
+        experience_years    INT DEFAULT 0,
+        dob                 VARCHAR(50),
+        state               VARCHAR(100),
+        city                VARCHAR(100),
+        address             TEXT,
+        password            VARCHAR(255),
+        auth_provider       VARCHAR(50) DEFAULT 'agent_id',
+        google_id           VARCHAR(150),
+        avatar_url          TEXT,
+        kyc_status          VARCHAR(50) DEFAULT 'Pending',
+        rating              NUMERIC(3,2),
+        completed_jobs      INT DEFAULT 0,
+        is_online           BOOLEAN DEFAULT true,
+        wallet_balance      NUMERIC(12,2) DEFAULT 0.00,
+        availability_status VARCHAR(50) DEFAULT 'AVAILABLE',
+        location_updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        location_accuracy_m DOUBLE PRECISION DEFAULT 10,
+        h3_res_8            VARCHAR(30),
+        lat                 DOUBLE PRECISION,
+        lng                 DOUBLE PRECISION,
+        h3_index_res9       VARCHAR(30),
+        is_phone_verified   BOOLEAN DEFAULT false,
+        is_verified         BOOLEAN DEFAULT false,
+        last_login_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_agent_login_email ON agent_login(email);
+      CREATE INDEX IF NOT EXISTS idx_agent_login_partner ON agent_login(partner_id);
+
+      INSERT INTO agent_login (
+        partner_id, name, email, phone, trade, experience_years,
+        state, city, address, kyc_status, rating, completed_jobs,
+        is_online, wallet_balance, availability_status, is_phone_verified, is_verified,
+        lat, lng, location_accuracy_m
+      ) VALUES (
+        '202600009', 'kumar k', 'kumar@gmail.com', '+91 9876543210', 'both', 8,
+        'Karnataka', 'Bengaluru', 'Indiranagar 100ft Road, Bengaluru', 'Verified', 4.95, 0,
+        true, 0.00, 'AVAILABLE', true, true,
+        12.9716, 77.5946, 10
+      ) ON CONFLICT (email) DO UPDATE SET
+        partner_id = EXCLUDED.partner_id,
+        name = EXCLUDED.name,
+        is_verified = true,
+        is_phone_verified = true;
     `);
 
     // 5. Customers Table
@@ -398,10 +477,12 @@ export async function initDatabase() {
         status              VARCHAR(20) NOT NULL DEFAULT 'sent',
         dispatched_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         seen_at             TIMESTAMPTZ,
-        responded_at        TIMESTAMPTZ
+        responded_at        TIMESTAMPTZ,
+        CONSTRAINT uq_dispatch_request_agent UNIQUE (request_id, agent_id)
       );
       CREATE INDEX IF NOT EXISTS idx_dispatch_request      ON request_dispatches(request_id);
       CREATE INDEX IF NOT EXISTS idx_dispatch_professional ON request_dispatches(professional_id);
+      CREATE INDEX IF NOT EXISTS idx_dispatch_agent        ON request_dispatches(agent_id);
     `);
 
     // 13. Quotes
@@ -460,6 +541,7 @@ export async function initDatabase() {
         issue_type            VARCHAR(150) NOT NULL DEFAULT 'Inspection & Repair',
         problem_description   TEXT,
         problem_timing        VARCHAR(100),
+        problem_frequency     VARCHAR(100),
         service_address       TEXT,
         user_address          TEXT,
         service_city          VARCHAR(100),
@@ -472,6 +554,9 @@ export async function initDatabase() {
         technician_name       VARCHAR(150),
         professional_phone    VARCHAR(20),
         technician_phone      VARCHAR(20),
+        eta_minutes           INT DEFAULT 30,
+        photos                JSONB NOT NULL DEFAULT '[]',
+        time_slot             VARCHAR(100) DEFAULT 'Today, Express 30 Mins',
         total_amount          NUMERIC(10,2) NOT NULL DEFAULT 0.00,
         is_estimate           BOOLEAN NOT NULL DEFAULT true,
         payment_method        VARCHAR(60) DEFAULT 'UPI / Cash on completion',
@@ -485,6 +570,7 @@ export async function initDatabase() {
         rating                INT,
         review_feedback       TEXT,
         review_tags_json      JSONB NOT NULL DEFAULT '[]',
+        review_tags           JSONB NOT NULL DEFAULT '[]',
         reviewed_at           TIMESTAMPTZ,
         payment_status        VARCHAR(20) NOT NULL DEFAULT 'pending',
         scheduled_at          TIMESTAMPTZ,
@@ -501,6 +587,34 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_bookings_customer     ON bookings(customer_id);
       CREATE INDEX IF NOT EXISTS idx_bookings_professional ON bookings(professional_id);
       CREATE INDEX IF NOT EXISTS idx_bookings_status       ON bookings(status);
+
+      CREATE TABLE IF NOT EXISTS booking_photos (
+        id                SERIAL PRIMARY KEY,
+        booking_ref       VARCHAR(60),
+        storage_path      TEXT,
+        original_filename VARCHAR(255),
+        mime_type         VARCHAR(100),
+        file_size         INT,
+        uploaded_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_booking_photos_ref ON booking_photos(booking_ref);
+    `);
+
+    // 14.1 Job Lifecycle Audit Trail
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS job_events (
+        id            SERIAL PRIMARY KEY,
+        booking_id    INT REFERENCES bookings(id) ON DELETE CASCADE,
+        request_id    INT REFERENCES service_requests(id) ON DELETE CASCADE,
+        actor_type    VARCHAR(50) NOT NULL DEFAULT 'system',
+        actor_id      VARCHAR(100),
+        event_type    VARCHAR(100) NOT NULL,
+        metadata      JSONB DEFAULT '{}',
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_job_events_request ON job_events(request_id);
+      CREATE INDEX IF NOT EXISTS idx_job_events_booking ON job_events(booking_id);
+      CREATE INDEX IF NOT EXISTS idx_job_events_type    ON job_events(event_type);
     `);
 
     // 15. Booking Media
@@ -678,8 +792,89 @@ export async function initDatabase() {
       );
     `);
 
-    // Ensure triggers exist
+    // Ensure sync trigger functions and triggers exist
     await client.query(`
+      CREATE OR REPLACE FUNCTION fn_sync_user_to_customer()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        INSERT INTO customers (
+          full_name, email, phone, avatar_url, state, city, address,
+          password_hash, auth_provider, google_id, is_email_verified, is_phone_verified,
+          last_login_at, created_at, updated_at
+        ) VALUES (
+          NEW.name, NEW.email, NEW.phone, NEW.avatar_url, NEW.state, NEW.city, NEW.address,
+          NEW.password, COALESCE(NEW.auth_provider, 'email'), NEW.google_id,
+          COALESCE(NEW.is_verified, false), COALESCE(NEW.is_phone_verified, false),
+          NEW.last_login_at, COALESCE(NEW.created_at, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (email) DO UPDATE SET
+          full_name = EXCLUDED.full_name,
+          phone = COALESCE(EXCLUDED.phone, customers.phone),
+          avatar_url = COALESCE(EXCLUDED.avatar_url, customers.avatar_url),
+          state = COALESCE(EXCLUDED.state, customers.state),
+          city = COALESCE(EXCLUDED.city, customers.city),
+          address = COALESCE(EXCLUDED.address, customers.address),
+          password_hash = COALESCE(EXCLUDED.password_hash, customers.password_hash),
+          is_email_verified = COALESCE(EXCLUDED.is_email_verified, customers.is_email_verified),
+          is_phone_verified = COALESCE(EXCLUDED.is_phone_verified, customers.is_phone_verified),
+          last_login_at = EXCLUDED.last_login_at,
+          updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE OR REPLACE FUNCTION fn_sync_agent_to_professional()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        INSERT INTO professionals (
+          partner_code, full_name, email, phone, avatar_url,
+          state, city, address, trade, experience_years,
+          password_hash, auth_provider, google_id,
+          is_email_verified, is_phone_verified, kyc_status,
+          is_online, availability_status,
+          gps_lat, gps_lng, gps_accuracy_m, gps_h3_res8, gps_h3_res9, gps_updated_at,
+          rating, completed_jobs, wallet_balance,
+          last_login_at, created_at, updated_at
+        ) VALUES (
+          NEW.partner_id, NEW.name, NEW.email, NEW.phone, NEW.avatar_url,
+          NEW.state, NEW.city, NEW.address, NEW.trade, COALESCE(NEW.experience_years, 0),
+          NEW.password, COALESCE(NEW.auth_provider, 'partner_code'), NEW.google_id,
+          COALESCE(NEW.is_verified, false), COALESCE(NEW.is_phone_verified, false),
+          COALESCE(NEW.kyc_status, 'pending'),
+          COALESCE(NEW.is_online, false),
+          COALESCE(NEW.availability_status, 'available'),
+          NEW.lat, NEW.lng, COALESCE(NEW.location_accuracy_m, 10), NEW.h3_res_8, NEW.h3_index_res9, NEW.location_updated_at,
+          NEW.rating, COALESCE(NEW.completed_jobs, 0), COALESCE(NEW.wallet_balance, 0.00),
+          NEW.last_login_at, COALESCE(NEW.created_at, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (email) DO UPDATE SET
+          full_name = EXCLUDED.full_name,
+          phone = COALESCE(EXCLUDED.phone, professionals.phone),
+          trade = EXCLUDED.trade,
+          experience_years = EXCLUDED.experience_years,
+          is_online = EXCLUDED.is_online,
+          availability_status = EXCLUDED.availability_status,
+          gps_lat = EXCLUDED.gps_lat,
+          gps_lng = EXCLUDED.gps_lng,
+          gps_accuracy_m = EXCLUDED.gps_accuracy_m,
+          gps_h3_res8 = EXCLUDED.gps_h3_res8,
+          gps_h3_res9 = EXCLUDED.gps_h3_res9,
+          gps_updated_at = EXCLUDED.gps_updated_at,
+          wallet_balance = EXCLUDED.wallet_balance,
+          updated_at = CURRENT_TIMESTAMP;
+
+        -- Ensure wallet matches
+        INSERT INTO professional_wallets (professional_id, balance, total_earned)
+        SELECT p.id, COALESCE(NEW.wallet_balance, 0.00), COALESCE(NEW.wallet_balance, 0.00)
+        FROM professionals p WHERE p.email = NEW.email
+        ON CONFLICT (professional_id) DO UPDATE SET
+          balance = EXCLUDED.balance,
+          updated_at = CURRENT_TIMESTAMP;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
       DROP TRIGGER IF EXISTS trg_sync_user_to_customer ON user_login;
       CREATE TRIGGER trg_sync_user_to_customer
         AFTER INSERT OR UPDATE ON user_login
@@ -689,7 +884,7 @@ export async function initDatabase() {
       CREATE TRIGGER trg_sync_agent_to_professional
         AFTER INSERT OR UPDATE ON agent_login
         FOR EACH ROW EXECUTE FUNCTION fn_sync_agent_to_professional();
-    `).catch(() => {});
+    `);
 
     console.log('✅  NivaaroFix DB Schema v2.0 verified & ready!');
   } catch (err) {
