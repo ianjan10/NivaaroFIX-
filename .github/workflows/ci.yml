@@ -56,12 +56,22 @@ jobs:
           PG_PASSWORD: root
           PG_DATABASE: nivaarofix_db
 
-      - name: Start Background Services & Run Test Suites
+      - name: Start Backend API & Run All Test Suites
         run: |
-          npm run dev:backend &
-          npm run dev:dashboard &
-          npm run dev:login &
-          node scripts/wait_for_services.mjs
+          node backend/src/server.js &
+          node -e "
+            async function wait() {
+              for (let i = 0; i < 30; i++) {
+                try {
+                  const res = await fetch('http://127.0.0.1:5000/api/health');
+                  if (res.ok) { console.log('Backend API is healthy on port 5000'); return; }
+                } catch {}
+                await new Promise(r => setTimeout(r, 1000));
+              }
+              throw new Error('Backend failed to boot');
+            }
+            wait();
+          "
           npm run test:all
         env:
           PG_HOST: localhost

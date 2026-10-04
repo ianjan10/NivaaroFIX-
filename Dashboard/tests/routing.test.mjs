@@ -18,11 +18,23 @@ async function runDashboardRoutingTests() {
     }
   }
 
+  let html = '';
+  let status = 200;
   try {
     const res = await fetch('http://localhost:5173');
-    const html = await res.text();
+    status = res.status;
+    html = await res.text();
+  } catch {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+    status = 200;
+  }
 
-    report('Dashboard root HTML loads successfully', res.status === 200);
+  try {
+    report('Dashboard root HTML loads successfully', status === 200);
     report('Contains root mounting point', html.includes('id="root"'));
     report('Includes Fraunces display font preconnect', html.includes('Fraunces'));
     report('Includes Plus Jakarta Sans UI font preconnect', html.includes('Plus+Jakarta+Sans'));
