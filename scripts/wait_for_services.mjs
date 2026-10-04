@@ -1,32 +1,42 @@
 /**
- * Waits for backend, Dashboard, and WebLogin services to become responsive
+ * Waits for backend, Dashboard, and WebLogin services to become responsive in CI and local environments.
+ * Checks both localhost and 127.0.0.1 for IPv4/IPv6 resilience on Linux and Windows.
  */
 const targets = [
-  'http://localhost:5000/api/health',
-  'http://localhost:5173',
-  'http://localhost:5500'
+  ['http://127.0.0.1:5000/api/health', 'http://localhost:5000/api/health'],
+  ['http://127.0.0.1:5173', 'http://localhost:5173'],
+  ['http://127.0.0.1:5500', 'http://localhost:5500']
 ];
 
-async function waitForOne(url, timeoutMs = 45000) {
+async function checkOne(url) {
+  try {
+    const res = await fetch(url);
+    if (res.status < 500) return true;
+  } catch {
+    // not yet listening
+  }
+  return false;
+}
+
+async function waitForAny(urls, timeoutMs = 60000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(url);
-      if (res.status < 500) return true;
-    } catch {
-      // Service not yet ready
+    for (const url of urls) {
+      if (await checkOne(url)) {
+        return url;
+      }
     }
     await new Promise((r) => setTimeout(r, 1000));
   }
-  throw new Error(`Timed out waiting for service at ${url}`);
+  throw new Error(`Timed out waiting for service at ${urls.join(' or ')}`);
 }
 
 async function main() {
   console.log('⏳ Waiting for development servers to be ready...');
-  for (const url of targets) {
-    process.stdout.write(`   Connecting to ${url}... `);
-    await waitForOne(url);
-    console.log('✅ Online');
+  for (const urlGroup of targets) {
+    process.stdout.write(`   Connecting to ${urlGroup[0]}... `);
+    const readyUrl = await waitForAny(urlGroup);
+    console.log(`✅ Online (${readyUrl})`);
   }
   console.log('🚀 All services are healthy and responding!\n');
 }
