@@ -1,0 +1,93 @@
+# ==============================================================================
+# NivaaroFix Workspace — Comprehensive Git Ignore Policy
+# Protects secrets, build outputs, package caches, and system files.
+# ==============================================================================
+
+# Dependencies & Package Managers
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Build Outputs & Production Bundles
+dist/
+*/dist/
+dist-ssr/
+*/dist-ssr/
+build/
+*/build/
+out/
+*/out/
+.vite/
+*/.vite/
+coverage/
+*/coverage/
+
+# Environment Variables & Sensitive Credentials (CRITICAL FOR GITHUB)
+.env
+.env.*
+*.env
+*.env.*
+!.env.example
+!*.env.example
+!.env.*.example
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa*
+*.sql
+
+# Local User Uploads (Dynamic customer photos & test attachments)
+backend/uploads/booking_photos/*
+!backend/uploads/booking_photos/.gitkeep
+uploads/booking_photos/*
+!uploads/booking_photos/.gitkeep
+
+# Logs, Diagnostics & Crash Dumps
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Operating System & File System Metadata
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# IDE & Editor Configurations
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.bak
+*.tmp
+
+# Packaging & Archive Backups
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z

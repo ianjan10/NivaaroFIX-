@@ -1,0 +1,21 @@
+{
+  "name": "nivaarofix-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NivaaroFix — Monorepo for On-Demand Home Services & Verification Platform",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/system_health.test.mjs",
+    "test:backend": "npm --prefix backend test",
+    "test:dashboard": "npm --prefix Dashboard test",
+    "test:login": "npm --prefix WebLogin test",
+    "test:all": "node tests/system_health.test.mjs && npm --prefix backend test && npm --prefix Dashboard test && npm --prefix WebLogin test",
+    "db:reset": "npm --prefix backend run db:reset",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:dashboard": "npm --prefix Dashboard run dev",
+    "dev:login": "npm --prefix WebLogin run dev",
+    "install:all": "npm install && npm --prefix backend install && npm --prefix Dashboard install && npm --prefix WebLogin install",
+    "build:all": "npm --prefix Dashboard run build && npm --prefix WebLogin run build",
+    "package:zip": "powershell -ExecutionPolicy Bypass -File scripts/create_zip.ps1"
+  }
+}

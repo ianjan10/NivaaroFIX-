@@ -1,0 +1,21 @@
+# Backend Dependencies
+node_modules/
+
+# Environment Variables & Secrets
+.env
+.env.*
+*.env
+*.env.*
+!.env.example
+
+# Local Uploads
+uploads/booking_photos/*
+!uploads/booking_photos/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / Editor
+.DS_Store
+Thumbs.db

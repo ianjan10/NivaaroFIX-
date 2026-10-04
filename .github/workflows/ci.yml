@@ -1,0 +1,59 @@
+name: NivaaroFix Monorepo CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate-and-test:
+    name: Build, Test & Validate Monorepo
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: nivaarofix_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: |
+          npm install
+          npm --prefix backend install
+          npm --prefix Dashboard install
+          npm --prefix WebLogin install
+
+      - name: Run Backend & Monorepo Test Suites
+        run: |
+          npm run test:all
+        env:
+          PG_HOST: localhost
+          PG_PORT: 5432
+          PG_USER: postgres
+          PG_PASSWORD: root
+          PG_DATABASE: nivaarofix_db
+          PORT: 5000
+
+      - name: Build Production Frontend Bundles (Vite)
+        run: |
+          npm run build:all
