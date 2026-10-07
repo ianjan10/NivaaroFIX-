@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { usePartner } from '../context/PartnerContext';
 import { useLanguage } from '../context/LanguageContext';
 import { evaluateAgentChecklist } from '../utils/profileStrength';
 import BookingToast from '../components/BookingToast';
 import '../styles/PartnerConsole.css';
+
+const API_BASE = 'http://localhost:5000/api';
 
 /**
  * Format distance cleanly:
@@ -19,6 +21,77 @@ function formatDistance(distKm) {
     return `~${meters} m away`;
   }
   return `~${km.toFixed(1)} km away`;
+}
+
+function getServiceIcon(category, serviceTitle) {
+  const cat = `${category || ''} ${serviceTitle || ''}`.toLowerCase();
+  if (cat.includes('plumb') || cat.includes('pipe') || cat.includes('leak') || cat.includes('drain') || cat.includes('tap') || cat.includes('faucet')) {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+      </svg>
+    );
+  }
+  if (cat.includes('elect') || cat.includes('switch') || cat.includes('wire') || cat.includes('mcb') || cat.includes('power') || cat.includes('light')) {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
+    );
+  }
+  if (cat.includes('ac') || cat.includes('appliance') || cat.includes('ro') || cat.includes('refrigerat') || cat.includes('cooler') || cat.includes('purifier') || cat.includes('machine')) {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <line x1="4" y1="9" x2="20" y2="9" />
+        <circle cx="8" cy="6.5" r="1" fill="currentColor" />
+        <circle cx="11" cy="6.5" r="1" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (cat.includes('carpent') || cat.includes('wood') || cat.includes('furnit') || cat.includes('door') || cat.includes('lock')) {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </svg>
+  );
+}
+
+function StarRatingIcons({ rating }) {
+  const numeric = Number(rating);
+  const isRated = !isNaN(numeric) && numeric > 0;
+  const rounded = isRated ? Math.min(5, Math.max(1, Math.round(numeric))) : 0;
+
+  return (
+    <div className="pro-stars-row" title={isRated ? `${numeric.toFixed(1)} out of 5 stars` : 'Pending customer rating'}>
+      {[1, 2, 3, 4, 5].map((starIdx) => {
+        const isFilled = isRated && starIdx <= rounded;
+        return (
+          <svg
+            key={starIdx}
+            viewBox="0 0 24 24"
+            width="13"
+            height="13"
+            className={`pro-star-icon ${isFilled ? 'filled' : 'outline'}`}
+            fill={isFilled ? 'var(--pro-accent)' : 'none'}
+            stroke={isFilled ? 'var(--pro-accent)' : 'var(--pro-text-muted)'}
+            strokeWidth={isFilled ? '1' : '1.8'}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function PartnerConsolePage({ agent: propAgent }) {
@@ -66,7 +139,66 @@ export default function PartnerConsolePage({ agent: propAgent }) {
 
   const [withdrawSuccessMsg, setWithdrawSuccessMsg] = useState('');
   const [eligibilityNoticeMsg, setEligibilityNoticeMsg] = useState('');
-  const [activeTab, setActiveTab] = useState('feed'); // 'feed' | 'payouts'
+  const [activeTab, setActiveTab] = useState('feed'); // 'feed' | 'completed' | 'payouts'
+
+  // Real database-backed completed jobs & customer reviews
+  const [pastJobs, setPastJobs] = useState([]);
+  const [pastJobsLoading, setPastJobsLoading] = useState(false);
+  const [customerReviews, setCustomerReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  // Completed Jobs Filter, Sort & Interactive Accordion State
+  const [completedSort, setCompletedSort] = useState('recent'); // 'recent' | 'highest_rated' | 'lowest_rated'
+  const [completedRatingFilter, setCompletedRatingFilter] = useState('all'); // 'all' | '5' | '4_below'
+  const [expandedJobIds, setExpandedJobIds] = useState(new Set());
+
+  const toggleJobExpanded = (jobId) => {
+    setExpandedJobIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  };
+
+  const loadPastJobs = useCallback(async (email) => {
+    if (!email) return;
+    setPastJobsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/agents/completed-jobs/${encodeURIComponent(email)}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.jobs)) {
+        setPastJobs(data.jobs);
+      } else {
+        setPastJobs([]);
+      }
+    } catch {
+      setPastJobs([]);
+    } finally {
+      setPastJobsLoading(false);
+    }
+  }, []);
+
+  const loadCustomerReviews = useCallback(async (email) => {
+    if (!email) return;
+    setReviewsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/agents/reviews/${encodeURIComponent(email)}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.reviews)) {
+        setCustomerReviews(data.reviews);
+      } else {
+        setCustomerReviews([]);
+      }
+    } catch {
+      setCustomerReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, []);
 
   // 10-Second Toast Alert Queue (per user requirement: 10s pop message on interaction)
   const [toasts, setToasts] = useState([]);
@@ -111,7 +243,58 @@ export default function PartnerConsolePage({ agent: propAgent }) {
     currentAgent?.name || (currentAgent?.isLoggedIn ? 'Registered Partner' : 'Professional Partner')
   );
   const partnerId = currentAgent?.partnerId || currentAgent?.partner_id || (currentAgent?.isLoggedIn ? '202500001' : 'ID Pending');
-  const partnerHub = currentAgent?.city ? `${currentAgent.city} ${t.proHubLabel || 'Hub'}` : (currentAgent?.state ? `${currentAgent.state} ${t.proHubLabel || 'Hub'}` : (t.proHubPending || 'Hub Pending'));
+  const formatPrecisePartnerLocation = (agent) => {
+    if (!agent) return t.proLocationPending || 'Location Pending';
+
+    // 1. If explicit address exists (e.g. "Dilshad Garden, Delhi, Delhi 110095")
+    if (agent.address) {
+      const cleaned = agent.address
+        .replace(/\b\d{6}\b/g, '') // remove postal code
+        .replace(/\b(Hub|hub)\b/gi, '') // remove hub word
+        .replace(/,\s*,/g, ',')
+        .trim();
+      
+      const parts = cleaned.split(',').map((p) => p.trim()).filter(Boolean);
+      const uniqueParts = [];
+      for (const p of parts) {
+        if (!uniqueParts.some((u) => u.toLowerCase() === p.toLowerCase())) {
+          uniqueParts.push(p);
+        }
+      }
+      if (uniqueParts.length >= 2) {
+        return `${uniqueParts[0]}, ${uniqueParts[1]}`;
+      }
+      if (uniqueParts.length === 1) {
+        return uniqueParts[0];
+      }
+    }
+
+    // 2. If locality exists
+    if (agent.locality) {
+      const loc = agent.locality.replace(/\b(Hub|hub)\b/gi, '').trim();
+      const ct = (agent.city || '').replace(/\b(Hub|hub)\b/gi, '').trim();
+      if (loc && ct && !ct.toLowerCase().includes(loc.toLowerCase())) {
+        return `${loc}, ${ct}`;
+      }
+      if (loc) return loc;
+    }
+
+    // 3. If city exists
+    if (agent.city) {
+      const cleanCity = agent.city.replace(/\b(Hub|hub)\b/gi, '').trim();
+      if (cleanCity) return cleanCity;
+    }
+
+    // 4. If state exists
+    if (agent.state) {
+      const cleanState = agent.state.replace(/\b(Hub|hub)\b/gi, '').trim();
+      if (cleanState) return cleanState;
+    }
+
+    return t.proLocationPending || 'Location Pending';
+  };
+
+  const partnerLocation = formatPrecisePartnerLocation(currentAgent);
   const partnerTrade = currentAgent?.trade === 'plumber' 
     ? (t.proTradePlumber || 'Plumber') 
     : (currentAgent?.trade ? formatTitleCase(currentAgent.trade) : (t.proTradeElectrician || 'Electrician'));
@@ -126,16 +309,28 @@ export default function PartnerConsolePage({ agent: propAgent }) {
   // Load provider data & auto-fetch live GPS on mount / agent change
   useEffect(() => {
     if (currentAgent?.email) {
-      loadProviderProfile(currentAgent.email);
+      loadProviderProfile(currentAgent.email).then((profile) => {
+        if (profile) {
+          setCurrentAgent((prev) => {
+            const merged = { ...prev, ...profile };
+            try {
+              localStorage.setItem('nivaaro-agent', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      });
       loadActiveJob(currentAgent.email);
       loadWallet(currentAgent.email);
+      loadPastJobs(currentAgent.email);
+      loadCustomerReviews(currentAgent.email);
       if (autoFetchAndConnectLocation) {
         autoFetchAndConnectLocation(currentAgent.email, currentAgent.city || 'Bengaluru');
       } else {
         loadNearbyRequests(currentAgent.email, currentAgent.lat, currentAgent.lng);
       }
     }
-  }, [currentAgent, loadProviderProfile, loadActiveJob, loadWallet, loadNearbyRequests, autoFetchAndConnectLocation]);
+  }, [currentAgent?.email, loadProviderProfile, loadActiveJob, loadWallet, loadPastJobs, loadCustomerReviews, loadNearbyRequests, autoFetchAndConnectLocation]);
 
   // Real-time automatic background polling (every 3 seconds - no manual refresh needed)
   useEffect(() => {
@@ -495,6 +690,72 @@ export default function PartnerConsolePage({ agent: propAgent }) {
     }
   };
 
+  // Merged Completed Jobs with Ratings & Written Feedback
+  const mergedJobs = pastJobs.map((job, idx) => {
+    let rating = job.rating;
+    let feedback = job.feedback;
+    let tags = job.tags || [];
+
+    if (!feedback || rating === null || rating === undefined) {
+      const matchedReview = customerReviews.find(
+        (r) => (r.bookingRef && r.bookingRef === job.bookingRef) ||
+               (r.customerName && job.customerName && r.customerName.toLowerCase() === job.customerName.toLowerCase())
+      ) || (customerReviews.length === pastJobs.length ? customerReviews[idx] : null);
+
+      if (matchedReview) {
+        if (rating === null || rating === undefined) rating = matchedReview.rating;
+        if (!feedback) feedback = matchedReview.feedback;
+        if ((!tags || tags.length === 0) && Array.isArray(matchedReview.tags)) tags = matchedReview.tags;
+      }
+    }
+
+    return {
+      ...job,
+      rating: rating !== null && rating !== undefined ? Number(rating) : null,
+      feedback: feedback || '',
+      tags: tags || []
+    };
+  });
+
+  const totalCompletedCount = mergedJobs.length;
+  const ratedJobs = mergedJobs.filter((j) => j.rating && Number(j.rating) > 0);
+  const avgRatingNum = ratedJobs.length > 0
+    ? (ratedJobs.reduce((sum, j) => sum + Number(j.rating), 0) / ratedJobs.length).toFixed(1)
+    : (currentAgent?.rating ? Number(currentAgent.rating).toFixed(1) : null);
+
+  const now = new Date();
+  const curMonth = now.getMonth();
+  const curYear = now.getFullYear();
+  const thisMonthCount = mergedJobs.filter((j) => {
+    if (!j.completedAt) return false;
+    const d = new Date(j.completedAt);
+    return !isNaN(d.getTime()) && d.getMonth() === curMonth && d.getFullYear() === curYear;
+  }).length;
+
+  const filteredAndSortedJobs = [...mergedJobs]
+    .filter((job) => {
+      if (completedRatingFilter === 'all') return true;
+      const r = Number(job.rating);
+      if (completedRatingFilter === '5') return r >= 5;
+      if (completedRatingFilter === '4_below') return r && r <= 4;
+      return true;
+    })
+    .sort((a, b) => {
+      if (completedSort === 'highest_rated') {
+        const rA = Number(a.rating) || 0;
+        const rB = Number(b.rating) || 0;
+        if (rB !== rA) return rB - rA;
+      }
+      if (completedSort === 'lowest_rated') {
+        const rA = Number(a.rating) || 0;
+        const rB = Number(b.rating) || 0;
+        if (rA !== rB) return rA - rB;
+      }
+      const dateA = new Date(a.completedAt || a.createdAt || 0).getTime();
+      const dateB = new Date(b.completedAt || b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
+
   return (
     <div className="pro-console-container">
       {/* ================= 1. MINIMAL HEADER BAR ================= */}
@@ -551,7 +812,7 @@ export default function PartnerConsolePage({ agent: propAgent }) {
                 className="pro-meta-hub"
                 title={providerLocation?.lat ? `GPS: ${providerLocation.lat.toFixed(4)}, ${providerLocation.lng.toFixed(4)}` : (t.proLocationActive || 'Location Active')}
               >
-                {partnerHub}
+                {partnerLocation}
               </span>
             </div>
           </div>
@@ -730,7 +991,7 @@ export default function PartnerConsolePage({ agent: propAgent }) {
             <span className="pro-stat-label">{t.proServiceRating || 'Service Rating'}</span>
           </div>
           <div className="pro-stat-value-row">
-            {currentAgent?.rating && Number(currentAgent.rating) > 0 ? (
+            {currentAgent?.rating && Number(currentAgent.rating) > 0 && (completedJobsCount > 0 || pastJobs.length > 0) ? (
               <span className="pro-stat-number rating-val">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="none">
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -743,9 +1004,9 @@ export default function PartnerConsolePage({ agent: propAgent }) {
           </div>
           <div className="pro-stat-caption">
             <span>
-              {currentAgent?.rating && Number(currentAgent.rating) > 0
+              {currentAgent?.rating && Number(currentAgent.rating) > 0 && (completedJobsCount > 0 || pastJobs.length > 0)
                 ? (t.proRatingVerified || 'Customer verified score')
-                : (t.proNoReviewsYet || 'No reviews logged yet')}
+                : (t.proNoReviewsYet || 'No customer reviews yet')}
             </span>
           </div>
         </div>
@@ -930,6 +1191,20 @@ export default function PartnerConsolePage({ agent: propAgent }) {
         </button>
         <button
           type="button"
+          className={`pro-tab-item ${activeTab === 'completed' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('completed');
+            if (currentAgent?.email) {
+              loadPastJobs(currentAgent.email);
+              loadCustomerReviews(currentAgent.email);
+            }
+          }}
+        >
+          <span>{t.proTabCompletedJobs || 'Completed Jobs'}</span>
+          <span className="pro-tab-count">{pastJobs.length}</span>
+        </button>
+        <button
+          type="button"
           className={`pro-tab-item ${activeTab === 'payouts' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('payouts');
@@ -1100,7 +1375,357 @@ export default function PartnerConsolePage({ agent: propAgent }) {
       )}
 
 
-      {/* ================= TAB 2: FINANCIAL EARNINGS & PAYOUTS ================= */}
+      {/* ================= TAB 2: COMPLETED JOBS (MERGED & EXPANDABLE) ================= */}
+      {activeTab === 'completed' && (
+        <div className="pro-ledger-container">
+          {/* Header Toolbar: Single clean title & subtitle */}
+          <div className="pro-ledger-toolbar">
+            <div className="pro-ledger-header-meta">
+              <h3 className="pro-ledger-title">Completed Jobs</h3>
+              <p className="pro-ledger-desc">
+                Verified via customer door OTP, with ratings and feedback.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="pro-btn-secondary-ghost"
+              onClick={() => {
+                if (currentAgent?.email) {
+                  loadPastJobs(currentAgent.email);
+                  loadCustomerReviews(currentAgent.email);
+                }
+              }}
+              disabled={pastJobsLoading || reviewsLoading}
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              <span>{pastJobsLoading || reviewsLoading ? 'Refreshing...' : 'Refresh History'}</span>
+            </button>
+          </div>
+
+          {/* Compact Summary Bar (Top of Panel) */}
+          <div className="pro-completed-summary-bar">
+            <div className="pro-summary-stat-cell">
+              <span className="pro-summary-stat-label">Total Completed Jobs</span>
+              <div className="pro-summary-stat-value">
+                {totalCompletedCount}
+              </div>
+              <span className="pro-summary-stat-sub">Verified doorstep deliveries</span>
+            </div>
+
+            <div className="pro-summary-stat-cell">
+              <span className="pro-summary-stat-label">Average Customer Rating</span>
+              <div className="pro-summary-stat-value accented">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="var(--pro-accent)" stroke="var(--pro-accent)" strokeWidth="1" aria-hidden="true">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+                <span>{avgRatingNum ? `${avgRatingNum} / 5.0` : '—'}</span>
+              </div>
+              <span className="pro-summary-stat-sub">
+                {ratedJobs.length > 0
+                  ? `Based on ${ratedJobs.length} verified review${ratedJobs.length === 1 ? '' : 's'}`
+                  : 'Awaiting initial customer ratings'}
+              </span>
+            </div>
+
+            <div className="pro-summary-stat-cell">
+              <span className="pro-summary-stat-label">This Month's Completed</span>
+              <div className="pro-summary-stat-value">
+                {thisMonthCount}
+              </div>
+              <span className="pro-summary-stat-sub">Current settlement period</span>
+            </div>
+          </div>
+
+          {/* Lightweight Filter & Sort Controls */}
+          <div className="pro-completed-controls-bar">
+            <div className="pro-filter-chips-group">
+              <button
+                type="button"
+                className={`pro-filter-chip ${completedRatingFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setCompletedRatingFilter('all')}
+              >
+                <span>All Jobs</span>
+                <span>({mergedJobs.length})</span>
+              </button>
+              <button
+                type="button"
+                className={`pro-filter-chip ${completedRatingFilter === '5' ? 'active' : ''}`}
+                onClick={() => setCompletedRatingFilter('5')}
+              >
+                <span>5 Stars</span>
+                <span>({mergedJobs.filter((j) => Number(j.rating) >= 5).length})</span>
+              </button>
+              <button
+                type="button"
+                className={`pro-filter-chip ${completedRatingFilter === '4_below' ? 'active' : ''}`}
+                onClick={() => setCompletedRatingFilter('4_below')}
+              >
+                <span>4 Stars &amp; Below</span>
+                <span>({mergedJobs.filter((j) => j.rating && Number(j.rating) <= 4).length})</span>
+              </button>
+            </div>
+
+            <div className="pro-sort-dropdown-wrap">
+              <label htmlFor="pro-job-sort-select" className="pro-sort-label">Sort by:</label>
+              <select
+                id="pro-job-sort-select"
+                className="pro-sort-select"
+                value={completedSort}
+                onChange={(e) => setCompletedSort(e.target.value)}
+              >
+                <option value="recent">Most Recent</option>
+                <option value="highest_rated">Highest Rated</option>
+                <option value="lowest_rated">Lowest Rated</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Job List / Loading / Empty States */}
+          {pastJobsLoading ? (
+            <div className="pro-ledger-empty-state">
+              <div className="pro-empty-icon-radar">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
+              <h4 className="pro-ledger-empty-title">Loading Job History...</h4>
+            </div>
+          ) : mergedJobs.length === 0 ? (
+            <div className="pro-ledger-empty-state">
+              <div className="pro-ledger-empty-icon">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+              </div>
+              <h4 className="pro-ledger-empty-title">No completed jobs yet</h4>
+              <p className="pro-ledger-empty-desc">
+                Verified doorstep repair jobs completed via customer 4-digit OTP will appear here in your verified ledger.
+              </p>
+              <div className="pro-ledger-empty-meta">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span>Doorstep 4-digit OTP verification ensures fraud-proof completion</span>
+              </div>
+            </div>
+          ) : filteredAndSortedJobs.length === 0 ? (
+            <div className="pro-ledger-empty-state" style={{ padding: '2.5rem 1.5rem' }}>
+              <h4 className="pro-ledger-empty-title">No completed jobs match this filter</h4>
+              <p className="pro-ledger-empty-desc">
+                Try switching to "All Jobs" to view your full verified service ledger.
+              </p>
+              <button
+                type="button"
+                className="pro-btn-secondary-ghost"
+                onClick={() => setCompletedRatingFilter('all')}
+              >
+                Clear Filter
+              </button>
+            </div>
+          ) : (
+            <div className="pro-completed-jobs-list">
+              {filteredAndSortedJobs.map((job) => {
+                const jobKey = job.id || job.bookingRef;
+                const isExpanded = expandedJobIds.has(jobKey);
+                const hasWrittenFeedback = Boolean(job.feedback && job.feedback.trim());
+                const refId = job.bookingRef || `JOB-${job.id}`;
+
+                return (
+                  <div
+                    key={jobKey}
+                    className={`pro-completed-job-card ${isExpanded ? 'expanded' : ''}`}
+                  >
+                    {/* Collapsed One Clean Row Header */}
+                    <button
+                      type="button"
+                      className="pro-job-row-header"
+                      onClick={() => toggleJobExpanded(jobKey)}
+                      aria-expanded={isExpanded}
+                    >
+                      {/* 1. Service Type + Icon + Reference ID */}
+                      <div className="pro-job-service-col">
+                        <div className="pro-job-icon-box">
+                          {getServiceIcon(job.category, job.serviceTitle)}
+                        </div>
+                        <div className="pro-job-title-stack">
+                          <span className="pro-job-service-name" title={job.serviceTitle}>
+                            {job.serviceTitle}
+                          </span>
+                          <span className="pro-job-ref-tag">Ref: {refId}</span>
+                        </div>
+                      </div>
+
+                      {/* 2. Completion Date */}
+                      <div className="pro-job-date-col">
+                        <span className="pro-job-date-val">
+                          {job.completedAt
+                            ? new Date(job.completedAt).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              })
+                            : 'Completed'}
+                        </span>
+                        {job.completedAt && (
+                          <span className="pro-job-date-time">
+                            {new Date(job.completedAt).toLocaleTimeString('en-IN', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 3. Customer Star Rating (Star Icons, No numeric badge) */}
+                      <div className="pro-job-rating-col">
+                        <StarRatingIcons rating={job.rating} />
+                        <span className="pro-rating-subtext">
+                          {job.rating ? `${Number(job.rating).toFixed(1)} Rating` : 'Unrated'}
+                        </span>
+                      </div>
+
+                      {/* 4. Payout Amount */}
+                      <div className="pro-job-payout-col">
+                        <span className="pro-job-payout-val">
+                          ₹{parseFloat(job.amount || 0).toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </span>
+                        <span className="pro-job-payout-status">Settled</span>
+                      </div>
+
+                      {/* 5. Chevron Toggle */}
+                      <div className="pro-job-chevron-col" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </div>
+                    </button>
+
+                    {/* Accordion Expandable Body (Smooth ~200ms) */}
+                    <div className={`pro-job-accordion-body ${isExpanded ? 'open' : ''}`}>
+                      <div className="pro-job-accordion-inner">
+                        <div className="pro-job-expanded-content">
+                          {/* Written Feedback (Silently collapsed if none) */}
+                          {hasWrittenFeedback && (
+                            <div className="pro-job-feedback-box">
+                              <div className="pro-job-feedback-header">
+                                <span className="pro-job-feedback-customer">
+                                  Customer Review · {job.customerName || 'Verified Customer'}
+                                </span>
+                                <span className="pro-job-feedback-verified-tag">
+                                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                  Verified Service
+                                </span>
+                              </div>
+                              <p className="pro-job-feedback-text">
+                                "{job.feedback.trim()}"
+                              </p>
+                              {Array.isArray(job.tags) && job.tags.length > 0 && (
+                                <div className="pro-job-feedback-tags">
+                                  {job.tags.map((tag, tIdx) => (
+                                    <span key={tIdx} className="pro-job-feedback-tag">{tag}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Details Grid: Address, OTP Timestamp, Payout Breakdown */}
+                          <div className="pro-job-details-grid">
+                            {/* Service Address */}
+                            <div className="pro-job-detail-card">
+                              <div className="pro-job-detail-label">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                  <circle cx="12" cy="10" r="3" />
+                                </svg>
+                                <span>Service Address</span>
+                              </div>
+                              <div className="pro-job-detail-val">
+                                {job.serviceAddress || 'Customer Doorstep Location'}
+                              </div>
+                              <div className="pro-job-detail-sub">
+                                Customer: {job.customerName || 'Verified Customer'}
+                              </div>
+                            </div>
+
+                            {/* OTP Verified Completion */}
+                            <div className="pro-job-detail-card">
+                              <div className="pro-job-detail-label">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                  <polyline points="9 12 11 14 15 10" />
+                                </svg>
+                                <span>Door OTP Verified</span>
+                              </div>
+                              <div className="pro-job-detail-val">
+                                {job.otpVerifiedAt || job.completedAt
+                                  ? new Date(job.otpVerifiedAt || job.completedAt).toLocaleString('en-IN', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                  : 'Verified at Doorstep'}
+                              </div>
+                              <div className="pro-job-detail-sub pro-job-otp-badge">
+                                4-digit customer security PIN verified
+                              </div>
+                            </div>
+
+                            {/* Payout Breakdown */}
+                            <div className="pro-job-detail-card">
+                              <div className="pro-job-detail-label">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <rect x="2" y="4" width="20" height="16" rx="2" />
+                                  <line x1="2" y1="10" x2="22" y2="10" />
+                                </svg>
+                                <span>Payout Breakdown</span>
+                              </div>
+                              <div className="pro-job-payout-breakdown">
+                                <div className="pro-payout-line">
+                                  <span>Gross Fare</span>
+                                  <span>₹{parseFloat(job.amount || 0).toFixed(2)}</span>
+                                </div>
+                                <div className="pro-payout-line">
+                                  <span>Platform Fee</span>
+                                  <span className="pro-payout-free">₹0.00 (Zero Fee)</span>
+                                </div>
+                                <div className="pro-payout-line total">
+                                  <span>Net Credited</span>
+                                  <span className="pro-payout-credited">₹{parseFloat(job.amount || 0).toFixed(2)}</span>
+                                </div>
+                                <div className="pro-payout-method-tag">
+                                  {job.paymentMethod || 'UPI / Cash on completion'}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================= TAB 3: FINANCIAL EARNINGS & PAYOUTS ================= */}
       {activeTab === 'payouts' && (
         <div className="pro-ledger-panel">
           <div className="pro-ledger-header">

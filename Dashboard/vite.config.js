@@ -7,6 +7,10 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    open: false
+    open: false,
+    fs: {
+      strict: false,
+      allow: ['..', 'C:/NivaaroFIX-', 'D:/My Project']
+    }
   }
 });

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supportedLanguages, translations } from '../data/languageData';
+import universalTranslator from '../services/universalTranslator';
 
 export { supportedLanguages, translations };
 
@@ -27,7 +28,7 @@ export function LanguageProvider({ children }) {
         return urlLang;
       }
       // 2. Check localStorage
-      const savedLang = localStorage.getItem('nivaarofix-lang');
+      const savedLang = localStorage.getItem('nivaarofix-lang') || localStorage.getItem('nivaaro-lang');
       if (savedLang && translations[savedLang]) {
         return savedLang;
       }
@@ -39,10 +40,11 @@ export function LanguageProvider({ children }) {
 
   const [isLangModalOpen, setIsLangModalOpen] = useState(false);
 
-  // Sync to localStorage, document lang, and URL params
+  // Sync to universal DOM translator, localStorage, document lang, and URL params
   useEffect(() => {
     try {
       localStorage.setItem('nivaarofix-lang', activeLanguage);
+      localStorage.setItem('nivaaro-lang', activeLanguage);
       document.documentElement.lang = activeLanguage;
 
       const currentUrl = new URL(window.location.href);
@@ -50,6 +52,9 @@ export function LanguageProvider({ children }) {
         currentUrl.searchParams.set('lang', activeLanguage);
         window.history.replaceState({}, '', currentUrl.toString());
       }
+
+      // Trigger world-class universal DOM translation engine across all elements & text
+      universalTranslator.setLanguage(activeLanguage);
     } catch (e) {
       console.warn('Language sync error:', e);
     }
@@ -71,10 +76,12 @@ export function LanguageProvider({ children }) {
       setActiveLanguage(code);
       try {
         localStorage.setItem('nivaarofix-lang', code);
+        localStorage.setItem('nivaaro-lang', code);
         document.documentElement.lang = code;
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('lang', code);
         window.history.replaceState({}, '', currentUrl.toString());
+        universalTranslator.setLanguage(code);
       } catch (e) {
         console.warn('LocalStorage write error:', e);
       }

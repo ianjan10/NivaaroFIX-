@@ -122,17 +122,18 @@ export default function TopNavbar({
           {/* Language Switcher */}
           <button
             type="button"
-            className="nav-btn-subtle nav-lang-trigger"
+            className="nav-btn-subtle nav-lang-trigger notranslate ignore"
             onClick={() => setIsLangModalOpen(true)}
             title="Select language / भाषा चुनें"
             aria-label="Select language"
+            data-no-translate="true"
           >
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <line x1="2" y1="12" x2="22" y2="12" />
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
             </svg>
-            <span>{(activeLanguage || 'en').toUpperCase()}</span>
+            <span className="notranslate ignore" data-no-translate="true">{(activeLanguage || 'en').toUpperCase()}</span>
           </button>
 
           {/* Help Helpline Dropdown */}

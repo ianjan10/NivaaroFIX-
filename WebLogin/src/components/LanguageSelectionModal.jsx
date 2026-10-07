@@ -32,15 +32,16 @@ export default function LanguageSelectionModal() {
           </button>
         </div>
 
-        <div className="uber-lang-grid">
+        <div className="uber-lang-grid notranslate ignore" data-no-translate="true">
           {supportedLanguages.map((lang) => {
             const isSelected = activeLanguage === lang.code;
             return (
               <button
                 key={lang.code}
                 type="button"
-                className={`uber-lang-item ${isSelected ? 'active' : ''}`}
+                className={`uber-lang-item notranslate ignore ${isSelected ? 'active' : ''}`}
                 onClick={() => selectLanguage(lang.code)}
+                data-no-translate="true"
               >
                 <div className="uber-lang-names">
                   <span className="uber-lang-native">{lang.nativeName}</span>

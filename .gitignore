@@ -41,6 +41,11 @@ coverage/
 *.crt
 id_rsa*
 *.sql
+pgsql18/
+data/
+postgres_data/
+*.pid
+*.opts
 
 # Local User Uploads (Dynamic customer photos & test attachments)
 backend/uploads/booking_photos/*

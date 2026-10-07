@@ -1365,6 +1365,545 @@ body.dark-theme .pro-btn-complete-profile:hover {
   color: var(--pro-text-secondary);
 }
 
+/* ==========================================================================
+   Completed Jobs Merged Tab (Interactive Expandable Design)
+   ========================================================================== */
+.pro-ledger-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.pro-ledger-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.pro-ledger-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pro-ledger-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--pro-text-main);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.pro-ledger-desc {
+  font-size: 0.84rem;
+  color: var(--pro-text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ---------------- Compact Summary Bar ---------------- */
+.pro-completed-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--pro-surface);
+  border: 1px solid var(--pro-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pro-summary-stat-cell {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-right: 1px solid var(--pro-border);
+}
+
+.pro-summary-stat-cell:last-child {
+  border-right: none;
+}
+
+.pro-summary-stat-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pro-text-secondary);
+}
+
+.pro-summary-stat-value {
+  font-family: var(--font-mono, monospace);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--pro-text-main);
+  letter-spacing: -0.03em;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  line-height: 1.1;
+}
+
+.pro-summary-stat-value.accented {
+  color: var(--pro-accent);
+}
+
+.pro-summary-stat-sub {
+  font-size: 0.75rem;
+  color: var(--pro-text-muted);
+}
+
+/* ---------------- Filter & Sort Controls ---------------- */
+.pro-completed-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.25rem 0;
+}
+
+.pro-filter-chips-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pro-filter-chip {
+  background: var(--pro-surface);
+  border: 1px solid var(--pro-border);
+  color: var(--pro-text-secondary);
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pro-filter-chip:hover {
+  background: var(--pro-surface-hover);
+  color: var(--pro-text-main);
+}
+
+.pro-filter-chip.active {
+  background: var(--pro-accent-subtle);
+  border-color: var(--pro-accent);
+  color: var(--pro-accent);
+  font-weight: 600;
+}
+
+.pro-sort-dropdown-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pro-sort-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--pro-text-secondary);
+}
+
+.pro-sort-select {
+  background: var(--pro-surface);
+  border: 1px solid var(--pro-border);
+  color: var(--pro-text-main);
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 150ms ease;
+}
+
+.pro-sort-select:focus {
+  border-color: var(--pro-accent);
+}
+
+/* ---------------- Merged Completed Job Cards ---------------- */
+.pro-completed-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pro-completed-job-card {
+  background: var(--pro-surface);
+  border: 1px solid var(--pro-border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.pro-completed-job-card:hover {
+  border-color: var(--pro-accent-border);
+}
+
+.pro-completed-job-card.expanded {
+  border-color: var(--pro-accent-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+/* Collapsed Single Clean Row */
+.pro-job-row-header {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 2.2fr 1.1fr 1fr 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  transition: background 150ms ease;
+}
+
+.pro-job-row-header:hover {
+  background: var(--pro-surface-hover);
+}
+
+.pro-completed-job-card.expanded .pro-job-row-header {
+  background: var(--pro-surface-subtle);
+  border-bottom: 1px solid var(--pro-border);
+}
+
+/* Service Type + Icon */
+.pro-job-service-col {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.pro-job-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--pro-accent-subtle);
+  color: var(--pro-accent);
+  border: 1px solid var(--pro-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pro-job-title-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.pro-job-service-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--pro-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pro-job-ref-tag {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  color: var(--pro-text-muted);
+}
+
+/* Completion Date Col */
+.pro-job-date-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.pro-job-date-val {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--pro-text-main);
+}
+
+.pro-job-date-time {
+  font-size: 0.72rem;
+  color: var(--pro-text-muted);
+}
+
+/* Star Rating Col */
+.pro-job-rating-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pro-stars-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pro-star-icon {
+  flex-shrink: 0;
+}
+
+.pro-star-icon.filled {
+  color: var(--pro-accent);
+}
+
+.pro-star-icon.outline {
+  color: var(--pro-text-muted);
+}
+
+.pro-rating-subtext {
+  font-size: 0.7rem;
+  color: var(--pro-text-muted);
+}
+
+/* Payout Col */
+.pro-job-payout-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+
+.pro-job-payout-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--pro-accent);
+  letter-spacing: -0.02em;
+}
+
+.pro-job-payout-status {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--pro-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Chevron */
+.pro-job-chevron-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pro-text-muted);
+  transition: transform 200ms ease, color 150ms ease;
+}
+
+.pro-completed-job-card.expanded .pro-job-chevron-col {
+  transform: rotate(180deg);
+  color: var(--pro-accent);
+}
+
+/* Accordion Smooth Body (~200ms) */
+.pro-job-accordion-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms ease;
+}
+
+.pro-job-accordion-body.open {
+  grid-template-rows: 1fr;
+}
+
+.pro-job-accordion-inner {
+  overflow: hidden;
+  transition: opacity 200ms ease;
+  opacity: 0;
+}
+
+.pro-job-accordion-body.open .pro-job-accordion-inner {
+  opacity: 1;
+}
+
+/* Expanded Content */
+.pro-job-expanded-content {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: var(--pro-surface);
+}
+
+/* Customer Feedback Box */
+.pro-job-feedback-box {
+  background: var(--pro-surface-subtle);
+  border: 1px solid var(--pro-border);
+  border-left: 3px solid var(--pro-accent);
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.pro-job-feedback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pro-job-feedback-customer {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--pro-text-main);
+}
+
+.pro-job-feedback-verified-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--pro-accent);
+}
+
+.pro-job-feedback-text {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--pro-text-secondary);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.pro-job-feedback-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.pro-job-feedback-tag {
+  font-size: 0.72rem;
+  background: var(--pro-surface);
+  border: 1px solid var(--pro-border);
+  color: var(--pro-text-secondary);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* Details Grid: Address, OTP, Payout Breakdown */
+.pro-job-details-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+}
+
+.pro-job-detail-card {
+  background: var(--pro-surface-subtle);
+  border: 1px solid var(--pro-border);
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pro-job-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pro-text-secondary);
+}
+
+.pro-job-detail-val {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--pro-text-main);
+  line-height: 1.35;
+}
+
+.pro-job-detail-sub {
+  font-size: 0.75rem;
+  color: var(--pro-text-muted);
+}
+
+.pro-job-otp-badge {
+  color: var(--pro-accent);
+  font-weight: 500;
+}
+
+/* Payout Breakdown */
+.pro-job-payout-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
+.pro-payout-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--pro-text-secondary);
+}
+
+.pro-payout-line.total {
+  font-weight: 600;
+  color: var(--pro-text-main);
+  padding-top: 0.35rem;
+  border-top: 1px dashed var(--pro-border);
+}
+
+.pro-payout-free {
+  color: var(--pro-accent);
+  font-weight: 600;
+}
+
+.pro-payout-credited {
+  color: var(--pro-accent);
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+}
+
+.pro-payout-method-tag {
+  font-size: 0.7rem;
+  color: var(--pro-text-muted);
+  margin-top: 0.2rem;
+}
+
+@media (max-width: 900px) {
+  .pro-completed-summary-bar {
+    grid-template-columns: 1fr;
+  }
+  .pro-summary-stat-cell {
+    border-right: none;
+    border-bottom: 1px solid var(--pro-border);
+  }
+  .pro-summary-stat-cell:last-child {
+    border-bottom: none;
+  }
+  .pro-job-details-grid {
+    grid-template-columns: 1fr;
+  }
+  .pro-job-row-header {
+    grid-template-columns: 1fr auto;
+    gap: 0.65rem;
+  }
+  .pro-job-date-col,
+  .pro-job-rating-col {
+    display: none;
+  }
+}
+
 /* -------------------- 10. Quote Modal -------------------- */
 .pro-modal-backdrop {
   position: fixed;

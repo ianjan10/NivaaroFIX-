@@ -191,13 +191,12 @@ try {
   assert.equal(verifyAgentData.isPhoneVerified, true, 'Verify phone must set isPhoneVerified: true');
   console.log('  ✅ [PASS] POST /api/auth/verify-phone successfully verifies agent phone');
 
-  // Verify user's specific account from screenshot: kumar k (kumar@gmail.com, FIX-PRO-4572)
-  const kumarProfileRes = await fetch('http://localhost:5000/api/auth/agent-profile?email=kumar%40gmail.com');
-  const kumarProfileData = await kumarProfileRes.json();
-  assert.equal(kumarProfileRes.status, 200, 'Kumar profile endpoint must return 200');
-  assert.match(kumarProfileData.agent.partnerId, /^[0-9]{9}$/, 'Kumar partner ID must be a valid 9-digit format');
-  assert.equal(kumarProfileData.agent.partnerId, '202600009', 'Kumar partner ID must match migrated 9-digit ID 202600009');
-  console.log(`  ✅ [PASS] Professional account kumar k (kumar@gmail.com / ID: ${kumarProfileData.agent.partnerId}) is verified in DB: true`);
+  // Verify registered agent profile endpoint and 9-digit partner ID format
+  const registeredProfileRes = await fetch(`http://localhost:5000/api/auth/agent-profile?email=${encodeURIComponent(testAgentEmail)}`);
+  const registeredProfileData = await registeredProfileRes.json();
+  assert.equal(registeredProfileRes.status, 200, 'Agent profile endpoint must return 200');
+  assert.match(registeredProfileData.agent.partnerId, /^[0-9]{9}$/, 'Partner ID must be a valid 9-digit format');
+  console.log(`  ✅ [PASS] Professional account (${testAgentEmail} / ID: ${registeredProfileData.agent.partnerId}) is verified in DB: true`);
 
   // --- Cleanup: Remove test accounts created during this test run (prevents DB pollution) ---
   const { pool } = await import('../../backend/src/config/db.js');

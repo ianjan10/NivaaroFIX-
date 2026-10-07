@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "node src/server.js",
     "db:reset": "node --max-old-space-size=2048 src/db/reset.js",
+    "db:clean": "node src/db/clean_database.js",
     "test": "node --max-old-space-size=2048 tests/marketplace_dispatch_e2e.test.mjs",
     "test:all": "node --max-old-space-size=2048 tests/postgres_crud.test.mjs && node --max-old-space-size=2048 tests/oauth.test.mjs && node --max-old-space-size=2048 tests/real_booking_flow.test.mjs && node --max-old-space-size=2048 tests/marketplace_dispatch_e2e.test.mjs && node --max-old-space-size=2048 tests/gps_dispatch_quotation_e2e.test.mjs"
   },

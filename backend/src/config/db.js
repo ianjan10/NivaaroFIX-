@@ -230,22 +230,6 @@ export async function initDatabase() {
       );
       CREATE INDEX IF NOT EXISTS idx_agent_login_email ON agent_login(email);
       CREATE INDEX IF NOT EXISTS idx_agent_login_partner ON agent_login(partner_id);
-
-      INSERT INTO agent_login (
-        partner_id, name, email, phone, trade, experience_years,
-        state, city, address, kyc_status, rating, completed_jobs,
-        is_online, wallet_balance, availability_status, is_phone_verified, is_verified,
-        lat, lng, location_accuracy_m
-      ) VALUES (
-        '202600009', 'kumar k', 'kumar@gmail.com', '+91 9876543210', 'both', 8,
-        'Karnataka', 'Bengaluru', 'Indiranagar 100ft Road, Bengaluru', 'Verified', 4.95, 0,
-        true, 0.00, 'AVAILABLE', true, true,
-        12.9716, 77.5946, 10
-      ) ON CONFLICT (email) DO UPDATE SET
-        partner_id = EXCLUDED.partner_id,
-        name = EXCLUDED.name,
-        is_verified = true,
-        is_phone_verified = true;
     `);
 
     // 5. Customers Table
@@ -590,6 +574,7 @@ export async function initDatabase() {
 
       CREATE TABLE IF NOT EXISTS booking_photos (
         id                SERIAL PRIMARY KEY,
+        booking_id        INT REFERENCES bookings(id) ON DELETE CASCADE,
         booking_ref       VARCHAR(60),
         storage_path      TEXT,
         original_filename VARCHAR(255),
@@ -597,7 +582,9 @@ export async function initDatabase() {
         file_size         INT,
         uploaded_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE booking_photos ADD COLUMN IF NOT EXISTS booking_id INT REFERENCES bookings(id) ON DELETE CASCADE;
       CREATE INDEX IF NOT EXISTS idx_booking_photos_ref ON booking_photos(booking_ref);
+      CREATE INDEX IF NOT EXISTS idx_booking_photos_booking ON booking_photos(booking_id);
     `);
 
     // 14.1 Job Lifecycle Audit Trail

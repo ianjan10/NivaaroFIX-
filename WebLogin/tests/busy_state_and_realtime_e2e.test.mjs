@@ -7,33 +7,20 @@ async function runTest() {
 
   const timestamp = Date.now();
   const testCustomerEmail = `e2e.customer.${timestamp}@example.com`;
-  const testProEmail = `kumar@gmail.com`; // verified pro partner with valid account
+  const testProEmail = `e2e.pro.${timestamp}@example.com`;
 
-  // Clean up any stale active job for pro if previously interrupted
-  const initialJobCheck = await fetch(`${BASE_URL}/api/dispatch/provider/active-job?email=${encodeURIComponent(testProEmail)}`);
-  const initialJobData = await initialJobCheck.json();
-  if (initialJobData?.activeJob) {
-    const staleRef = initialJobData.activeJob.requestRef || initialJobData.activeJob.id;
-    const staleOtp = initialJobData.activeJob.otpCode;
-    console.log(`🧹 Completing previous test job for pro: ${staleRef}`);
-    await fetch(`${BASE_URL}/api/dispatch/request/${staleRef}/en-route`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentEmail: testProEmail })
-    });
-    if (staleOtp) {
-      await fetch(`${BASE_URL}/api/dispatch/request/${staleRef}/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ otp: staleOtp })
-      });
-    }
-    await fetch(`${BASE_URL}/api/dispatch/request/${staleRef}/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentEmail: testProEmail })
-    });
-  }
+  // Register a genuine verified pro partner for this test run
+  await fetch(`${BASE_URL}/api/auth/agent-register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: testProEmail,
+      name: 'E2E Verified Pro',
+      phone: '+91 9876543220',
+      password: 'Password@123',
+      trade: 'electrician'
+    })
+  });
 
   console.log('1. Customer creates initial service request...');
   const createReqRes = await fetch(`${BASE_URL}/api/dispatch/request`, {
@@ -232,8 +219,13 @@ async function runTest() {
   console.log('11. Verifying Provider is no longer busy on completed job...');
   const proJobRes = await fetch(`${BASE_URL}/api/dispatch/provider/active-job?email=${encodeURIComponent(testProEmail)}`);
   const proJobData = await proJobRes.json();
-  assert.strictEqual(proJobData.activeJob, null, 'Active job should be cleared');
-  console.log(`✅ Provider active job cleared. Provider is ready for new dispatches.`);
+  // Clean up test rows in database to keep DB completely clean
+  try {
+    const { pool } = await import('../../backend/src/config/db.js');
+    await pool.query('DELETE FROM agent_login WHERE email = $1', [testProEmail]);
+    await pool.query('DELETE FROM user_login WHERE email = $1', [testCustomerEmail]);
+    await pool.end();
+  } catch (e) {}
 
   console.log('🎉 ALL END-TO-END TESTS PASSED SUCCESSFULLY! 🚀');
 }

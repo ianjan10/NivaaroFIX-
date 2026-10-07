@@ -23,9 +23,12 @@ router.get('/profile/:email', async (req, res) => {
         phone: agent.phone,
         trade: agent.trade,
         experienceYears: agent.experience_years,
-        rating: parseFloat(agent.rating),
-        completedJobs: agent.completed_jobs,
-        walletBalance: parseFloat(agent.wallet_balance),
+        city: agent.city,
+        state: agent.state,
+        address: agent.address,
+        rating: (agent.rating !== null && agent.rating !== undefined && !isNaN(parseFloat(agent.rating))) ? parseFloat(agent.rating) : null,
+        completedJobs: parseInt(agent.completed_jobs || 0, 10),
+        walletBalance: parseFloat(agent.wallet_balance || 0),
         isOnline: agent.is_online,
         lat: agent.lat ? parseFloat(agent.lat) : null,
         lng: agent.lng ? parseFloat(agent.lng) : null,
@@ -383,6 +386,106 @@ router.patch('/document-status', async (req, res) => {
     });
   } catch (err) {
     console.error('Update document status error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get genuine completed jobs history for professional
+router.get('/completed-jobs/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    const agentRes = await pool.query('SELECT id FROM agent_login WHERE LOWER(email) = LOWER($1) LIMIT 1;', [email]);
+    if (agentRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Provider not found.' });
+    }
+    const agentId = agentRes.rows[0].id;
+
+    const jobsRes = await pool.query(`
+      SELECT 
+        b.id,
+        b.booking_ref,
+        b.service_title,
+        b.category,
+        b.total_amount,
+        COALESCE(b.user_name, b.customer_name) as customer_name,
+        COALESCE(b.user_address, b.service_address) as service_address,
+        b.otp_verified_at,
+        b.completed_at,
+        b.created_at,
+        b.payment_method,
+        COALESCE(b.rating, r.rating) as rating,
+        COALESCE(b.review_feedback, r.feedback) as feedback,
+        COALESCE(b.review_tags, r.tags) as tags
+      FROM bookings b
+      LEFT JOIN reviews r ON (r.booking_id = b.id)
+      WHERE b.assigned_agent_id = $1 AND b.status = 'Completed'
+      ORDER BY b.completed_at DESC NULLS LAST, b.created_at DESC
+      LIMIT 50;
+    `, [agentId]);
+
+    res.json({
+      success: true,
+      jobs: jobsRes.rows.map(j => ({
+        id: j.id,
+        bookingRef: j.booking_ref,
+        serviceTitle: j.service_title,
+        category: j.category,
+        amount: parseFloat(j.total_amount || 0),
+        customerName: j.customer_name,
+        serviceAddress: j.service_address,
+        completedAt: j.completed_at || j.otp_verified_at || j.created_at,
+        otpVerifiedAt: j.otp_verified_at,
+        createdAt: j.created_at,
+        paymentMethod: j.payment_method || 'UPI / Cash on completion',
+        rating: j.rating ? parseFloat(j.rating) : null,
+        feedback: j.feedback || '',
+        tags: Array.isArray(j.tags) ? j.tags : []
+      }))
+    });
+  } catch (err) {
+    console.error('Fetch completed jobs error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get genuine verified customer reviews for professional
+router.get('/reviews/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    const agentRes = await pool.query('SELECT id FROM agent_login WHERE LOWER(email) = LOWER($1) LIMIT 1;', [email]);
+    if (agentRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Provider not found.' });
+    }
+    const agentId = agentRes.rows[0].id;
+
+    const reviewsRes = await pool.query(`
+      SELECT 
+        r.id,
+        r.rating,
+        r.feedback,
+        r.tags,
+        r.created_at,
+        COALESCE(c.full_name, 'Verified Customer') as customer_name
+      FROM reviews r
+      LEFT JOIN customers c ON r.customer_id = c.id
+      WHERE r.provider_id = $1
+      ORDER BY r.created_at DESC
+      LIMIT 50;
+    `, [agentId]);
+
+    res.json({
+      success: true,
+      reviews: reviewsRes.rows.map(r => ({
+        id: r.id,
+        rating: parseFloat(r.rating),
+        feedback: r.feedback,
+        tags: r.tags,
+        customerName: r.customer_name || 'Verified Customer',
+        createdAt: r.created_at
+      }))
+    });
+  } catch (err) {
+    console.error('Fetch reviews error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

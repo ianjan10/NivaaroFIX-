@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/routing.test.mjs && node tests/hero_experience.test.mjs && node tests/about_page.test.mjs && node tests/services_page.test.mjs && node tests/scroll_story.test.mjs && node tests/my_bookings_page.test.mjs && node tests/profile_eligibility_guard.test.mjs && node tests/profile_design_qa.test.mjs && node tests/profile_name_change.test.mjs && node tests/footer_refinement.test.mjs && node tests/brand_logo_implementation.test.mjs && node --test tests/gps_accuracy_and_doorstep_address.test.mjs"
+    "test": "node tests/routing.test.mjs && node tests/hero_experience.test.mjs && node tests/about_page.test.mjs && node tests/services_page.test.mjs && node tests/scroll_story.test.mjs && node tests/my_bookings_page.test.mjs && node tests/profile_eligibility_guard.test.mjs && node tests/profile_design_qa.test.mjs && node tests/profile_name_change.test.mjs && node tests/footer_refinement.test.mjs && node tests/brand_logo_implementation.test.mjs && node --test tests/gps_accuracy_and_doorstep_address.test.mjs && node tests/partner_console_redesign.test.mjs && node tests/partner_console_tabs_and_clean_data.test.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
