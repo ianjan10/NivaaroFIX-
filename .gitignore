@@ -41,9 +41,15 @@ coverage/
 *.crt
 id_rsa*
 *.sql
+!database/**/*.sql
 pgsql18/
 data/
 postgres_data/
+snapshots/
+*/snapshots/
+*.dump
+Temp/
+*/Temp/
 *.pid
 *.opts
 

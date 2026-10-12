@@ -1,0 +1,10 @@
+{
+  "name": "@nivaarofix/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Shared constants, enums, and utility contracts for NivaaroFix workspace",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@nivaarofix/auth",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node tests/login_viewport_fitting.test.mjs && node tests/otp_and_unverified_profile.test.mjs && node tests/header_nav_my_bookings.test.mjs && node tests/busy_state_and_realtime_e2e.test.mjs && node tests/phone_otp_login_input.test.mjs && node tests/phone_number_verification_rule.test.mjs"
+  },
+  "dependencies": {
+    "input-otp": "^1.5.0",
+    "leaflet": "^1.9.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.2.0"
+  }
+}

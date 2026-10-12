@@ -4,18 +4,28 @@
   "private": true,
   "description": "NivaaroFix — Monorepo for On-Demand Home Services & Verification Platform",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
+    "dev": "npm run dev:api",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:auth": "npm --prefix apps/auth run dev",
+    "build": "npm run build:all",
+    "build:web": "npm --prefix apps/web run build",
+    "build:auth": "npm --prefix apps/auth run build",
+    "build:all": "npm --prefix apps/web run build && npm --prefix apps/auth run build",
     "test": "node tests/system_health.test.mjs",
-    "test:backend": "npm --prefix backend test",
-    "test:dashboard": "npm --prefix Dashboard test",
-    "test:login": "npm --prefix WebLogin test",
-    "test:all": "node tests/system_health.test.mjs && npm --prefix backend test && npm --prefix Dashboard test && npm --prefix WebLogin test",
-    "db:reset": "npm --prefix backend run db:reset",
-    "dev:backend": "npm --prefix backend run dev",
-    "dev:dashboard": "npm --prefix Dashboard run dev",
-    "dev:login": "npm --prefix WebLogin run dev",
-    "install:all": "npm install && npm --prefix backend install && npm --prefix Dashboard install && npm --prefix WebLogin install",
-    "build:all": "npm --prefix Dashboard run build && npm --prefix WebLogin run build",
-    "package:zip": "powershell -ExecutionPolicy Bypass -File scripts/create_zip.ps1"
+    "test:api": "npm --prefix apps/api test",
+    "test:web": "npm --prefix apps/web test",
+    "test:auth": "npm --prefix apps/auth test",
+    "test:e2e": "node tests/arrival_tracking_e2e.test.mjs",
+    "test:all": "node tests/system_health.test.mjs && npm --prefix apps/api test && npm --prefix apps/web test && npm --prefix apps/auth test && node tests/arrival_tracking_e2e.test.mjs",
+    "db:reset": "npm --prefix apps/api run db:reset",
+    "db:clean": "npm --prefix apps/api run db:clean",
+    "lint": "eslint . --ext .js,.jsx,.mjs",
+    "format": "prettier --write ."
   }
 }

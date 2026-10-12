@@ -1,0 +1,7 @@
+node_modules
+dist
+build
+coverage
+pgsql18
+*.dump
+package-lock.json

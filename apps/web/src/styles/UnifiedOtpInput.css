@@ -1,0 +1,190 @@
+/* ==========================================================================
+   NivaaroFix — Unified OTP Input Component Design System
+   Headless engine via input-otp, custom premium design
+   ========================================================================== */
+
+.nivaaro-otp-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.nivaaro-otp-label {
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-main, #0f172a);
+  text-align: center;
+}
+
+/* Container rendered by input-otp */
+.nivaaro-otp-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: text;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.nivaaro-otp-container:disabled,
+.nivaaro-otp-container[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* Slots Track: Non-wrapping horizontal row */
+.nivaaro-otp-slots-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.8vw, 10px);
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Individual Slot */
+.nivaaro-otp-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-weight: 700;
+  color: #0f172a;
+  transition: border-color 200ms ease, background-color 200ms ease, color 200ms ease;
+  box-sizing: border-box;
+}
+
+/* Slot sizes depending on length */
+.nivaaro-otp-root[data-length="4"] .nivaaro-otp-slot {
+  width: clamp(44px, 12vw, 56px);
+  height: clamp(48px, 13vw, 60px);
+  font-size: clamp(1.35rem, 3.5vw, 1.65rem);
+  border-radius: 10px;
+}
+
+.nivaaro-otp-root[data-length="6"] .nivaaro-otp-slot {
+  width: clamp(36px, 9vw, 46px);
+  height: clamp(42px, 11vw, 54px);
+  font-size: clamp(1.2rem, 3vw, 1.45rem);
+  border-radius: 8px;
+}
+
+/* Active Slot: 1.5px border in brand green (#059669). No glow, no gradient, no stripe */
+.nivaaro-otp-slot.is-active {
+  border: 1.5px solid #059669;
+}
+
+/* Filled Slot: stays neutral, only the digit shows */
+.nivaaro-otp-slot.is-filled {
+  border-color: #94a3b8;
+}
+
+/* Error State: Border turns red (#dc2626). No shake or bounce */
+.nivaaro-otp-slot.is-error {
+  border-color: #dc2626 !important;
+  color: #dc2626;
+}
+
+/* Success State: 200ms transition, brand green border and color */
+.nivaaro-otp-slot.is-success {
+  border-color: #059669 !important;
+  color: #059669;
+}
+
+/* Disabled / Locked Slot */
+.nivaaro-otp-slot.is-disabled {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
+
+/* Caret: thin blinking line in brand green */
+.nivaaro-otp-caret {
+  position: absolute;
+  width: 1.5px;
+  height: 22px;
+  background-color: #059669;
+  border-radius: 1px;
+  animation: nivaaroOtpCaretBlink 1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes nivaaroOtpCaretBlink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Inline Messages: Error & Locked Countdown */
+.nivaaro-otp-error-msg {
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #dc2626;
+  text-align: center;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+.nivaaro-otp-locked-msg {
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #d97706;
+  background-color: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+.nivaaro-otp-success-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #059669;
+  margin-top: 0.25rem;
+  transition: opacity 200ms ease;
+}
+
+/* Fallback accessible submit button */
+.nivaaro-otp-fallback-btn {
+  background: #059669;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.625rem 1.25rem;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+  margin-top: 0.5rem;
+}
+
+.nivaaro-otp-fallback-btn:hover:not(:disabled) {
+  background: #047857;
+}
+
+.nivaaro-otp-fallback-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
