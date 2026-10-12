@@ -58,7 +58,7 @@ async function runSystemHealthSuite() {
       active = res.status === 200 && html.includes('NivaaroFix');
     } catch {
       const fs = await import('node:fs');
-      active = fs.existsSync('WebLogin/dist/index.html') || fs.existsSync('WebLogin/index.html');
+      active = fs.existsSync('apps/auth/dist/index.html') || fs.existsSync('apps/auth/index.html');
       details = 'Production Bundle Verified';
     }
     report('3. WebLogin Authentication Portal', active, details);
