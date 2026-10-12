@@ -134,12 +134,15 @@ async function runSystemHealthSuite() {
 
   // Clean up any test records created during health suite run
   try {
-    const { pool } = await import('../backend/src/config/db.js');
+    const { pool } = await import('../apps/api/src/config/db.js');
     await pool.query("DELETE FROM user_login WHERE email = 'aarav.sharma.test@gmail.com'");
     await pool.query("DELETE FROM agent_login WHERE email = 'devendra.mehra.test@gmail.com'");
+    await pool.query("DELETE FROM customers WHERE email = 'aarav.sharma.test@gmail.com'");
+    await pool.query("DELETE FROM professionals WHERE email = 'devendra.mehra.test@gmail.com'");
+    await pool.query("DELETE FROM users WHERE email IN ('aarav.sharma.test@gmail.com', 'devendra.mehra.test@gmail.com')");
     await pool.end();
-  } catch {
-    // Non-blocking cleanup
+  } catch (err) {
+    console.error('System health cleanup error:', err);
   }
 
   console.log('\n================================================================');

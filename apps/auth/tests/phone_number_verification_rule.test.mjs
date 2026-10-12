@@ -102,6 +102,17 @@ if (unverifiedData.success && unverifiedData.agent) {
   console.log('  ✅ [PASS] Live API verifies other partner: isPhoneVerified = false');
 }
 
+// --- Cleanup: Remove test partner record from DB ---
+try {
+  const { pool } = await import('../../api/src/config/db.js');
+  await pool.query("DELETE FROM agent_login WHERE email = 'rahulkumar@gmail.com'");
+  await pool.query("DELETE FROM professionals WHERE email = 'rahulkumar@gmail.com'");
+  await pool.query("DELETE FROM users WHERE email = 'rahulkumar@gmail.com'");
+  await pool.end();
+} catch (err) {
+  // Non-blocking cleanup
+}
+
 console.log('\n========================================');
 console.log('Phone Number Verification Rules: All Tests Passed!');
 console.log('========================================\n');

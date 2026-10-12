@@ -23,8 +23,8 @@
     "test:auth": "npm --prefix apps/auth test",
     "test:e2e": "node tests/arrival_tracking_e2e.test.mjs",
     "test:all": "node tests/system_health.test.mjs && npm --prefix apps/api test && npm --prefix apps/web test && npm --prefix apps/auth test && node tests/arrival_tracking_e2e.test.mjs",
-    "db:reset": "npm --prefix apps/api run db:reset",
-    "db:clean": "npm --prefix apps/api run db:clean",
+    "db:reset": "node scripts/migrate.js",
+    "db:clean": "node scripts/fresh_db_reset.js",
     "lint": "eslint . --ext .js,.jsx,.mjs",
     "format": "prettier --write ."
   }
