@@ -4,7 +4,7 @@
  * and reverse-geocodes into detailed doorstep residential addresses.
  */
 
-import { indianStatesAndCitiesData } from '../data/indianStatesAndCitiesData';
+import { indianStatesAndCitiesData } from '../data/indianStatesAndCitiesData.js';
 
 /**
  * Normalizes state name to match canonical indianStatesAndCitiesData key
@@ -46,21 +46,64 @@ function normalizeStateName(rawState) {
 }
 
 /**
+ * Matches district/city from a list of administrative candidates against the state's official list
+ */
+export function matchDistrictOrCity(candidates, stateKey) {
+  if (!Array.isArray(candidates)) {
+    candidates = [candidates];
+  }
+  const cleanCandidates = candidates.filter(c => Boolean(c && String(c).trim())).map(c => String(c).trim());
+  if (!cleanCandidates.length) return '';
+
+  const cities = indianStatesAndCitiesData[stateKey] || [];
+  if (!cities.length) return cleanCandidates[0] || '';
+
+  // 1. Exact match (case-insensitive)
+  for (const cand of cleanCandidates) {
+    const cLower = cand.toLowerCase();
+    const found = cities.find(c => c.toLowerCase() === cLower);
+    if (found) return found;
+  }
+
+  // 2. Parenthesized alias & word-level matching
+  // (e.g. 'Tiruchirappalli' or 'Trichy' matches 'Tiruchirappalli (Trichy)', 'Kochi' matches 'Ernakulam (Kochi)')
+  for (const cand of cleanCandidates) {
+    const cLower = cand.toLowerCase();
+    if (cLower.length < 3) continue;
+
+    const found = cities.find(c => {
+      const cityLower = c.toLowerCase();
+      // Split on delimiters like '(', ')', '/', '-', ','
+      const aliases = cityLower.split(/[\(\)\/\,\-]/).map(p => p.trim()).filter(Boolean);
+      return aliases.some(alias => alias === cLower || alias.includes(cLower) || cLower.includes(alias));
+    });
+    if (found) return found;
+  }
+
+  // 3. Substring inclusion
+  for (const cand of cleanCandidates) {
+    const cLower = cand.toLowerCase();
+    if (cLower.length < 3) continue;
+
+    const found = cities.find(c => {
+      const cityLower = c.toLowerCase();
+      return cityLower.includes(cLower) || cLower.includes(cityLower);
+    });
+    if (found) return found;
+  }
+
+  // 4. Fallback to first available candidate
+  return cleanCandidates[0] || '';
+}
+
+/**
  * Normalizes city/district to best match within the state's list
  */
-function normalizeCityName(rawCity, stateKey) {
+export function normalizeCityName(rawCity, stateKey) {
   if (!rawCity) return '';
-  const cities = indianStatesAndCitiesData[stateKey] || [];
-  const cleanCity = rawCity.trim().toLowerCase();
-
-  // Try exact match or inclusion
-  const found = cities.find(c => {
-    const cLower = c.toLowerCase();
-    return cLower === cleanCity || cLower.includes(cleanCity) || cleanCity.includes(cLower);
-  });
-
-  return found || rawCity.trim();
+  return matchDistrictOrCity([rawCity], stateKey);
 }
+
 
 /**
  * Formats a rich, doorstep-level residential or commercial address
@@ -75,8 +118,8 @@ export function formatDetailedDoorstepAddress(addr, fallbackDisplayName = '') {
   const parts = [];
 
   // 1. Premise / Building / House / Landmark / Amenity
-  const houseNum = addr.house_number ? `#${addr.house_number}` : '';
-  const premiseName = addr.house_name || addr.building || addr.amenity || addr.office || addr.shop || addr.place || '';
+  const houseNum = addr.house_number ? `#${addr.house_number}` : (addr.flat_number ? `Flat ${addr.flat_number}` : '');
+  const premiseName = addr.house_name || addr.building || addr.amenity || addr.office || addr.shop || addr.place || addr.commercial || addr.industrial || '';
   let premise = '';
   if (houseNum && premiseName) {
     premise = `${premiseName}, ${houseNum}`;
@@ -278,57 +321,90 @@ export function getHighAccuracyCoordinates(options = {}) {
  * { lat, lng, state, city, address, pincode, accuracy, details }
  */
 export async function detectCurrentGpsLocation() {
-  // 1. Get high-accuracy browser GPS coordinates
+  // 1. Get high-accuracy browser GPS coordinates (< 20m precision)
   const coords = await getHighAccuracyCoordinates({
     timeoutMs: 15000,
-    desiredAccuracyMeters: 25,
+    desiredAccuracyMeters: 20,
     maxWaitAfterFirstFixMs: 3500
   });
 
-  // 2. Primary: OpenStreetMap Nominatim Reverse Geocoding with zoom=18 & addressdetails=1
-  // zoom=18 provides building, premise, house number, and street-level granularity
+  // Helper to extract state, district and doorstep address from Nominatim addr
+  const parseNominatimAddress = (addr, displayName) => {
+    const rawState = addr.state || '';
+    const state = normalizeStateName(rawState);
+    const candidateCities = [
+      addr.state_district,
+      addr.district,
+      addr.county,
+      addr.city,
+      addr.town,
+      addr.municipality,
+      addr.village,
+      addr.suburb,
+      addr.city_district
+    ].filter(Boolean);
+
+    const city = matchDistrictOrCity(candidateCities, state);
+    const pincode = addr.postcode || '';
+    const formattedAddress = formatDetailedDoorstepAddress(addr, displayName);
+
+    return {
+      lat: coords.lat,
+      lng: coords.lng,
+      state,
+      city,
+      address: formattedAddress,
+      pincode,
+      accuracy: coords.accuracy,
+      details: {
+        premise: addr.house_number ? (addr.amenity ? `${addr.amenity}, #${addr.house_number}` : `#${addr.house_number}`) : (addr.amenity || addr.building || addr.commercial || addr.industrial || ''),
+        road: addr.road || addr.street || '',
+        neighbourhood: addr.neighbourhood || addr.sublocality || '',
+        suburb: addr.suburb || '',
+        city,
+        state,
+        pincode
+      }
+    };
+  };
+
+  // 2. Primary: Backend Reverse Geocoding Proxy (reliable, bypasses browser CORS/rate-limits)
+  try {
+    const backendRes = await fetch(
+      `http://localhost:5000/api/geo/reverse?lat=${coords.lat}&lng=${coords.lng}`
+    );
+    if (backendRes.ok) {
+      const data = await backendRes.json();
+      if (data.success && data.address) {
+        const parsed = parseNominatimAddress(data.address, data.displayName);
+        if (parsed.address && parsed.address.length > 5) {
+          return parsed;
+        }
+      }
+    }
+  } catch (err) {
+    // Backend proxy notice, proceed to client fallback
+  }
+
+  // 3. Fallback: Direct OpenStreetMap Nominatim Reverse Geocoding
   try {
     const osmRes = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.lat}&lon=${coords.lng}&zoom=18&addressdetails=1`,
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.lat}&lon=${coords.lng}&zoom=18&addressdetails=1&extratags=1&namedetails=1`,
       { headers: { 'Accept-Language': 'en' } }
     );
     if (osmRes.ok) {
       const data = await osmRes.json();
       const addr = data.address || {};
-      const rawState = addr.state || '';
-      const state = normalizeStateName(rawState);
-      const rawCity = addr.city || addr.town || addr.village || addr.municipality || addr.district || addr.county || addr.suburb || '';
-      const city = normalizeCityName(rawCity, state);
-      const pincode = addr.postcode || '';
-
-      const formattedAddress = formatDetailedDoorstepAddress(addr, data.display_name);
-
-      if (formattedAddress && formattedAddress.length > 5) {
-        return {
-          lat: coords.lat,
-          lng: coords.lng,
-          state,
-          city,
-          address: formattedAddress,
-          pincode,
-          accuracy: coords.accuracy,
-          details: {
-            premise: addr.house_number ? (addr.amenity ? `${addr.amenity}, #${addr.house_number}` : `#${addr.house_number}`) : (addr.amenity || addr.building || ''),
-            road: addr.road || addr.street || '',
-            neighbourhood: addr.neighbourhood || addr.sublocality || '',
-            suburb: addr.suburb || '',
-            city,
-            state,
-            pincode
-          }
-        };
+      const parsed = parseNominatimAddress(addr, data.display_name);
+      if (parsed.address && parsed.address.length > 5) {
+        return parsed;
       }
     }
   } catch (err) {
     console.warn('Nominatim reverse geocode notice:', err.message);
   }
 
-  // 3. Fallback: BigDataCloud client API (deep locality info parsing)
+  // 4. Fallback: BigDataCloud client API (deep locality info parsing)
   try {
     const bdcRes = await fetch(
       `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.lat}&longitude=${coords.lng}&localityLanguage=en`
@@ -337,11 +413,20 @@ export async function detectCurrentGpsLocation() {
       const data = await bdcRes.json();
       const rawState = data.principalSubdivision || '';
       const state = normalizeStateName(rawState);
-      const rawCity = data.city || data.locality || '';
-      const city = normalizeCityName(rawCity, state);
+
+      const adminNames = (data.localityInfo?.administrative || [])
+        .map(a => a.name.replace(/\s+(District|Taluk|Tehsil|Division|State)$/i, '').trim())
+        .filter(Boolean);
+
+      const candidateCities = [
+        ...adminNames,
+        data.city,
+        data.locality
+      ].filter(Boolean);
+
+      const city = matchDistrictOrCity(candidateCities, state);
       const pincode = data.postcode || '';
 
-      // Extract fine administrative & informative components
       const area = data.locality || data.localityInfo?.administrative?.[3]?.name || '';
       const informativeLandmarks = (data.localityInfo?.informative || [])
         .filter(item => item.order >= 6 && item.order <= 14 && item.name && item.name !== city && item.name !== state)
@@ -386,7 +471,7 @@ export async function detectCurrentGpsLocation() {
     console.warn('BigDataCloud reverse geocode notice:', err.message);
   }
 
-  // 4. Coordinates fallback if all reverse-geocoders fail
+  // 5. Coordinates fallback if all reverse-geocoders fail
   return {
     lat: coords.lat,
     lng: coords.lng,
@@ -398,3 +483,4 @@ export async function detectCurrentGpsLocation() {
     details: {}
   };
 }
+

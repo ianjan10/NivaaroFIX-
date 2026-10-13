@@ -185,6 +185,46 @@ router.post('/providers/me/presence', async (req, res) => {
     return res.status(400).json({ success: false, error: err.message });
   }
 });
+// =========================================================================
+// High-Precision Reverse Geocoding Proxy (Avoids browser rate-limits/CORS)
+// =========================================================================
+router.get('/geo/reverse', async (req, res) => {
+  try {
+    const { lat, lng, lon } = req.query;
+    const latitude = lat || req.query.latitude;
+    const longitude = lng || lon || req.query.longitude;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ success: false, error: 'Latitude and longitude query parameters are required.' });
+    }
+
+    const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&zoom=18&addressdetails=1&extratags=1&namedetails=1`;
+
+    const response = await fetch(nominatimUrl, {
+      headers: {
+        'User-Agent': 'NivaaroFixApp/1.0 (contact@nivaarofix.in)',
+        'Accept-Language': 'en'
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, error: `Nominatim responded with status ${response.status}` });
+    }
+
+    const data = await response.json();
+    return res.json({
+      success: true,
+      address: data.address || {},
+      displayName: data.display_name || '',
+      lat: data.lat,
+      lon: data.lon
+    });
+  } catch (err) {
+    console.error('Reverse geocode error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 export default router;
+
 

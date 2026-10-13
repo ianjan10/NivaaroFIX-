@@ -20,7 +20,7 @@ export default defineConfig({
     },
     fs: {
       strict: false,
-      allow: ['..', 'C:/NivaaroFIX-', 'D:/My Project']
+      allow: ['..']
     }
   }
 });
