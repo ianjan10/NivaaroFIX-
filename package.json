@@ -26,6 +26,7 @@
     "db:reset": "node scripts/migrate.js",
     "db:clean": "node scripts/fresh_db_reset.js",
     "bundle:llm": "node scripts/build_full_project_knowledge_bundle.mjs",
+    "bundle:db": "node scripts/build_database_knowledge_bundle.mjs",
     "lint": "eslint . --ext .js,.jsx,.mjs",
     "format": "prettier --write ."
   }
