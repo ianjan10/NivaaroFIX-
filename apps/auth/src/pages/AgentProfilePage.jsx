@@ -134,7 +134,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
   const [email, setEmail] = useState(agent?.email || '');
   const [phone, setPhone] = useState(cleanPhone(agent?.phone));
   const [partnerId, setPartnerId] = useState(agent?.partnerId || agent?.partner_id || '202500001');
-  const [trade, setTrade] = useState(() => (agent?.trade === 'plumber' ? 'plumber' : 'electrician'));
+  const [trade, setTrade] = useState(() => (agent?.trade || 'electrician'));
   const [experienceYears, setExperienceYears] = useState(() => {
     if (agent?.experienceYears !== undefined && agent?.experienceYears !== null) return Number(agent.experienceYears);
     if (agent?.experience_years !== undefined && agent?.experience_years !== null) return Number(agent.experience_years);
@@ -456,7 +456,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
       setEmail(agent.email || '');
       setPhone(cleanPhone(agent.phone));
       setPartnerId(agent.partnerId || agent.partner_id || '202500001');
-      setTrade(agent.trade === 'plumber' ? 'plumber' : 'electrician');
+      setTrade(agent.trade || 'electrician');
       const exp = agent.experienceYears !== undefined && agent.experienceYears !== null
         ? Number(agent.experienceYears)
         : (agent.experience_years !== undefined && agent.experience_years !== null ? Number(agent.experience_years) : 0);
@@ -1108,7 +1108,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
       email: email.trim().toLowerCase(),
       name: name.trim(),
       phone: (phone && !isTestGarbagePhone(phone)) ? `+91 ${phone}` : null,
-      trade: trade === 'plumber' ? 'plumber' : 'electrician',
+      trade: trade || 'electrician',
       experienceYears: (experienceYears !== '' && !isNaN(Number(experienceYears))) ? Number(experienceYears) : 0,
       dob: dob.day && dob.month && dob.year ? dob : null,
       state: state || null,
@@ -1493,11 +1493,12 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
                       <select
                         id="agent-profile-trade"
                         className="input-select"
-                        value={trade === 'plumber' ? 'plumber' : 'electrician'}
+                        value={trade || 'electrician'}
                         onChange={(e) => setTrade(e.target.value)}
                       >
                         <option value="electrician">Electrician</option>
                         <option value="plumber">Plumber</option>
+                        <option value="both">Both (Electrician &amp; Plumber)</option>
                       </select>
                     </div>
 

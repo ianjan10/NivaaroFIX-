@@ -305,9 +305,11 @@ export default function PartnerConsolePage({ agent: propAgent }) {
   };
 
   const partnerLocation = formatPrecisePartnerLocation(currentAgent);
-  const partnerTrade = currentAgent?.trade === 'plumber' 
-    ? (t.proTradePlumber || 'Plumber') 
-    : (currentAgent?.trade ? formatTitleCase(currentAgent.trade) : (t.proTradeElectrician || 'Electrician'));
+  const partnerTrade = currentAgent?.trade === 'both'
+    ? 'Electrician & Plumber'
+    : currentAgent?.trade === 'plumber' 
+      ? (t.proTradePlumber || 'Plumber') 
+      : (currentAgent?.trade ? formatTitleCase(currentAgent.trade) : (t.proTradeElectrician || 'Electrician'));
   const partnerInitials = (partnerName || 'P').trim().charAt(0).toUpperCase();
 
   // Check if provider is busy on an ongoing job (mutual exclusivity requirement)

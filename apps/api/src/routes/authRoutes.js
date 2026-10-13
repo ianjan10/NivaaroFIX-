@@ -726,7 +726,7 @@ router.post('/agent-update-profile', async (req, res) => {
     if (isTestGarbagePhone(cleanPhone)) cleanPhone = null;
 
     const cleanEmail = email ? email.toLowerCase().trim() : null;
-    const cleanTrade = trade === 'plumber' ? 'plumber' : 'electrician';
+    const cleanTrade = trade === 'plumber' ? 'plumber' : (trade === 'both' ? 'both' : 'electrician');
 
     // Compute or derive geospatial coordinates & H3 index
     let finalLat = req.body.lat !== undefined && req.body.lat !== null ? parseFloat(req.body.lat) : null;
