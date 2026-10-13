@@ -102,10 +102,19 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
       const params = new URLSearchParams(window.location.search);
       const agentParam = params.get('agent');
       if (agentParam) {
-        const parsed = JSON.parse(decodeURIComponent(agentParam));
-        if (isTestGarbageDob(parsed?.dob)) parsed.dob = null;
-        if (isTestGarbagePhone(parsed?.phone)) parsed.phone = null;
-        return parsed;
+        let parsed = null;
+        try {
+          parsed = JSON.parse(agentParam);
+        } catch {
+          try {
+            parsed = JSON.parse(decodeURIComponent(agentParam));
+          } catch {}
+        }
+        if (parsed) {
+          if (isTestGarbageDob(parsed?.dob)) parsed.dob = null;
+          if (isTestGarbagePhone(parsed?.phone)) parsed.phone = null;
+          return parsed;
+        }
       }
       const saved = localStorage.getItem('nivaaro-agent');
       if (saved) {

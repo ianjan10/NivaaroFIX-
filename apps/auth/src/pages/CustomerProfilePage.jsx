@@ -84,10 +84,19 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
       const params = new URLSearchParams(window.location.search);
       const userParam = params.get('user');
       if (userParam) {
-        const parsed = JSON.parse(decodeURIComponent(userParam));
-        if (isTestGarbageDob(parsed?.dob)) parsed.dob = null;
-        if (isTestGarbagePhone(parsed?.phone)) parsed.phone = null;
-        return parsed;
+        let parsed = null;
+        try {
+          parsed = JSON.parse(userParam);
+        } catch {
+          try {
+            parsed = JSON.parse(decodeURIComponent(userParam));
+          } catch {}
+        }
+        if (parsed) {
+          if (isTestGarbageDob(parsed?.dob)) parsed.dob = null;
+          if (isTestGarbagePhone(parsed?.phone)) parsed.phone = null;
+          return parsed;
+        }
       }
       const saved = localStorage.getItem('nivaaro-user');
       if (saved) {
@@ -121,6 +130,8 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
   const gpsNoticeTimeoutRef = useRef(null);
   const verifiedTimerRef = useRef(null);
   const [showVerifiedTransient, setShowVerifiedTransient] = useState(false);
+  const [isPhoneOtpModalOpen, setIsPhoneOtpModalOpen] = useState(false);
+  const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
 
   const [verifiedPhone, setVerifiedPhone] = useState(() => (
     user?.isPhoneVerified ?? user?.is_phone_verified ? cleanPhone(user?.phone) : (cleanPhone(user?.phone) === '8934678924' ? '8934678924' : '')

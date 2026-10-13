@@ -56,7 +56,13 @@ function AppLayout() {
 
     if (userParam) {
       try {
-        localStorage.setItem('nivaaro-user', decodeURIComponent(userParam));
+        let cleanVal = userParam;
+        try {
+          cleanVal = decodeURIComponent(userParam);
+        } catch (_) {}
+        // Validate JSON
+        JSON.parse(cleanVal);
+        localStorage.setItem('nivaaro-user', cleanVal);
         localStorage.removeItem('nivaaro-agent');
       } catch (e) {
         console.error('Error saving user in WebLogin', e);
@@ -65,7 +71,13 @@ function AppLayout() {
 
     if (agentParam) {
       try {
-        localStorage.setItem('nivaaro-agent', decodeURIComponent(agentParam));
+        let cleanVal = agentParam;
+        try {
+          cleanVal = decodeURIComponent(agentParam);
+        } catch (_) {}
+        // Validate JSON
+        JSON.parse(cleanVal);
+        localStorage.setItem('nivaaro-agent', cleanVal);
         localStorage.removeItem('nivaaro-user');
       } catch (e) {
         console.error('Error saving agent in WebLogin', e);
