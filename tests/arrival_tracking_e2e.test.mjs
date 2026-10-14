@@ -336,9 +336,10 @@ async function runE2ETest() {
   console.log('\n--- 12. CLEANUP & VERIFY EMPTY STATES ---');
   const { pool } = await import('../apps/api/src/config/db.js');
   await pool.query('DELETE FROM reviews WHERE request_id IN (SELECT id FROM service_requests WHERE user_email LIKE \'%nivaarofix.test\') OR customer_id IS NULL;');
-  await pool.query('DELETE FROM wallet_transactions WHERE request_ref LIKE \'2026%\';');
-  await pool.query('DELETE FROM job_events;');
-  await pool.query('DELETE FROM professional_gps_log;');
+  await pool.query('DELETE FROM wallet_transactions WHERE agent_id IN (SELECT id FROM agent_login WHERE email LIKE \'%nivaarofix.test\') OR request_ref IN (SELECT service_request_code FROM service_requests WHERE user_email LIKE \'%nivaarofix.test\');');
+  await pool.query('DELETE FROM payouts WHERE professional_id IN (SELECT id FROM professionals WHERE email LIKE \'%nivaarofix.test\') OR service_request_id IN (SELECT id FROM service_requests WHERE user_email LIKE \'%nivaarofix.test\');');
+  await pool.query('DELETE FROM job_events WHERE request_id IN (SELECT id FROM service_requests WHERE user_email LIKE \'%nivaarofix.test\');');
+  await pool.query('DELETE FROM professional_gps_log WHERE professional_id IN (SELECT id FROM professionals WHERE email LIKE \'%nivaarofix.test\');');
   await pool.query('DELETE FROM bookings WHERE user_email LIKE \'%nivaarofix.test\';');
   await pool.query('DELETE FROM service_requests WHERE user_email LIKE \'%nivaarofix.test\';');
   await pool.query('DELETE FROM user_login WHERE email LIKE \'%nivaarofix.test\';');

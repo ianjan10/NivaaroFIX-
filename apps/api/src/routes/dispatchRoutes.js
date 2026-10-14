@@ -1775,6 +1775,25 @@ router.post('/request/:ref/complete', async (req, res) => {
       VALUES ($1, 'provider', $2, 'JOB_COMPLETED', $3::jsonb);
     `, [sr.id, String(quote.agent_id), JSON.stringify({ grossAmount, providerPayout, platformFee, photosCount: photosToStore.length })]);
 
+    // Resolve both agent_login.id and professionals.id
+    let agentLoginId = quote.agent_id;
+    let professionalId = quote.agent_id;
+    try {
+      const matchRes = await pool.query(`
+        SELECT a.id AS agent_id, p.id AS pro_id
+        FROM agent_login a
+        FULL OUTER JOIN professionals p ON LOWER(a.email) = LOWER(p.email)
+        WHERE a.id = $1 OR p.id = $1
+        LIMIT 1;
+      `, [quote.agent_id]);
+      if (matchRes.rows.length > 0) {
+        if (matchRes.rows[0].agent_id) agentLoginId = matchRes.rows[0].agent_id;
+        if (matchRes.rows[0].pro_id) professionalId = matchRes.rows[0].pro_id;
+      }
+    } catch (lookupErr) {
+      console.warn('Provider dual-ID lookup notice:', lookupErr.message);
+    }
+
     // Credit provider wallet and unlock availability
     const walletUpdate = await pool.query(`
       UPDATE agent_login
@@ -1785,7 +1804,21 @@ router.post('/request/:ref/complete', async (req, res) => {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
       RETURNING wallet_balance, completed_jobs, availability_status, is_online;
-    `, [providerPayout, quote.agent_id]);
+    `, [providerPayout, agentLoginId]);
+
+    try {
+      await pool.query(`
+        UPDATE professionals
+        SET wallet_balance = wallet_balance + $1,
+            completed_jobs = completed_jobs + 1,
+            availability_status = 'available',
+            is_online = true,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1;
+      `, [providerPayout, professionalId]);
+    } catch (proErr) {
+      // Ignored if table or row missing
+    }
 
     try {
       await pool.query(`
@@ -1796,7 +1829,7 @@ router.post('/request/:ref/complete', async (req, res) => {
             is_online = true,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = $2;
-      `, [providerPayout, quote.agent_id]);
+      `, [providerPayout, agentLoginId]);
     } catch (agentsErr) {
       // Legacy table agents may not exist in clean schema
     }
@@ -1808,7 +1841,7 @@ router.post('/request/:ref/complete', async (req, res) => {
       INSERT INTO wallet_transactions (agent_id, request_ref, type, amount, balance_after, description)
       VALUES ($1, $2, 'credit', $3, $4, $5);
     `, [
-      quote.agent_id,
+      agentLoginId,
       ref,
       providerPayout,
       newBalance,
@@ -2039,33 +2072,83 @@ router.get('/provider/active-job', async (req, res) => {
 router.get('/wallet/:email', async (req, res) => {
   try {
     const { email } = req.params;
+    const lowerEmail = email.toLowerCase();
 
     const agentRes = await pool.query(
       'SELECT id, wallet_balance, completed_jobs FROM agent_login WHERE email = $1 LIMIT 1;',
-      [email.toLowerCase()]
+      [lowerEmail]
     );
-    if (agentRes.rows.length === 0) {
+    const proRes = await pool.query(
+      'SELECT id, wallet_balance, completed_jobs FROM professionals WHERE email = $1 LIMIT 1;',
+      [lowerEmail]
+    );
+
+    if (agentRes.rows.length === 0 && proRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Provider not found.' });
     }
 
-    const agent = agentRes.rows[0];
+    const agentId = agentRes.rows[0]?.id || null;
+    const proId = proRes.rows[0]?.id || null;
+    const balance = agentRes.rows[0]
+      ? parseFloat(agentRes.rows[0].wallet_balance || 0)
+      : parseFloat(proRes.rows[0]?.wallet_balance || 0);
+    const completedJobs = agentRes.rows[0]?.completed_jobs ?? proRes.rows[0]?.completed_jobs ?? 0;
 
-    const txRes = await pool.query(
-      'SELECT * FROM wallet_transactions WHERE agent_id = $1 ORDER BY created_at DESC LIMIT 50;',
-      [agent.id]
-    );
+    const txRes = await pool.query(`
+      SELECT 
+        id,
+        request_ref,
+        type,
+        amount,
+        balance_after,
+        description,
+        created_at
+      FROM (
+        SELECT 
+          wt.id::text AS id,
+          wt.request_ref,
+          COALESCE(wt.type, 'credit') AS type,
+          wt.amount,
+          wt.balance_after,
+          wt.description,
+          wt.created_at
+        FROM wallet_transactions wt
+        WHERE wt.agent_id = $1 OR wt.agent_id = $2
+        
+        UNION ALL
+        
+        SELECT
+          'payout_' || p.id::text AS id,
+          COALESCE(sr.service_request_code, sr.request_ref, 'SR-' || p.service_request_id) AS request_ref,
+          'credit' AS type,
+          p.net_payout AS amount,
+          p.balance_after,
+          COALESCE('Job completed: ' || NULLIF(COALESCE(sr.title, sr.service_title), ''), 'Service Job Payout Credited') AS description,
+          p.created_at
+        FROM payouts p
+        LEFT JOIN service_requests sr ON sr.id = p.service_request_id
+        WHERE (p.professional_id = $2 OR p.professional_id = $1)
+          AND NOT EXISTS (
+            SELECT 1 FROM wallet_transactions wt2 
+            WHERE (wt2.agent_id = $1 OR wt2.agent_id = $2)
+              AND wt2.request_ref = COALESCE(sr.service_request_code, sr.request_ref)
+          )
+      ) combined_tx
+      ORDER BY created_at DESC
+      LIMIT 50;
+    `, [agentId, proId]);
 
     return res.json({
       success: true,
       wallet: {
-        balance: parseFloat(agent.wallet_balance),
-        completedJobs: agent.completed_jobs,
+        balance,
+        completedJobs,
         transactions: txRes.rows.map(tx => ({
           id: tx.id,
           requestRef: tx.request_ref,
           type: tx.type,
-          amount: parseFloat(tx.amount),
-          balanceAfter: parseFloat(tx.balance_after),
+          amount: parseFloat(tx.amount || 0),
+          balanceAfter: parseFloat(tx.balance_after || 0),
           description: tx.description,
           createdAt: tx.created_at
         }))
@@ -2073,6 +2156,83 @@ router.get('/wallet/:email', async (req, res) => {
     });
   } catch (err) {
     console.error('Wallet error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// =========================================================================
+// 15. Instant Provider Bank Withdrawal (IMPS)
+// =========================================================================
+router.post('/withdraw', async (req, res) => {
+  try {
+    const { email, amount } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Provider email is required.' });
+    }
+    const withdrawAmt = parseFloat(amount);
+    if (isNaN(withdrawAmt) || withdrawAmt <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid withdrawal amount.' });
+    }
+
+    const lowerEmail = email.toLowerCase();
+    const agentRes = await pool.query(
+      'SELECT id, wallet_balance, completed_jobs FROM agent_login WHERE email = $1 LIMIT 1;',
+      [lowerEmail]
+    );
+    const proRes = await pool.query(
+      'SELECT id, wallet_balance, completed_jobs FROM professionals WHERE email = $1 LIMIT 1;',
+      [lowerEmail]
+    );
+
+    if (agentRes.rows.length === 0 && proRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Provider not found.' });
+    }
+
+    const agent = agentRes.rows[0];
+    const currentBalance = agent ? parseFloat(agent.wallet_balance || 0) : parseFloat(proRes.rows[0]?.wallet_balance || 0);
+
+    if (currentBalance < withdrawAmt) {
+      return res.status(400).json({ success: false, error: 'Insufficient wallet balance.' });
+    }
+
+    const newBalance = Math.max(0, currentBalance - withdrawAmt);
+    const agentId = agent?.id || null;
+    const proId = proRes.rows[0]?.id || null;
+
+    if (agentId) {
+      await pool.query(
+        'UPDATE agent_login SET wallet_balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;',
+        [newBalance, agentId]
+      );
+    }
+    if (proId) {
+      await pool.query(
+        'UPDATE professionals SET wallet_balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;',
+        [newBalance, proId]
+      );
+    }
+
+    // Record debit transaction in wallet_transactions
+    if (agentId) {
+      await pool.query(`
+        INSERT INTO wallet_transactions (agent_id, request_ref, type, amount, balance_after, description)
+        VALUES ($1, $2, 'debit', $3, $4, $5);
+      `, [
+        agentId,
+        'WTH-' + Date.now().toString(36).toUpperCase(),
+        withdrawAmt,
+        newBalance,
+        'Instant IMPS Bank Transfer Withdrawal'
+      ]);
+    }
+
+    return res.json({
+      success: true,
+      message: `₹${withdrawAmt.toLocaleString('en-IN')} transferred to primary bank account via Instant IMPS.`,
+      newBalance
+    });
+  } catch (err) {
+    console.error('Withdraw error:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

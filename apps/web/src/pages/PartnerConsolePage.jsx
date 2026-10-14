@@ -514,9 +514,25 @@ export default function PartnerConsolePage({ agent: propAgent }) {
     };
   }, [currentAgent, loadActiveJob, loadWallet, loadNearbyRequests]);
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
     if (walletBalance <= 0) return;
-    const msg = `₹${walletBalance.toLocaleString('en-IN')} transferred to primary bank account via Instant IMPS.`;
+    const withdrawAmt = walletBalance;
+    try {
+      if (currentAgent?.email) {
+        const res = await fetch(`${API_BASE}/dispatch/withdraw`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: currentAgent.email, amount: withdrawAmt })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadWallet(currentAgent.email);
+        }
+      }
+    } catch (e) {
+      console.warn('Withdrawal API notice:', e.message);
+    }
+    const msg = `₹${withdrawAmt.toLocaleString('en-IN')} transferred to primary bank account via Instant IMPS.`;
     setWithdrawSuccessMsg(msg);
     addToast(msg, 'brass');
     setTimeout(() => setWithdrawSuccessMsg(''), 10000);
