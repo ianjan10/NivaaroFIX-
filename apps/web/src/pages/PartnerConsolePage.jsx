@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePartner } from '../context/PartnerContext';
 import { useLanguage } from '../context/LanguageContext';
 import { evaluateAgentChecklist } from '../utils/profileStrength';
