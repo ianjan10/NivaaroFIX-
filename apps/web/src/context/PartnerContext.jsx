@@ -118,9 +118,13 @@ export function PartnerProvider({ children }) {
     if (!email) return;
     setNearbyLoading(true);
     try {
-      const params = new URLSearchParams({ email });
-      if (lat) params.set('lat', lat);
-      if (lng) params.set('lng', lng);
+      const params = new URLSearchParams({ email: email.toLowerCase().trim() });
+      if (lat !== undefined && lat !== null && lat !== '' && !isNaN(Number(lat))) {
+        params.set('lat', Number(lat));
+      }
+      if (lng !== undefined && lng !== null && lng !== '' && !isNaN(Number(lng))) {
+        params.set('lng', Number(lng));
+      }
       if (radiusKm) params.set('radiusKm', radiusKm);
 
       const res = await fetch(`${API_BASE}/dispatch/nearby-requests?${params.toString()}`);
@@ -146,6 +150,9 @@ export function PartnerProvider({ children }) {
     setIsLocatingGPS(true);
     setGpsStatus('locating');
 
+    // Immediately load nearby requests using stored database/profile location so the feed is never blank
+    await loadNearbyRequests(email);
+
     return new Promise((resolve) => {
       if (typeof window !== 'undefined' && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -158,7 +165,7 @@ export function PartnerProvider({ children }) {
 
             // Update backend PostgreSQL and H3 spatial index
             await updateLocation(email, lat, lng);
-            // Immediately fetch nearby jobs for new coordinates
+            // Re-fetch nearby jobs for new coordinates
             await loadNearbyRequests(email, lat, lng);
             resolve({ lat, lng, source: 'gps' });
           },
@@ -166,13 +173,16 @@ export function PartnerProvider({ children }) {
             console.warn('GPS location request notice:', err.message);
             setIsLocatingGPS(false);
             setGpsStatus('denied');
+            // Gracefully maintain feed using registered database profile coordinates
+            await loadNearbyRequests(email);
             resolve(null);
           },
-          { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
         );
       } else {
         setIsLocatingGPS(false);
         setGpsStatus('unsupported');
+        loadNearbyRequests(email);
         resolve(null);
       }
     });

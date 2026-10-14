@@ -144,6 +144,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
   const [state, setState] = useState(agent?.state || '');
   const [city, setCity] = useState(agent?.city || '');
   const [address, setAddress] = useState(agent?.address || '');
+  const [coords, setCoords] = useState({ lat: agent?.lat || null, lng: agent?.lng || null });
   const [avatarUrl, setAvatarUrl] = useState(agent?.avatarUrl || agent?.avatar_url || '');
   const [avatarError, setAvatarError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -392,6 +393,9 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
       if (loc.address) {
         setAddress(loc.address);
         updatedSomething = true;
+      }
+      if (loc.lat && loc.lng) {
+        setCoords({ lat: loc.lat, lng: loc.lng });
       }
 
       setIsDetectingGps(false);
@@ -1114,6 +1118,8 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
       state: state || null,
       city: city || null,
       address: address.trim() || null,
+      lat: coords.lat || null,
+      lng: coords.lng || null,
       avatarUrl: avatarUrl || null,
       isLoggedIn: true
     };
@@ -1141,6 +1147,8 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
         state: data.agent?.state || '',
         city: data.agent?.city || '',
         address: data.agent?.address || '',
+        lat: data.agent?.lat || coords.lat || null,
+        lng: data.agent?.lng || coords.lng || null,
         isLoggedIn: true
       };
 

@@ -840,8 +840,11 @@ router.get('/nearby-requests', async (req, res) => {
       });
     }
 
-    const agentLat = lat ? parseFloat(lat) : parseFloat(agent.lat);
-    const agentLng = lng ? parseFloat(lng) : parseFloat(agent.lng);
+    const parsedLat = (lat !== undefined && lat !== null && lat !== '' && lat !== 'undefined' && lat !== 'null') ? parseFloat(lat) : NaN;
+    const parsedLng = (lng !== undefined && lng !== null && lng !== '' && lng !== 'undefined' && lng !== 'null') ? parseFloat(lng) : NaN;
+
+    const agentLat = (!isNaN(parsedLat)) ? parsedLat : (agent.lat ? parseFloat(agent.lat) : null);
+    const agentLng = (!isNaN(parsedLng)) ? parsedLng : (agent.lng ? parseFloat(agent.lng) : null);
     const maxRadius = radiusKm ? parseFloat(radiusKm) : 10;
 
     // If provider has no location set, return empty

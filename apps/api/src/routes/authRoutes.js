@@ -625,6 +625,17 @@ router.post('/customer-update-profile', async (req, res) => {
 
     const cleanEmail = email ? email.toLowerCase().trim() : null;
 
+    // Compute or derive geospatial coordinates
+    let finalLat = req.body.lat !== undefined && req.body.lat !== null && req.body.lat !== '' ? parseFloat(req.body.lat) : null;
+    let finalLng = req.body.lng !== undefined && req.body.lng !== null && req.body.lng !== '' ? parseFloat(req.body.lng) : null;
+    if ((isNaN(finalLat) || isNaN(finalLng) || finalLat === null || finalLng === null) && city) {
+      const cityCoords = getCityCoordinates(city);
+      if (cityCoords) {
+        finalLat = cityCoords.lat;
+        finalLng = cityCoords.lng;
+      }
+    }
+
     const updateQuery = `
       UPDATE user_login
       SET
@@ -635,8 +646,10 @@ router.post('/customer-update-profile', async (req, res) => {
         city = $5,
         address = $6,
         avatar_url = COALESCE($7, avatar_url),
+        lat = COALESCE($8, lat),
+        lng = COALESCE($9, lng),
         updated_at = CURRENT_TIMESTAMP
-      WHERE (email = $8 AND $8 IS NOT NULL) OR (id = $9 AND $9 IS NOT NULL)
+      WHERE (email = $10 AND $10 IS NOT NULL) OR (id = $11 AND $11 IS NOT NULL)
       RETURNING *;
     `;
 
@@ -648,14 +661,16 @@ router.post('/customer-update-profile', async (req, res) => {
       city ? city.trim() : null,
       address ? address.trim() : null,
       avatarUrl || null,
+      (!isNaN(finalLat) && finalLat !== null) ? finalLat : null,
+      (!isNaN(finalLng) && finalLng !== null) ? finalLng : null,
       cleanEmail,
       numericId
     ]);
 
     if (result.rows.length === 0 && cleanEmail) {
       const insertQuery = `
-        INSERT INTO user_login (name, email, phone, dob, state, city, address, avatar_url, auth_provider, is_verified)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'email', true)
+        INSERT INTO user_login (name, email, phone, dob, state, city, address, avatar_url, lat, lng, auth_provider, is_verified)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'email', true)
         ON CONFLICT (email) DO UPDATE SET
           name = EXCLUDED.name,
           phone = EXCLUDED.phone,
@@ -664,6 +679,8 @@ router.post('/customer-update-profile', async (req, res) => {
           city = EXCLUDED.city,
           address = EXCLUDED.address,
           avatar_url = EXCLUDED.avatar_url,
+          lat = COALESCE(EXCLUDED.lat, user_login.lat),
+          lng = COALESCE(EXCLUDED.lng, user_login.lng),
           updated_at = CURRENT_TIMESTAMP
         RETURNING *;
       `;
@@ -675,7 +692,9 @@ router.post('/customer-update-profile', async (req, res) => {
         state ? state.trim() : null,
         city ? city.trim() : null,
         address ? address.trim() : null,
-        avatarUrl || null
+        avatarUrl || null,
+        (!isNaN(finalLat) && finalLat !== null) ? finalLat : null,
+        (!isNaN(finalLng) && finalLng !== null) ? finalLng : null
       ]);
     }
 

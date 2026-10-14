@@ -330,6 +330,7 @@ export default function PartnerConsolePage({ agent: propAgent }) {
             } catch {}
             return merged;
           });
+          loadNearbyRequests(currentAgent.email, profile.lat || currentAgent.lat, profile.lng || currentAgent.lng);
         }
       });
       loadActiveJob(currentAgent.email);
@@ -353,7 +354,9 @@ export default function PartnerConsolePage({ agent: propAgent }) {
         await loadActiveJob(currentAgent.email);
         await loadWallet(currentAgent.email);
         if (!isBusyOnJob) {
-          loadNearbyRequests(currentAgent.email, currentAgent.lat, currentAgent.lng);
+          const targetLat = providerLocation?.lat || currentAgent?.lat || null;
+          const targetLng = providerLocation?.lng || currentAgent?.lng || null;
+          loadNearbyRequests(currentAgent.email, targetLat, targetLng);
         }
       } catch (err) {
         // Silent sync catch
@@ -361,7 +364,7 @@ export default function PartnerConsolePage({ agent: propAgent }) {
     }, 3000);
 
     return () => clearInterval(pollInterval);
-  }, [currentAgent, isBusyOnJob, loadActiveJob, loadWallet, loadNearbyRequests]);
+  }, [currentAgent, isBusyOnJob, providerLocation, loadActiveJob, loadWallet, loadNearbyRequests]);
 
   // Automatic background live GPS tracking without human intervention
   useEffect(() => {
@@ -459,6 +462,17 @@ export default function PartnerConsolePage({ agent: propAgent }) {
       eventSource.addEventListener('request.cancelled', (e) => {
         try {
           addToast('A service request was cancelled by the customer.', 'destructive');
+          loadNearbyRequests(currentAgent.email, currentAgent.lat, currentAgent.lng);
+        } catch (err) {}
+      });
+
+      eventSource.addEventListener('request.broadcast', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          addToast(
+            `New Request Nearby: "${data.serviceTitle || 'Service Request'}" within your service radius!`,
+            'brass'
+          );
           loadNearbyRequests(currentAgent.email, currentAgent.lat, currentAgent.lng);
         } catch (err) {}
       });

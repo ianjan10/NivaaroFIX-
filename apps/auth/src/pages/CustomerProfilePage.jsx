@@ -119,6 +119,7 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
   const [state, setState] = useState(user?.state || '');
   const [city, setCity] = useState(user?.city || '');
   const [address, setAddress] = useState(user?.address || '');
+  const [coords, setCoords] = useState({ lat: user?.lat || null, lng: user?.lng || null });
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || user?.avatar_url || '');
   const [avatarError, setAvatarError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -306,6 +307,9 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
         setAddress(loc.address);
         updatedSomething = true;
       }
+      if (loc.lat && loc.lng) {
+        setCoords({ lat: loc.lat, lng: loc.lng });
+      }
 
       setIsDetectingGps(false);
       if (updatedSomething) {
@@ -464,6 +468,8 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
       state: state || null,
       city: city || null,
       address: address.trim() || null,
+      lat: coords.lat || null,
+      lng: coords.lng || null,
       avatarUrl: avatarUrl || null,
       isLoggedIn: true
     };
@@ -491,6 +497,8 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
         state: data.user?.state || '',
         city: data.user?.city || '',
         address: data.user?.address || '',
+        lat: data.user?.lat || coords.lat || null,
+        lng: data.user?.lng || coords.lng || null,
         isLoggedIn: true
       };
 

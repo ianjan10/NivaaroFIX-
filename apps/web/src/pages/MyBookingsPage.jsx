@@ -310,11 +310,16 @@ export default function MyBookingsPage({
         if (!ref || seenRefs.has(ref)) return;
         seenRefs.add(ref);
 
-        const statusLower = (b.status || '').toLowerCase();
-        let normalizedStatus = 'Confirmed';
+        const statusLower = (b.status || '').toLowerCase().trim();
+        let normalizedStatus = 'Open';
         if (statusLower === 'completed') normalizedStatus = 'Completed';
         else if (statusLower === 'cancelled') normalizedStatus = 'Cancelled';
-        else if (statusLower === 'in progress') normalizedStatus = 'In progress';
+        else if (['in progress', 'in_progress', 'otp verified'].includes(statusLower)) normalizedStatus = 'In progress';
+        else if (statusLower === 'arrived') normalizedStatus = 'Arrived';
+        else if (['on the way', 'en route', 'on_the_way'].includes(statusLower)) normalizedStatus = 'On the way';
+        else if (['confirmed', 'accepted'].includes(statusLower)) normalizedStatus = 'Confirmed';
+        else if (statusLower === 'quoted') normalizedStatus = 'Quoted';
+        else normalizedStatus = 'Open';
 
         list.push({
           id: ref,
