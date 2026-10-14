@@ -8,6 +8,7 @@ export default function BookingRateModal({ isOpen, onClose, booking, onSubmitRat
   const [feedback, setFeedback] = useState('');
   const [selectedTags, setSelectedTags] = useState(['On-Time Arrival', 'Clean Workmanship']);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState(null);
 
   useModalFocusTrap(isOpen, onClose, modalRef);
 
@@ -89,19 +90,35 @@ export default function BookingRateModal({ isOpen, onClose, booking, onSubmitRat
               Completed Work Proof
             </div>
             {booking.completionPhotos && booking.completionPhotos.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: booking.completionRemarks ? '0.5rem' : 0 }}>
+              <div className="proof-thumbnails-row">
                 {booking.completionPhotos.map((photo, i) => (
-                  <img
+                  <button
                     key={i}
-                    src={photo}
-                    alt={`Completion ${i + 1}`}
-                    style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e5e7eb' }}
-                  />
+                    type="button"
+                    className="proof-thumbnail-btn"
+                    onClick={() => setPreviewPhoto(photo)}
+                    title="Click to view full photo"
+                    aria-label={`View full proof photo ${i + 1}`}
+                  >
+                    <img
+                      src={photo}
+                      alt={`Completion ${i + 1}`}
+                      className="proof-thumbnail-img"
+                    />
+                    <span className="proof-thumbnail-zoom-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="7" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        <line x1="11" y1="8" x2="11" y2="14" />
+                        <line x1="8" y1="11" x2="14" y2="11" />
+                      </svg>
+                    </span>
+                  </button>
                 ))}
               </div>
             )}
             {booking.completionRemarks && (
-              <div style={{ fontSize: '0.84rem', color: 'var(--text-primary, #111827)', fontStyle: 'italic' }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-primary, #111827)', fontStyle: 'italic', marginTop: booking.completionPhotos?.length > 0 ? '0.5rem' : 0 }}>
                 "{booking.completionRemarks}"
               </div>
             )}
@@ -200,6 +217,42 @@ export default function BookingRateModal({ isOpen, onClose, booking, onSubmitRat
           </div>
         </form>
       </div>
+
+      {/* Work Proof Full-Screen / Lightbox Modal */}
+      {previewPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Work proof photo preview"
+          className="proof-lightbox-backdrop"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div className="proof-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="proof-lightbox-close-btn"
+              onClick={() => setPreviewPhoto(null)}
+              aria-label="Close full preview"
+              title="Close full preview"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <img
+              src={previewPhoto}
+              alt="Completed work proof preview"
+              className="proof-lightbox-img"
+              onClick={() => setPreviewPhoto(null)}
+              title="Click image to minimize"
+            />
+            <div className="proof-lightbox-hint">
+              Click anywhere or press Esc to minimize
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

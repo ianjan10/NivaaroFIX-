@@ -105,6 +105,16 @@ export default function MyBookingsPage({
   const [invoiceModalBooking, setInvoiceModalBooking] = useState(null);
   const [rescheduleBooking, setRescheduleBooking] = useState(null);
   const [rateModalBooking, setRateModalBooking] = useState(null);
+  const [previewPhoto, setPreviewPhoto] = useState(null);
+
+  useEffect(() => {
+    if (!previewPhoto) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setPreviewPhoto(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewPhoto]);
 
   // Pending Quote Acceptance dialog state: { quote, job } | null
   const [pendingAcceptQuote, setPendingAcceptQuote] = useState(null);
@@ -1038,19 +1048,35 @@ export default function MyBookingsPage({
                               Completed Work Proof
                             </div>
                             {job.completionPhotos && job.completionPhotos.length > 0 && (
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: job.completionRemarks ? '0.4rem' : 0 }}>
+                              <div className="proof-thumbnails-row">
                                 {job.completionPhotos.map((imgUrl, i) => (
-                                  <img
+                                  <button
                                     key={i}
-                                    src={imgUrl}
-                                    alt={`Proof ${i + 1}`}
-                                    style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e5e7eb' }}
-                                  />
+                                    type="button"
+                                    className="proof-thumbnail-btn"
+                                    onClick={() => setPreviewPhoto(imgUrl)}
+                                    title="Click to view full photo"
+                                    aria-label={`View full proof photo ${i + 1}`}
+                                  >
+                                    <img
+                                      src={imgUrl}
+                                      alt={`Proof ${i + 1}`}
+                                      className="proof-thumbnail-img"
+                                    />
+                                    <span className="proof-thumbnail-zoom-icon" aria-hidden="true">
+                                      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="11" cy="11" r="7" />
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                        <line x1="11" y1="8" x2="11" y2="14" />
+                                        <line x1="8" y1="11" x2="14" y2="11" />
+                                      </svg>
+                                    </span>
+                                  </button>
                                 ))}
                               </div>
                             )}
                             {job.completionRemarks && (
-                              <div style={{ fontSize: '0.82rem', color: 'var(--text-primary, #111827)', fontStyle: 'italic' }}>
+                              <div style={{ fontSize: '0.82rem', color: 'var(--text-primary, #111827)', fontStyle: 'italic', marginTop: job.completionPhotos?.length > 0 ? '0.5rem' : 0 }}>
                                 "{job.completionRemarks}"
                               </div>
                             )}
@@ -1176,6 +1202,42 @@ export default function MyBookingsPage({
         booking={rateModalBooking}
         onSubmitRating={handleExecuteRating}
       />
+
+      {/* Work Proof Full-Screen / Lightbox Modal */}
+      {previewPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Work proof photo preview"
+          className="proof-lightbox-backdrop"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div className="proof-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="proof-lightbox-close-btn"
+              onClick={() => setPreviewPhoto(null)}
+              aria-label="Close full preview"
+              title="Close full preview"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <img
+              src={previewPhoto}
+              alt="Completed work proof preview"
+              className="proof-lightbox-img"
+              onClick={() => setPreviewPhoto(null)}
+              title="Click image to minimize"
+            />
+            <div className="proof-lightbox-hint">
+              Click anywhere or press Esc to minimize
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
