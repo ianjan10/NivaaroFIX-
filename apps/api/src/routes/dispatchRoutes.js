@@ -1891,12 +1891,29 @@ router.post('/request/:ref/rate', async (req, res) => {
       [numericRating, feedback || '', sr.id, ref]
     );
 
-    // 2. Fetch provider agentId from quote or assignment
-    let agentId = sr.assigned_professional_id;
-    if (!agentId && sr.accepted_quote_id) {
-      const quoteRes = await pool.query('SELECT agent_id FROM quotes WHERE id = $1 LIMIT 1;', [sr.accepted_quote_id]);
+    // 2. Fetch provider agentId and professional references
+    let agentId = null;
+    let providerEmail = null;
+    if (sr.accepted_quote_id) {
+      const quoteRes = await pool.query('SELECT agent_id, professional_id, agent_email FROM quotes WHERE id = $1 LIMIT 1;', [sr.accepted_quote_id]);
       if (quoteRes.rows.length > 0) {
         agentId = quoteRes.rows[0].agent_id;
+        providerEmail = quoteRes.rows[0].agent_email;
+      }
+    }
+    if (!agentId && sr.assigned_professional_id) {
+      agentId = sr.assigned_professional_id;
+    }
+
+    // Resolve valid customer_id from customers table
+    let validCustomerId = sr.customer_id;
+    if (!validCustomerId) {
+      const cRes = await pool.query(
+        'SELECT id FROM customers WHERE email = $1 OR user_id = $2 LIMIT 1;',
+        [sr.user_email, sr.user_id]
+      );
+      if (cRes.rows.length > 0) {
+        validCustomerId = cRes.rows[0].id;
       }
     }
 
@@ -1905,20 +1922,35 @@ router.post('/request/:ref/rate', async (req, res) => {
       await pool.query(`
         INSERT INTO reviews (request_id, customer_id, provider_id, rating, feedback, tags)
         VALUES ($1, $2, $3, $4, $5, $6::jsonb);
-      `, [sr.id, sr.user_id, agentId, numericRating, feedback || '', JSON.stringify(tags)]);
+      `, [sr.id, validCustomerId || sr.user_id, agentId, numericRating, feedback || '', JSON.stringify(tags)]);
 
       // 4. Recompute professional rating ONLY from real feedback in reviews table
       const aggRes = await pool.query(`
         SELECT ROUND(AVG(rating)::numeric, 1) AS avg_rating, COUNT(*) AS review_count
         FROM reviews
-        WHERE provider_id = $1;
+        WHERE provider_id = $1 OR provider_id IN (SELECT id FROM professionals WHERE email = (SELECT email FROM agent_login WHERE id = $1));
       `, [agentId]);
 
+      let newAvg = numericRating;
       if (aggRes.rows.length > 0 && aggRes.rows[0].avg_rating !== null) {
-        const newAvg = parseFloat(aggRes.rows[0].avg_rating);
+        newAvg = parseFloat(aggRes.rows[0].avg_rating);
         await pool.query('UPDATE agent_login SET rating = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;', [newAvg, agentId]);
         try { await pool.query('UPDATE agents SET rating = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;', [newAvg, agentId]); } catch (e) {}
-        try { await pool.query('UPDATE professionals SET rating = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;', [newAvg, agentId]); } catch (e) {}
+        try { 
+          await pool.query('UPDATE professionals SET rating = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 OR email = (SELECT email FROM agent_login WHERE id = $2);', [newAvg, agentId]); 
+        } catch (e) {}
+      }
+
+      // Notify provider in real-time
+      if (providerEmail) {
+        notifyProvider(providerEmail, 'rating.submitted', {
+          requestRef: ref,
+          rating: numericRating,
+          feedback: feedback || '',
+          newAvgRating: newAvg,
+          message: `Customer submitted a ${numericRating}-star review!`,
+          timestamp: new Date().toISOString()
+        });
       }
     }
 

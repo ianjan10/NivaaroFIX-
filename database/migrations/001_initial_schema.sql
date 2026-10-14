@@ -914,27 +914,49 @@ CREATE TABLE IF NOT EXISTS reviews (
 CREATE OR REPLACE FUNCTION fn_sync_reviews_to_feedback()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_cust_id BIGINT := NEW.customer_id;
+    v_cust_id BIGINT;
     v_pro_id BIGINT;
 BEGIN
-    IF v_cust_id IS NULL THEN
+    -- 1. Try to resolve valid customer_id from customers table
+    IF NEW.customer_id IS NOT NULL AND EXISTS (SELECT 1 FROM customers WHERE id = NEW.customer_id) THEN
+        v_cust_id := NEW.customer_id;
+    ELSIF NEW.customer_id IS NOT NULL AND EXISTS (SELECT 1 FROM customers WHERE user_id = NEW.customer_id) THEN
+        SELECT id INTO v_cust_id FROM customers WHERE user_id = NEW.customer_id LIMIT 1;
+    ELSIF NEW.request_id IS NOT NULL THEN
         SELECT customer_id INTO v_cust_id FROM service_requests WHERE id = NEW.request_id LIMIT 1;
-    END IF;
-
-    IF EXISTS (SELECT 1 FROM professionals WHERE id = NEW.provider_id) THEN
-        v_pro_id := NEW.provider_id;
-    ELSE
-        SELECT p.id INTO v_pro_id FROM professionals p JOIN agent_login a ON a.email = p.email WHERE a.id = NEW.provider_id LIMIT 1;
-        IF v_pro_id IS NULL THEN
-            SELECT id INTO v_pro_id FROM professionals ORDER BY id ASC LIMIT 1;
+        IF v_cust_id IS NULL OR NOT EXISTS (SELECT 1 FROM customers WHERE id = v_cust_id) THEN
+            SELECT c.id INTO v_cust_id 
+            FROM customers c 
+            JOIN service_requests sr ON (sr.user_email = c.email OR sr.user_id = c.user_id) 
+            WHERE sr.id = NEW.request_id 
+            LIMIT 1;
         END IF;
     END IF;
 
-    INSERT INTO feedback (
-        service_request_id, customer_id, professional_id, rating, comment, tags
-    ) VALUES (
-        NEW.request_id, COALESCE(v_cust_id, 1), COALESCE(v_pro_id, 1), NEW.rating, NEW.feedback, COALESCE(NEW.tags, '[]'::jsonb)
-    );
+    IF v_cust_id IS NULL OR NOT EXISTS (SELECT 1 FROM customers WHERE id = v_cust_id) THEN
+        SELECT id INTO v_cust_id FROM customers ORDER BY id ASC LIMIT 1;
+    END IF;
+
+    -- 2. Try to resolve valid professional_id from professionals table
+    IF NEW.provider_id IS NOT NULL AND EXISTS (SELECT 1 FROM professionals WHERE id = NEW.provider_id) THEN
+        v_pro_id := NEW.provider_id;
+    ELSIF NEW.provider_id IS NOT NULL THEN
+        SELECT p.id INTO v_pro_id FROM professionals p JOIN agent_login a ON a.email = p.email WHERE a.id = NEW.provider_id LIMIT 1;
+    END IF;
+
+    IF v_pro_id IS NULL OR NOT EXISTS (SELECT 1 FROM professionals WHERE id = v_pro_id) THEN
+        SELECT id INTO v_pro_id FROM professionals ORDER BY id ASC LIMIT 1;
+    END IF;
+
+    -- 3. Insert into feedback only if we have valid customer and pro references
+    IF v_cust_id IS NOT NULL AND v_pro_id IS NOT NULL THEN
+        INSERT INTO feedback (
+            service_request_id, customer_id, professional_id, rating, comment, tags
+        ) VALUES (
+            NEW.request_id, v_cust_id, v_pro_id, NEW.rating, NEW.feedback, COALESCE(NEW.tags, '[]'::jsonb)
+        );
+    END IF;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

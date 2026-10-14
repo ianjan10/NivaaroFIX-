@@ -394,11 +394,14 @@ router.patch('/document-status', async (req, res) => {
 router.get('/completed-jobs/:email', async (req, res) => {
   try {
     const { email } = req.params;
-    const agentRes = await pool.query('SELECT id FROM agent_login WHERE LOWER(email) = LOWER($1) LIMIT 1;', [email]);
+    const cleanEmail = (email || '').toLowerCase().trim();
+    const agentRes = await pool.query('SELECT id FROM agent_login WHERE LOWER(email) = $1 LIMIT 1;', [cleanEmail]);
     if (agentRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Provider not found.' });
     }
     const agentId = agentRes.rows[0].id;
+    const profRes = await pool.query('SELECT id FROM professionals WHERE LOWER(email) = $1 LIMIT 1;', [cleanEmail]);
+    const profId = profRes.rows.length > 0 ? profRes.rows[0].id : agentId;
 
     const jobsRes = await pool.query(`
       SELECT 
@@ -407,41 +410,50 @@ router.get('/completed-jobs/:email', async (req, res) => {
         b.service_title,
         b.category,
         b.total_amount,
-        COALESCE(b.user_name, b.customer_name) as customer_name,
+        b.user_name as customer_name,
         b.user_address as service_address,
         b.otp_verified_at,
         b.completed_at,
         b.created_at,
-        COALESCE(b.rating, r.rating) as rating,
-        COALESCE(b.review_feedback, r.feedback) as feedback,
+        COALESCE(b.rating, sr.rating, r.rating) as rating,
+        COALESCE(b.review_feedback, sr.rating_feedback, r.feedback) as feedback,
         COALESCE(b.review_tags::text, r.tags::text) as tags
       FROM bookings b
-      LEFT JOIN reviews r ON (r.booking_id = b.id OR (b.request_id IS NOT NULL AND r.request_id = b.request_id))
-      WHERE (b.assigned_agent_id = $1 OR b.professional_id = $1) AND b.status = 'Completed'
+      LEFT JOIN service_requests sr ON (sr.id = b.request_id OR sr.request_ref = b.booking_ref)
+      LEFT JOIN reviews r ON (r.request_id = b.request_id OR r.request_id = sr.id)
+      WHERE (
+        b.assigned_agent_id IN ($1, $2)
+        OR b.accepted_quote_id IN (SELECT id FROM quotes WHERE agent_id = $1 OR professional_id = $2 OR LOWER(agent_email) = $3)
+        OR sr.accepted_quote_id IN (SELECT id FROM quotes WHERE agent_id = $1 OR professional_id = $2 OR LOWER(agent_email) = $3)
+        OR sr.assigned_professional_id IN ($1, $2)
+      )
+      AND (b.status = 'Completed' OR sr.status = 'Completed' OR LOWER(b.status) = 'completed' OR LOWER(sr.status) = 'completed')
       UNION ALL
       SELECT
-        sr.id,
-        sr.request_ref as booking_ref,
-        sr.service_title,
-        sr.category,
+        sr2.id,
+        sr2.request_ref as booking_ref,
+        sr2.service_title,
+        sr2.category,
         COALESCE(q.amount, 0) as total_amount,
-        sr.user_name as customer_name,
-        sr.user_address as service_address,
-        sr.otp_verified_at,
-        sr.completed_at,
-        sr.created_at,
-        COALESCE(sr.rating, r.rating) as rating,
-        COALESCE(sr.rating_feedback, r.feedback) as feedback,
-        r.tags::text as tags
-      FROM service_requests sr
-      JOIN quotes q ON (q.id = sr.accepted_quote_id)
-      LEFT JOIN reviews r ON (r.request_id = sr.id)
-      WHERE q.agent_id = $1 AND sr.status = 'Completed' AND NOT EXISTS (
-        SELECT 1 FROM bookings b WHERE b.request_id = sr.id OR b.booking_ref = sr.request_ref
-      )
+        sr2.user_name as customer_name,
+        sr2.user_address as service_address,
+        sr2.otp_verified_at,
+        sr2.completed_at,
+        sr2.created_at,
+        COALESCE(sr2.rating, r2.rating) as rating,
+        COALESCE(sr2.rating_feedback, r2.feedback) as feedback,
+        r2.tags::text as tags
+      FROM service_requests sr2
+      JOIN quotes q ON (q.id = sr2.accepted_quote_id)
+      LEFT JOIN reviews r2 ON (r2.request_id = sr2.id)
+      WHERE (q.agent_id = $1 OR q.professional_id = $2 OR LOWER(q.agent_email) = $3 OR sr2.assigned_professional_id IN ($1, $2))
+        AND (sr2.status = 'Completed' OR LOWER(sr2.status) = 'completed')
+        AND NOT EXISTS (
+          SELECT 1 FROM bookings bk WHERE bk.request_id = sr2.id OR bk.booking_ref = sr2.request_ref
+        )
       ORDER BY completed_at DESC NULLS LAST, created_at DESC
       LIMIT 50;
-    `, [agentId]);
+    `, [agentId, profId, cleanEmail]);
 
     res.json({
       success: true,
@@ -451,12 +463,12 @@ router.get('/completed-jobs/:email', async (req, res) => {
         serviceTitle: j.service_title,
         category: j.category,
         amount: parseFloat(j.total_amount || 0),
-        customerName: j.customer_name,
+        customerName: j.customer_name || 'Verified Customer',
         serviceAddress: j.service_address,
         completedAt: j.completed_at || j.otp_verified_at || j.created_at,
         otpVerifiedAt: j.otp_verified_at,
         createdAt: j.created_at,
-        paymentMethod: j.payment_method || 'UPI / Cash on completion',
+        paymentMethod: 'UPI / Cash on completion',
         rating: j.rating ? parseFloat(j.rating) : null,
         feedback: j.feedback || '',
         tags: Array.isArray(j.tags) ? j.tags : []
@@ -472,11 +484,14 @@ router.get('/completed-jobs/:email', async (req, res) => {
 router.get('/reviews/:email', async (req, res) => {
   try {
     const { email } = req.params;
-    const agentRes = await pool.query('SELECT id FROM agent_login WHERE LOWER(email) = LOWER($1) LIMIT 1;', [email]);
+    const cleanEmail = (email || '').toLowerCase().trim();
+    const agentRes = await pool.query('SELECT id FROM agent_login WHERE LOWER(email) = $1 LIMIT 1;', [cleanEmail]);
     if (agentRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Provider not found.' });
     }
     const agentId = agentRes.rows[0].id;
+    const profRes = await pool.query('SELECT id FROM professionals WHERE LOWER(email) = $1 LIMIT 1;', [cleanEmail]);
+    const profId = profRes.rows.length > 0 ? profRes.rows[0].id : agentId;
 
     const reviewsRes = await pool.query(`
       SELECT 
@@ -485,13 +500,13 @@ router.get('/reviews/:email', async (req, res) => {
         r.feedback,
         r.tags,
         r.created_at,
-        COALESCE(c.full_name, 'Verified Customer') as customer_name
+        COALESCE(c.name, 'Verified Customer') as customer_name
       FROM reviews r
       LEFT JOIN customers c ON r.customer_id = c.id
-      WHERE r.provider_id = $1
+      WHERE r.provider_id = $1 OR r.provider_id = $2
       ORDER BY r.created_at DESC
       LIMIT 50;
-    `, [agentId]);
+    `, [agentId, profId]);
 
     res.json({
       success: true,

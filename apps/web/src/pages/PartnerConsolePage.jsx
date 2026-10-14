@@ -359,13 +359,17 @@ export default function PartnerConsolePage({ agent: propAgent }) {
           const targetLng = providerLocation?.lng || currentAgent?.lng || null;
           loadNearbyRequests(currentAgent.email, targetLat, targetLng);
         }
+        if (activeTab === 'completed') {
+          loadPastJobs(currentAgent.email);
+          loadCustomerReviews(currentAgent.email);
+        }
       } catch (err) {
         // Silent sync catch
       }
     }, 3000);
 
     return () => clearInterval(pollInterval);
-  }, [currentAgent, isBusyOnJob, providerLocation, loadActiveJob, loadWallet, loadNearbyRequests]);
+  }, [currentAgent, isBusyOnJob, activeTab, providerLocation, loadActiveJob, loadWallet, loadNearbyRequests, loadPastJobs, loadCustomerReviews]);
 
   // Automatic background live GPS tracking without human intervention
   useEffect(() => {
@@ -457,6 +461,22 @@ export default function PartnerConsolePage({ agent: propAgent }) {
           );
           loadActiveJob(currentAgent.email);
           loadWallet(currentAgent.email);
+          loadPastJobs(currentAgent.email);
+          loadCustomerReviews(currentAgent.email);
+          loadProviderProfile(currentAgent.email);
+        } catch (err) {}
+      });
+
+      eventSource.addEventListener('rating.submitted', (e) => {
+        try {
+          const data = JSON.parse(e.data || '{}');
+          addToast(
+            `Customer submitted a ${data.rating || 5}-star review!`,
+            'brass'
+          );
+          loadPastJobs(currentAgent.email);
+          loadCustomerReviews(currentAgent.email);
+          loadProviderProfile(currentAgent.email);
         } catch (err) {}
       });
 

@@ -337,6 +337,17 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
     };
   }, [step, acceptedQuote, isSubmitting, isMinimized, resetAutoMinimizeTimer]);
 
+  // Auto-redirect to My Bookings page after 7-8 seconds of broadcast confirmation
+  useEffect(() => {
+    if (step === 3 && confirmedBooking && !isSubmitting) {
+      const redirectTimer = setTimeout(() => {
+        closeBookingModal();
+        window.location.hash = '#/bookings';
+      }, 7500); // 7.5 seconds
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [step, confirmedBooking, isSubmitting, closeBookingModal]);
+
   // Connect SSE for real-time incoming quotations
   useEffect(() => {
     const ref = confirmedBooking?.requestRef || confirmedBooking?.bookingRef || confirmedBooking?.bookingId;
@@ -1595,6 +1606,9 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
                       <h3 className="confirmed-main-title">SERVICE REQUEST BROADCASTED</h3>
                       <p className="confirmed-sub-title">
                         Nearby verified professionals receive your request and submit transparent quotations.
+                      </p>
+                      <p style={{ margin: '0.4rem 0 0', fontSize: '0.78rem', color: '#047857', fontWeight: 600 }}>
+                        Redirecting to My Bookings in a few seconds...
                       </p>
                     </div>
                   </div>
