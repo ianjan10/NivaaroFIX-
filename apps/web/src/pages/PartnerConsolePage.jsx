@@ -95,7 +95,7 @@ function StarRatingIcons({ rating }) {
   );
 }
 
-export default function PartnerConsolePage({ agent: propAgent }) {
+export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce = 0 }) {
   const {
     isOnline,
     toggleOnline,
@@ -142,7 +142,16 @@ export default function PartnerConsolePage({ agent: propAgent }) {
 
   const [withdrawSuccessMsg, setWithdrawSuccessMsg] = useState('');
   const [eligibilityNoticeMsg, setEligibilityNoticeMsg] = useState('');
-  const [activeTab, setActiveTab] = useState('feed'); // 'feed' | 'completed' | 'payouts'
+  const [activeTab, setActiveTab] = useState(() => {
+    // If active partner job exists, or if nearby requests already loaded and present, start on feed
+    if (activePartnerJob || (nearbyRequests && nearbyRequests.length > 0)) {
+      return 'feed';
+    }
+    return 'completed';
+  });
+
+  // Track whether initial tab selection has been performed on entry
+  const hasInitializedTabRef = useRef(false);
 
   // Completion modal sheet state (Photos + Remarks)
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
@@ -208,6 +217,42 @@ export default function PartnerConsolePage({ agent: propAgent }) {
       setReviewsLoading(false);
     }
   }, []);
+
+  // Initial tab resolution on console load / entry:
+  // When there are no live requests and no active job in progress, automatically land on 'completed' jobs;
+  // otherwise start on 'feed' (Live Requests).
+  useEffect(() => {
+    if (nearbyLoading) return;
+    if (!hasInitializedTabRef.current) {
+      hasInitializedTabRef.current = true;
+      const hasLiveWork = Boolean(activePartnerJob || (nearbyRequests && nearbyRequests.length > 0));
+      if (!hasLiveWork) {
+        setActiveTab('completed');
+        if (currentAgent?.email) {
+          loadPastJobs(currentAgent.email);
+          loadCustomerReviews(currentAgent.email);
+        }
+      } else {
+        setActiveTab('feed');
+      }
+    }
+  }, [nearbyLoading, activePartnerJob, nearbyRequests, currentAgent?.email, loadPastJobs, loadCustomerReviews]);
+
+  // When professional explicitly clicks "Professional Console" in navbar / navigation:
+  useEffect(() => {
+    if (partnerNavNonce > 0) {
+      const hasLiveWork = Boolean(activePartnerJob || (nearbyRequests && nearbyRequests.length > 0));
+      if (!hasLiveWork) {
+        setActiveTab('completed');
+        if (currentAgent?.email) {
+          loadPastJobs(currentAgent.email);
+          loadCustomerReviews(currentAgent.email);
+        }
+      } else {
+        setActiveTab('feed');
+      }
+    }
+  }, [partnerNavNonce, activePartnerJob, nearbyRequests, currentAgent?.email, loadPastJobs, loadCustomerReviews]);
 
   // 10-Second Toast Alert Queue (per user requirement: 10s pop message on interaction)
   const [toasts, setToasts] = useState([]);
@@ -802,14 +847,14 @@ export default function PartnerConsolePage({ agent: propAgent }) {
         setIsCompletionModalOpen(false);
         setCompletionPhotos([]);
         setCompletionRemarks('');
+        setActiveTab('completed');
         if (currentAgent?.email) {
           loadActiveJob(currentAgent.email);
           loadWallet(currentAgent.email);
           loadProviderProfile(currentAgent.email);
           loadNearbyRequests(currentAgent.email, currentAgent.lat, currentAgent.lng);
-          if (typeof fetchPastJobs === 'function') {
-            fetchPastJobs(currentAgent.email);
-          }
+          loadPastJobs(currentAgent.email);
+          loadCustomerReviews(currentAgent.email);
         }
       } else {
         addToast(res?.error || 'Failed to complete job.', 'destructive');

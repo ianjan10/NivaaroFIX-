@@ -32,6 +32,7 @@ function getViewFromHash() {
 function DashboardAppContent() {
   const [currentView, setCurrentView] = useState(getViewFromHash);
   const [bookingsNavNonce, setBookingsNavNonce] = useState(() => (getViewFromHash() === 'bookings' ? 1 : 0));
+  const [partnerNavNonce, setPartnerNavNonce] = useState(() => (getViewFromHash() === 'partner' ? 1 : 0));
   const [selectedServiceCategory, setSelectedServiceCategory] = useState('all');
   const [isUserAuthOpen, setIsUserAuthOpen] = useState(false);
 
@@ -261,6 +262,9 @@ function DashboardAppContent() {
       if (targetView === 'bookings') {
         setBookingsNavNonce((prev) => prev + 1);
       }
+      if (targetView === 'partner') {
+        setPartnerNavNonce((prev) => prev + 1);
+      }
     };
 
     const handleStorageSync = () => {
@@ -306,6 +310,9 @@ function DashboardAppContent() {
     setCurrentView(view);
     if (view === 'bookings') {
       setBookingsNavNonce((prev) => prev + 1);
+    }
+    if (view === 'partner') {
+      setPartnerNavNonce((prev) => prev + 1);
     }
     const targetHash = view === 'home' ? '#/' : `#/${view}`;
     if (window.location.hash !== targetHash) {
@@ -372,7 +379,7 @@ function DashboardAppContent() {
 
         {currentView === 'partner' && (
           /* 4. Dedicated Service Partner / Agent Console Page */
-          <PartnerConsolePage agent={agent} />
+          <PartnerConsolePage agent={agent} partnerNavNonce={partnerNavNonce} />
         )}
 
         {currentView === 'bookings' && (
