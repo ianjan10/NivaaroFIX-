@@ -709,6 +709,87 @@ router.patch('/request/:ref/cancel', handleCancelRequest);
 router.post('/request/:ref/cancel', handleCancelRequest);
 
 // =========================================================================
+// Customer Logout Cleanup: Automatically invalidates & deletes unassigned requests
+// =========================================================================
+export async function handleCustomerLogoutCleanup({ email, userId }) {
+  const cleanEmail = email ? email.toLowerCase().trim() : null;
+  const numericId = (userId && !isNaN(parseInt(userId, 10))) ? parseInt(userId, 10) : null;
+
+  if (!cleanEmail && !numericId) {
+    return { success: false, error: 'Customer identifier (email or userId) required.' };
+  }
+
+  // 1. Find all open/unaccepted service requests for this customer
+  const srRes = await pool.query(`
+    SELECT id, request_ref, service_request_code, service_title, category
+    FROM service_requests
+    WHERE (
+      (user_email = $1 AND $1 IS NOT NULL) OR
+      (user_id = $2 AND $2 IS NOT NULL)
+    )
+    AND LOWER(REPLACE(status, ' ', '_')) IN ('open', 'pending', 'quoting', 'quoted');
+  `, [cleanEmail, numericId]);
+
+  const removedRequests = [];
+
+  for (const sr of srRes.rows) {
+    const ref = sr.request_ref || sr.service_request_code;
+
+    // Delete quotes for this request
+    await pool.query('DELETE FROM quotes WHERE request_id = $1;', [sr.id]);
+
+    // Delete unconfirmed bookings
+    await pool.query(`
+      DELETE FROM bookings 
+      WHERE (request_id = $1 OR booking_ref = $2)
+        AND LOWER(status) IN ('open', 'pending', 'confirmed');
+    `, [sr.id, ref]);
+
+    // Delete request itself from database
+    await pool.query('DELETE FROM service_requests WHERE id = $1;', [sr.id]);
+
+    // Broadcast cancellation to providers so live feeds immediately remove it
+    broadcastToProviders('request.cancelled', {
+      requestRef: ref,
+      serviceTitle: sr.service_title,
+      category: sr.category,
+      message: 'Request was automatically removed because customer logged out.',
+      timestamp: new Date().toISOString()
+    });
+
+    removedRequests.push(ref);
+  }
+
+  // Also clean any orphaned open/pending bookings for this customer
+  await pool.query(`
+    DELETE FROM bookings
+    WHERE (
+      (user_email = $1 AND $1 IS NOT NULL) OR
+      (user_id = $2 AND $2 IS NOT NULL)
+    )
+    AND LOWER(status) IN ('open', 'pending');
+  `, [cleanEmail, numericId]);
+
+  return {
+    success: true,
+    message: 'Customer logged out. All open unassigned requests invalidated and removed from database.',
+    removedRequests,
+    removedCount: removedRequests.length
+  };
+}
+
+router.post('/customer-logout', async (req, res) => {
+  try {
+    const { email, userId } = req.body || {};
+    const result = await handleCustomerLogoutCleanup({ email, userId });
+    return res.json(result);
+  } catch (err) {
+    console.error('Customer logout error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// =========================================================================
 // Timeout Safeguard Action: Customer triggers Cancel & Re-broadcast
 // =========================================================================
 router.post('/request/:ref/rebroadcast', async (req, res) => {

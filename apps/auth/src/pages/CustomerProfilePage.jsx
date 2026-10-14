@@ -522,8 +522,18 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
     }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    const userToLogout = user;
     localStorage.removeItem('nivaaro-user');
+    if (userToLogout?.email) {
+      try {
+        await fetch('http://localhost:5000/api/auth/customer-logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: userToLogout.email, userId: userToLogout.id })
+        });
+      } catch (err) {}
+    }
     if (onLogout) {
       onLogout();
     } else {

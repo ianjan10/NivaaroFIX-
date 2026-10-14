@@ -111,6 +111,7 @@ export default function PartnerConsolePage({ agent: propAgent }) {
     isLocatingGPS,
     gpsStatus,
     nearbyRequests,
+    setNearbyRequests,
     nearbyLoading,
     loadNearbyRequests,
     quotingRequestRef,
@@ -461,9 +462,15 @@ export default function PartnerConsolePage({ agent: propAgent }) {
 
       eventSource.addEventListener('request.cancelled', (e) => {
         try {
-          addToast('A service request was cancelled by the customer.', 'destructive');
+          const data = JSON.parse(e.data || '{}');
+          if (data && data.requestRef) {
+            setNearbyRequests(prev => prev.filter(r => r.requestRef !== data.requestRef && r.id !== data.requestRef));
+          }
+          addToast('A service request was cancelled or removed.', 'destructive');
           loadNearbyRequests(currentAgent.email, currentAgent.lat, currentAgent.lng);
-        } catch (err) {}
+        } catch (err) {
+          loadNearbyRequests(currentAgent.email, currentAgent.lat, currentAgent.lng);
+        }
       });
 
       eventSource.addEventListener('request.broadcast', (e) => {

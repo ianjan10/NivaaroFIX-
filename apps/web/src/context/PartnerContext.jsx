@@ -579,6 +579,7 @@ export function PartnerProvider({ children }) {
 
         // Nearby requests (from dispatch API)
         nearbyRequests,
+        setNearbyRequests,
         nearbyLoading,
         loadNearbyRequests,
 
@@ -621,6 +622,7 @@ export function usePartner() {
       isLocatingGPS: false,
       gpsStatus: 'idle',
       nearbyRequests: [],
+      setNearbyRequests: () => {},
       nearbyLoading: false,
       loadNearbyRequests: async () => {},
       quotingRequestRef: null,

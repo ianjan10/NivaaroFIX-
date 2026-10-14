@@ -235,9 +235,21 @@ function DashboardAppContent() {
     resumeBookingIntentIfPresent(userData);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const prevUser = user;
     setUser(null);
     localStorage.removeItem('nivaaro-user');
+    if (prevUser?.email) {
+      try {
+        await fetch('http://localhost:5000/api/dispatch/customer-logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: prevUser.email, userId: prevUser.id })
+        });
+      } catch (err) {
+        console.warn('Customer logout cleanup error:', err.message);
+      }
+    }
   };
 
   // Synchronize state with browser back/forward buttons and page returns

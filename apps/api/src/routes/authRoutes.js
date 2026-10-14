@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../config/db.js';
 import { latLngToH3, getCityCoordinates } from '../utils/geoDispatch.js';
 import { generateProfessionalId } from '../utils/idGenerator.js';
+import { handleCustomerLogoutCleanup } from './dispatchRoutes.js';
 
 const router = Router();
 
@@ -724,6 +725,18 @@ router.post('/customer-update-profile', async (req, res) => {
   } catch (err) {
     console.error('Customer update profile error:', err);
     res.status(500).json({ success: false, error: err.message, message: 'Failed to update profile: ' + err.message });
+  }
+});
+
+// Customer Logout: cleans up unfulfilled requests automatically
+router.post('/customer-logout', async (req, res) => {
+  try {
+    const { email, userId } = req.body || {};
+    const result = await handleCustomerLogoutCleanup({ email, userId });
+    return res.json(result);
+  } catch (err) {
+    console.error('Auth customer logout error:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
