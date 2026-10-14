@@ -116,6 +116,24 @@ export default function MyBookingsPage({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [previewPhoto]);
 
+  // Accordion state to minimize/expand booking cards: { [jobId]: boolean }
+  const [cardExpandedMap, setCardExpandedMap] = useState({});
+
+  const isCardExpanded = (job) => {
+    if (cardExpandedMap[job.id] !== undefined) {
+      return cardExpandedMap[job.id];
+    }
+    // Default: Completed and Cancelled jobs are minimized (collapsed). Active jobs are expanded.
+    return job.status !== 'Completed' && job.status !== 'Cancelled';
+  };
+
+  const toggleCardExpanded = (jobId, currentStatus) => {
+    setCardExpandedMap((prev) => {
+      const current = prev[jobId] !== undefined ? prev[jobId] : (currentStatus !== 'Completed' && currentStatus !== 'Cancelled');
+      return { ...prev, [jobId]: !current };
+    });
+  };
+
   // Pending Quote Acceptance dialog state: { quote, job } | null
   const [pendingAcceptQuote, setPendingAcceptQuote] = useState(null);
   const [isAcceptingQuote, setIsAcceptingQuote] = useState(false);
@@ -757,6 +775,7 @@ export default function MyBookingsPage({
                 const currentSort = quotesSortMap[job.id] || 'lowest';
                 const hasDetails = hasCustomDetails(job.problemDescription, job.serviceTitle);
                 const isTrackerVisible = !isOpen && !isQuoted && !isCancelled;
+                const isExpanded = isCardExpanded(job);
 
                 return (
                   <div
@@ -766,12 +785,27 @@ export default function MyBookingsPage({
                       border: '1px solid var(--bg-card-border, #e5e7eb)',
                       borderRadius: '16px',
                       background: 'var(--bg-card, #ffffff)',
-                      padding: '1.5rem',
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.03)'
+                      padding: isExpanded ? '1.5rem' : '1.15rem 1.5rem',
+                      boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                      transition: 'all 0.2s ease'
                     }}
                   >
-                    {/* 1. CARD HEADER */}
-                    <div className="card-top-header" style={{ marginBottom: '0.85rem' }}>
+                    {/* 1. CARD HEADER (Clickable to minimize/expand details) */}
+                    <div
+                      className="card-top-header clickable-header"
+                      style={{ marginBottom: isExpanded ? '0.85rem' : 0 }}
+                      onClick={() => toggleCardExpanded(job.id, job.status)}
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? 'Minimize' : 'Expand'} details for ${job.serviceTitle}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleCardExpanded(job.id, job.status);
+                        }
+                      }}
+                    >
                       <div className="card-service-meta">
                         <div className="service-icon-badge" aria-hidden="true">
                           {job.category === 'plumber' ? (
@@ -795,8 +829,8 @@ export default function MyBookingsPage({
                         </div>
                       </div>
 
-                      {/* Header right: Calm status or job price */}
-                      <div className="card-status-container">
+                      {/* Header right: Calm status or job price + chevron */}
+                      <div className="card-status-container" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         {isCompleted && (
                           <span className="live-status-pill forest-pill" style={{ background: '#ecfdf5', color: '#065f46' }}>
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.6">
@@ -810,16 +844,41 @@ export default function MyBookingsPage({
                             <span>Cancelled</span>
                           </span>
                         )}
+                        <span
+                          className="card-expand-toggle-btn"
+                          aria-hidden="true"
+                          title={isExpanded ? 'Minimize details' : 'Click to view details'}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            width="16"
+                            height="16"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{
+                              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}
+                          >
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </span>
                       </div>
                     </div>
 
-                    {/* Details Box: Rendered ONLY if customer wrote custom text */}
-                    {hasDetails && (
-                      <div className="card-details-box">
-                        <span className="card-details-label">Details:</span>
-                        <span>{job.problemDescription}</span>
-                      </div>
-                    )}
+                    {/* Expandable Details Body */}
+                    {isExpanded && (
+                      <div className="card-expanded-body">
+                        {/* Details Box: Rendered ONLY if customer wrote custom text */}
+                        {hasDetails && (
+                          <div className="card-details-box">
+                            <span className="card-details-label">Details:</span>
+                            <span>{job.problemDescription}</span>
+                          </div>
+                        )}
 
                     {/* 2. QUOTES SECTION (When Open or Quoted) */}
                     {(isOpen || isQuoted) && (
@@ -1106,6 +1165,8 @@ export default function MyBookingsPage({
                         >
                           Cancel request
                         </button>
+                      </div>
+                    )}
                       </div>
                     )}
                   </div>
