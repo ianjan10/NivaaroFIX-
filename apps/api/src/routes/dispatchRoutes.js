@@ -1814,7 +1814,7 @@ router.post('/request/:ref/complete', async (req, res) => {
             availability_status = 'available',
             is_online = true,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1;
+        WHERE id = $2;
       `, [providerPayout, professionalId]);
     } catch (proErr) {
       // Ignored if table or row missing
@@ -2089,9 +2089,9 @@ router.get('/wallet/:email', async (req, res) => {
 
     const agentId = agentRes.rows[0]?.id || null;
     const proId = proRes.rows[0]?.id || null;
-    const balance = agentRes.rows[0]
-      ? parseFloat(agentRes.rows[0].wallet_balance || 0)
-      : parseFloat(proRes.rows[0]?.wallet_balance || 0);
+    const agentBalance = agentRes.rows[0] ? parseFloat(agentRes.rows[0].wallet_balance || 0) : 0;
+    const proBalance = proRes.rows[0] ? parseFloat(proRes.rows[0].wallet_balance || 0) : 0;
+    let balance = Math.max(agentBalance, proBalance);
     const completedJobs = agentRes.rows[0]?.completed_jobs ?? proRes.rows[0]?.completed_jobs ?? 0;
 
     const txRes = await pool.query(`
@@ -2123,7 +2123,7 @@ router.get('/wallet/:email', async (req, res) => {
           'credit' AS type,
           p.net_payout AS amount,
           p.balance_after,
-          COALESCE('Job completed: ' || NULLIF(COALESCE(sr.title, sr.service_title), ''), 'Service Job Payout Credited') AS description,
+          COALESCE('Job completed: ' || NULLIF(sr.service_title, ''), 'Service Job Payout Credited') AS description,
           p.created_at
         FROM payouts p
         LEFT JOIN service_requests sr ON sr.id = p.service_request_id
@@ -2137,6 +2137,24 @@ router.get('/wallet/:email', async (req, res) => {
       ORDER BY created_at DESC
       LIMIT 50;
     `, [agentId, proId]);
+
+    // Ensure balance reflects latest transaction balance if higher
+    if (txRes.rows.length > 0 && txRes.rows[0].balance_after) {
+      const latestTxBalance = parseFloat(txRes.rows[0].balance_after);
+      if (!isNaN(latestTxBalance) && latestTxBalance > balance) {
+        balance = latestTxBalance;
+      }
+    }
+
+    // Keep DB tables in sync with positive balance
+    if (balance > 0) {
+      if (agentId && agentBalance < balance) {
+        await pool.query('UPDATE agent_login SET wallet_balance = $1 WHERE id = $2;', [balance, agentId]).catch(() => {});
+      }
+      if (proId && proBalance < balance) {
+        await pool.query('UPDATE professionals SET wallet_balance = $1 WHERE id = $2;', [balance, proId]).catch(() => {});
+      }
+    }
 
     return res.json({
       success: true,
