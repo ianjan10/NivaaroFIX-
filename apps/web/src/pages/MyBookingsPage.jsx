@@ -72,7 +72,8 @@ export default function MyBookingsPage({
   currentUser,
   onNavigateToHome,
   onNavigateToServices,
-  onOpenAuth
+  onOpenAuth,
+  bookingsNavNonce = 0
 }) {
   const {
     activeBookings: liveDbBookings,
@@ -88,7 +89,21 @@ export default function MyBookingsPage({
   const { t } = useLanguage();
 
   // Active tab state: 'active' | 'completed' | 'all'
-  const [activeTab, setActiveTab] = useState('active');
+  // If active requests are already in context and empty, default directly to 'all'
+  const [activeTab, setActiveTab] = useState(() => {
+    if (Array.isArray(activeRequests)) {
+      const hasActive = activeRequests.some((r) =>
+        !['completed', 'cancelled'].includes((r.status || '').toLowerCase())
+      );
+      if (!hasActive && activeRequests.length > 0) {
+        return 'all';
+      }
+    }
+    return 'active';
+  });
+
+  // Track if user manually clicked a specific tab
+  const userInteractedTabRef = useRef(false);
 
   // Search input & debounced query
   const [searchInput, setSearchInput] = useState('');
@@ -415,6 +430,35 @@ export default function MyBookingsPage({
     });
   }, [unifiedJobs, activeTab, debouncedSearch]);
 
+  // When there is no active booking, automatically switch to 'all' booking
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (activeCount === 0) {
+      // If no active bookings exist, automatically show 'all'
+      if (!userInteractedTabRef.current || activeTab === 'active') {
+        setActiveTab('all');
+      }
+    } else {
+      // Active booking exists -> show 'active' if user hasn't explicitly selected another tab
+      if (!userInteractedTabRef.current) {
+        setActiveTab('active');
+      }
+    }
+  }, [isLoading, activeCount, activeTab]);
+
+  // When user clicks on "My Bookings" in navbar or anywhere across the app:
+  useEffect(() => {
+    if (bookingsNavNonce > 0) {
+      userInteractedTabRef.current = false;
+      if (activeCount === 0) {
+        setActiveTab('all');
+      } else {
+        setActiveTab('active');
+      }
+    }
+  }, [bookingsNavNonce, activeCount]);
+
   // Automatically prompt full-screen rating if an active request just completed and is unrated
   useEffect(() => {
     const unratedCompleted = unifiedJobs.find(
@@ -619,7 +663,10 @@ export default function MyBookingsPage({
                   role="tab"
                   aria-selected={activeTab === 'active'}
                   className={`segmented-tab-btn ${activeTab === 'active' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('active')}
+                  onClick={() => {
+                    userInteractedTabRef.current = true;
+                    setActiveTab('active');
+                  }}
                 >
                   <span>Active</span>
                   <span className="tab-count-badge active-badge">{activeCount}</span>
@@ -630,7 +677,10 @@ export default function MyBookingsPage({
                   role="tab"
                   aria-selected={activeTab === 'completed'}
                   className={`segmented-tab-btn ${activeTab === 'completed' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('completed')}
+                  onClick={() => {
+                    userInteractedTabRef.current = true;
+                    setActiveTab('completed');
+                  }}
                 >
                   <span>Completed</span>
                   <span className="tab-count-badge completed-badge">{completedCount}</span>
@@ -641,7 +691,10 @@ export default function MyBookingsPage({
                   role="tab"
                   aria-selected={activeTab === 'all'}
                   className={`segmented-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('all')}
+                  onClick={() => {
+                    userInteractedTabRef.current = true;
+                    setActiveTab('all');
+                  }}
                 >
                   <span>All</span>
                   <span className="tab-count-badge all-badge">{allCount}</span>

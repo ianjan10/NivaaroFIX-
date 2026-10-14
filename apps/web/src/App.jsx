@@ -31,6 +31,7 @@ function getViewFromHash() {
 
 function DashboardAppContent() {
   const [currentView, setCurrentView] = useState(getViewFromHash);
+  const [bookingsNavNonce, setBookingsNavNonce] = useState(() => (getViewFromHash() === 'bookings' ? 1 : 0));
   const [selectedServiceCategory, setSelectedServiceCategory] = useState('all');
   const [isUserAuthOpen, setIsUserAuthOpen] = useState(false);
 
@@ -257,6 +258,9 @@ function DashboardAppContent() {
     const handleUrlChange = () => {
       const targetView = getViewFromHash();
       setCurrentView(targetView);
+      if (targetView === 'bookings') {
+        setBookingsNavNonce((prev) => prev + 1);
+      }
     };
 
     const handleStorageSync = () => {
@@ -300,6 +304,9 @@ function DashboardAppContent() {
   const navigateTo = (view, category = 'all') => {
     setSelectedServiceCategory(category);
     setCurrentView(view);
+    if (view === 'bookings') {
+      setBookingsNavNonce((prev) => prev + 1);
+    }
     const targetHash = view === 'home' ? '#/' : `#/${view}`;
     if (window.location.hash !== targetHash) {
       window.location.hash = targetHash;
@@ -375,6 +382,7 @@ function DashboardAppContent() {
             onNavigateToHome={() => navigateTo('home')}
             onNavigateToServices={(cat) => navigateTo('services', cat)}
             onOpenAuth={() => setIsUserAuthOpen(true)}
+            bookingsNavNonce={bookingsNavNonce}
           />
         )}
       </main>
