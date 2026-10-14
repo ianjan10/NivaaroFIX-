@@ -102,8 +102,8 @@ export default function MyBookingsPage({
     return 'active';
   });
 
-  // Track if user manually clicked a specific tab
-  const userInteractedTabRef = useRef(false);
+  // Track whether initial tab selection has been performed on entry
+  const hasInitializedTabRef = useRef(false);
 
   // Search input & debounced query
   const [searchInput, setSearchInput] = useState('');
@@ -430,27 +430,23 @@ export default function MyBookingsPage({
     });
   }, [unifiedJobs, activeTab, debouncedSearch]);
 
-  // When there is no active booking, automatically switch to 'all' booking
+  // Initial tab resolution on page load / entry:
+  // When there are no active bookings, automatically start on 'all'; otherwise start on 'active'.
   useEffect(() => {
     if (isLoading) return;
-
-    if (activeCount === 0) {
-      // If no active bookings exist, automatically show 'all'
-      if (!userInteractedTabRef.current || activeTab === 'active') {
+    if (!hasInitializedTabRef.current) {
+      hasInitializedTabRef.current = true;
+      if (activeCount === 0) {
         setActiveTab('all');
-      }
-    } else {
-      // Active booking exists -> show 'active' if user hasn't explicitly selected another tab
-      if (!userInteractedTabRef.current) {
+      } else {
         setActiveTab('active');
       }
     }
-  }, [isLoading, activeCount, activeTab]);
+  }, [isLoading, activeCount]);
 
-  // When user clicks on "My Bookings" in navbar or anywhere across the app:
+  // When user explicitly clicks "My Bookings" in navbar or header navigation:
   useEffect(() => {
     if (bookingsNavNonce > 0) {
-      userInteractedTabRef.current = false;
       if (activeCount === 0) {
         setActiveTab('all');
       } else {
@@ -663,10 +659,7 @@ export default function MyBookingsPage({
                   role="tab"
                   aria-selected={activeTab === 'active'}
                   className={`segmented-tab-btn ${activeTab === 'active' ? 'active' : ''}`}
-                  onClick={() => {
-                    userInteractedTabRef.current = true;
-                    setActiveTab('active');
-                  }}
+                  onClick={() => setActiveTab('active')}
                 >
                   <span>Active</span>
                   <span className="tab-count-badge active-badge">{activeCount}</span>
@@ -677,10 +670,7 @@ export default function MyBookingsPage({
                   role="tab"
                   aria-selected={activeTab === 'completed'}
                   className={`segmented-tab-btn ${activeTab === 'completed' ? 'active' : ''}`}
-                  onClick={() => {
-                    userInteractedTabRef.current = true;
-                    setActiveTab('completed');
-                  }}
+                  onClick={() => setActiveTab('completed')}
                 >
                   <span>Completed</span>
                   <span className="tab-count-badge completed-badge">{completedCount}</span>
@@ -691,10 +681,7 @@ export default function MyBookingsPage({
                   role="tab"
                   aria-selected={activeTab === 'all'}
                   className={`segmented-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-                  onClick={() => {
-                    userInteractedTabRef.current = true;
-                    setActiveTab('all');
-                  }}
+                  onClick={() => setActiveTab('all')}
                 >
                   <span>All</span>
                   <span className="tab-count-badge all-badge">{allCount}</span>
