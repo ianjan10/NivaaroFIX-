@@ -269,6 +269,30 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const playDispatchChime = () => {
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    } catch (err) {
+      // AudioContext policy catch
+    }
+  };
+
   // Quote Submission Modal State
   const [quoteModalReq, setQuoteModalReq] = useState(null);
   const [quoteAmount, setQuoteAmount] = useState('');
@@ -363,6 +387,25 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     activePartnerJob &&
     ['accepted', 'en route', 'otp verified', 'in progress'].includes((activePartnerJob.status || '').toLowerCase())
   );
+
+  // Automatically refresh and switch to Live Requests feed whenever new customer requests arrive
+  const prevNearbyCountRef = useRef(nearbyRequests ? nearbyRequests.length : 0);
+  useEffect(() => {
+    if (isBusyOnJob) return;
+    const currentCount = Array.isArray(nearbyRequests) ? nearbyRequests.length : 0;
+    const prevCount = prevNearbyCountRef.current;
+
+    // Transition from 0 to >0 OR count increases: new incoming customer request arrived!
+    if (currentCount > 0 && (prevCount === 0 || currentCount > prevCount)) {
+      setActiveTab('feed');
+      const latestReq = nearbyRequests[0];
+      const title = latestReq?.serviceTitle || 'Customer Service Request';
+      addToast(`New Live Request: "${title}" is waiting for quotation. Switched to Live Requests.`, 'brass');
+      playDispatchChime();
+    }
+
+    prevNearbyCountRef.current = currentCount;
+  }, [nearbyRequests, isBusyOnJob]);
 
   // Load provider data & auto-fetch live GPS on mount / agent change
   useEffect(() => {
@@ -538,16 +581,25 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
         }
       });
 
-      eventSource.addEventListener('request.broadcast', (e) => {
+      const handleIncomingRequestEvent = (e) => {
         try {
-          const data = JSON.parse(e.data);
+          const data = JSON.parse(e.data || '{}');
+          const title = data.serviceTitle || 'Customer Service Request';
           addToast(
-            `New Request Nearby: "${data.serviceTitle || 'Service Request'}" within your service radius!`,
+            `New Request Nearby: "${title}" within your service radius! Review details and send quote.`,
             'brass'
           );
-          loadNearbyRequests(currentAgent.email, currentAgent.lat, currentAgent.lng);
+          setActiveTab('feed');
+          playDispatchChime();
+          const targetLat = providerLocation?.lat || currentAgent?.lat || null;
+          const targetLng = providerLocation?.lng || currentAgent?.lng || null;
+          loadNearbyRequests(currentAgent.email, targetLat, targetLng);
         } catch (err) {}
-      });
+      };
+
+      eventSource.addEventListener('request.broadcast', handleIncomingRequestEvent);
+      eventSource.addEventListener('request.dispatched', handleIncomingRequestEvent);
+      eventSource.addEventListener('dispatch.request.sent', handleIncomingRequestEvent);
     } catch (err) {
       console.warn('Provider SSE stream notice:', err);
     }
@@ -557,7 +609,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
         eventSource.close();
       }
     };
-  }, [currentAgent, loadActiveJob, loadWallet, loadNearbyRequests]);
+  }, [currentAgent, loadActiveJob, loadWallet, loadNearbyRequests, providerLocation]);
 
   const handleWithdraw = async () => {
     if (walletBalance <= 0) return;

@@ -2,7 +2,7 @@ import { latLngToCell } from 'h3-js';
 import { pool } from '../../config/db.js';
 import { DISPATCH_CONFIG } from '../../config/dispatchConfig.js';
 import { dispatchProgressiveWave } from '../dispatch/dispatchService.js';
-import { notifyCustomer } from '../realtime/realtimeService.js';
+import { notifyCustomer, broadcastToProviders } from '../realtime/realtimeService.js';
 import { classifyServiceCategory } from '../../routes/dispatchRoutes.js';
 
 /**
@@ -179,7 +179,22 @@ export async function createServiceRequest(params) {
       hasCoordinates: !!(numLat && numLng),
       initialRadius: DISPATCH_CONFIG.INITIAL_RADIUS_METERS || 50
     })
-  ]);
+  // Broadcast to online providers listening on SSE stream
+  try {
+    broadcastToProviders('request.broadcast', {
+      requestId: createdRequest.id,
+      requestRef: createdRequest.request_ref,
+      serviceTitle: createdRequest.service_title,
+      category: createdRequest.category,
+      problemDescription: createdRequest.problem_description,
+      userAddress: createdRequest.user_address,
+      lat: createdRequest.lat,
+      lng: createdRequest.lng,
+      createdAt: createdRequest.created_at
+    });
+  } catch (bcastErr) {
+    console.warn('Realtime broadcast notice:', bcastErr.message);
+  }
 
   return {
     success: true,

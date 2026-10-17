@@ -129,13 +129,27 @@ export function notifyProvider(email, eventName, payload) {
 }
 
 /**
- * Notify multiple providers (e.g. dispatched providers in a discovery radius wave).
+ * Notify multiple providers (e.g. dispatched providers in a discovery radius wave)
+ * or broadcast to all currently connected providers if called with (eventName, payload).
  */
-export function broadcastToProviders(emails, eventName, payload) {
-  if (!Array.isArray(emails)) return;
-  emails.forEach((email) => {
-    notifyProvider(email, eventName, payload);
-  });
+export function broadcastToProviders(emailsOrEvent, eventOrPayload, maybePayload) {
+  if (Array.isArray(emailsOrEvent)) {
+    const eventName = eventOrPayload;
+    const payload = maybePayload;
+    emailsOrEvent.forEach((email) => {
+      notifyProvider(email, eventName, payload);
+    });
+    return;
+  }
+
+  // If first argument is eventName string: broadcast to all connected providers
+  if (typeof emailsOrEvent === 'string') {
+    const eventName = emailsOrEvent;
+    const payload = eventOrPayload;
+    providerClients.forEach((clients, email) => {
+      notifyProvider(email, eventName, payload);
+    });
+  }
 }
 
 export default {
