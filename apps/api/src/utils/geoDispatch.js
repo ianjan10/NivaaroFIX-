@@ -204,7 +204,7 @@ export async function findNearbyProviders(lat, lng, category = 'electrician', ra
         AND h3_index_res9 IN (${placeholders})
         AND lat IS NOT NULL
         AND lng IS NOT NULL
-        AND (trade = $${cells.length + 1} OR trade = 'both')
+        AND ($${cells.length + 1}::text IN ('both', 'all') OR trade = $${cells.length + 1} OR trade = 'both')
       ORDER BY rating DESC, completed_jobs DESC;
     `;
 
@@ -219,7 +219,7 @@ export async function findNearbyProviders(lat, lng, category = 'electrician', ra
       WHERE is_online = true
         AND lat IS NOT NULL
         AND lng IS NOT NULL
-        AND (trade = $1 OR trade = 'both')
+        AND ($1::text IN ('both', 'all') OR trade = $1 OR trade = 'both')
       ORDER BY rating DESC, completed_jobs DESC
       LIMIT 50;
     `, [category]);

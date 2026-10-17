@@ -46,6 +46,7 @@ export default function UberStyleTrackingMap({
   const routePolylineRef = useRef(null);
   const destMarkerRef = useRef(null);
   const proMarkerRef = useRef(null);
+  const animationFrameRef = useRef(null);
 
   const [proLocation, setProLocation] = useState(() => {
     if (initialProLat && initialProLng) {
@@ -96,6 +97,36 @@ export default function UberStyleTrackingMap({
     }).addTo(mapInstanceRef.current);
   }, []);
 
+  // Smooth animated coordinate interpolation for vehicle marker
+  const animateProMarker = useCallback((targetLat, targetLng, targetHeading) => {
+    if (!proMarkerRef.current) return;
+    const startLatLng = proMarkerRef.current.getLatLng();
+    const startLat = startLatLng.lat;
+    const startLng = startLatLng.lng;
+    const startTime = performance.now();
+    const duration = 650;
+
+    const step = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const curLat = startLat + (targetLat - startLat) * ease;
+      const curLng = startLng + (targetLng - startLng) * ease;
+
+      if (proMarkerRef.current) {
+        proMarkerRef.current.setLatLng([curLat, curLng]);
+        proMarkerRef.current.setIcon(createProMarker(targetHeading));
+      }
+
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(step);
+      }
+    };
+
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = requestAnimationFrame(step);
+  }, []);
+
   // Handle new incoming position
   const handlePositionUpdate = useCallback((data) => {
     if (!data || !data.lat || !data.lng) return;
@@ -118,30 +149,53 @@ export default function UberStyleTrackingMap({
       setDistanceKm(data.distanceKm);
     }
 
-    // Update Pro Marker
-    if (proMarkerRef.current && mapInstanceRef.current) {
-      proMarkerRef.current.setLatLng([newLat, newLng]);
-      proMarkerRef.current.setIcon(createProMarker(heading));
+    // Smoothly animate Pro Marker
+    animateProMarker(newLat, newLng, heading);
 
-      if (isFollowing) {
-        mapInstanceRef.current.panTo([newLat, newLng], { animate: true, duration: 0.6 });
-      }
+    if (isFollowing && mapInstanceRef.current) {
+      mapInstanceRef.current.panTo([newLat, newLng], { animate: true, duration: 0.6 });
     }
 
     if (data.route && Array.isArray(data.route)) {
       updateRouteLine(data.route);
     }
-  }, [isFollowing, onEtaChange, updateRouteLine]);
+  }, [isFollowing, onEtaChange, updateRouteLine, animateProMarker]);
 
-  // WebSocket & SSE live location listener
+  // WebSocket & SSE live location listener + Initial snapshot fetch
   useEffect(() => {
     if (!jobRef) return;
 
     let ws = null;
     let sse = null;
-    let isSubscribed = false;
+    let isMounted = true;
 
-    // Connect WebSocket
+    // 1. Initial snapshot fetch to immediately draw road route and pro location
+    fetch(`/api/dispatch/job/${jobRef}/tracking`)
+      .then(res => res.json())
+      .then(data => {
+        if (!isMounted || !data.success || !data.tracking) return;
+        const tr = data.tracking;
+        if (tr.latestPosition) {
+          handlePositionUpdate({
+            lat: tr.latestPosition.lat,
+            lng: tr.latestPosition.lng,
+            heading: tr.latestPosition.heading,
+            route: tr.route,
+            etaMinutes: tr.etaMinutes,
+            distanceKm: tr.distanceKm
+          });
+        } else if (tr.route) {
+          updateRouteLine(tr.route);
+          if (tr.etaMinutes) {
+            setEta(tr.etaMinutes);
+            if (onEtaChange) onEtaChange(tr.etaMinutes);
+          }
+          if (tr.distanceKm) setDistanceKm(tr.distanceKm);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Connect WebSocket
     try {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${wsProtocol}//${window.location.host}/ws/tracking`;
@@ -153,7 +207,6 @@ export default function UberStyleTrackingMap({
           jobRef,
           role: 'customer'
         }));
-        isSubscribed = true;
       };
 
       ws.onmessage = (event) => {
@@ -177,7 +230,7 @@ export default function UberStyleTrackingMap({
       };
     } catch (e) {}
 
-    // SSE fallback
+    // 3. SSE fallback
     try {
       sse = new EventSource(`/api/dispatch/request/${jobRef}/events`);
       sse.addEventListener('location.update', (e) => {
@@ -189,10 +242,11 @@ export default function UberStyleTrackingMap({
     } catch (e) {}
 
     return () => {
+      isMounted = false;
       if (ws) ws.close();
       if (sse) sse.close();
     };
-  }, [jobRef, handlePositionUpdate]);
+  }, [jobRef, handlePositionUpdate, updateRouteLine, onEtaChange]);
 
   // Map initialization
   useEffect(() => {
@@ -268,6 +322,7 @@ export default function UberStyleTrackingMap({
     }, 250);
 
     return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       map.remove();
       mapInstanceRef.current = null;
     };

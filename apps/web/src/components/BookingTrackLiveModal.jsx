@@ -19,7 +19,7 @@ export default function BookingTrackLiveModal({ isOpen, onClose, booking, onCont
   // Listen to SSE status changes for real-time transitions (e.g. Arrived, In progress)
   useEffect(() => {
     if (!isOpen || !booking) return;
-    const ref = booking.bookingRef || booking.bookingId || booking.requestRef;
+    const ref = booking.bookingRef || booking.bookingId || booking.requestRef || booking.request_ref || booking.id;
     if (!ref) return;
 
     let sse = null;
@@ -119,7 +119,7 @@ export default function BookingTrackLiveModal({ isOpen, onClose, booking, onCont
 
         {/* Real Uber-Styled Tracking Map */}
         <UberStyleTrackingMap
-          jobRef={booking.bookingRef || booking.bookingId || booking.requestRef}
+          jobRef={booking.bookingRef || booking.bookingId || booking.requestRef || booking.request_ref || booking.id}
           destLat={booking.lat || booking.service_lat}
           destLng={booking.lng || booking.service_lng}
           initialProLat={booking.technicianLat}

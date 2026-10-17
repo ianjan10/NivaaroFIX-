@@ -9,8 +9,8 @@ import {
   RADIUS_EXPANSION_TIERS_KM,
   getCityCoordinates
 } from '../utils/geoDispatch.js';
-import { notifyCustomer, notifyProvider, broadcastToProviders } from '../modules/realtime/realtimeService.js';
-import { cleanupJobTracking, processLocationUpdate } from '../modules/tracking/trackingSocket.js';
+import { notifyCustomer, notifyProvider, broadcastToProviders, registerCustomerStream } from '../modules/realtime/realtimeService.js';
+import { cleanupJobTracking, processLocationUpdate, getOrInitChannel, fetchRoadRoute } from '../modules/tracking/trackingSocket.js';
 
 const router = Router();
 
@@ -1652,6 +1652,69 @@ router.post('/job/:ref/location', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// Realtime GPS Tracking State (Uber/Ola/Rapido Telemetry Snapshot)
+router.get('/job/:ref/tracking', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const channel = await getOrInitChannel(ref);
+    if (!channel) {
+      return res.status(404).json({ success: false, error: 'Tracking channel not found for this job reference.' });
+    }
+
+    // If channel has no latest position yet, retrieve the assigned pro's last known coordinates from DB
+    if (!channel.latestPosition && channel.assignedProId) {
+      const proRes = await pool.query('SELECT lat, lng, city FROM agent_login WHERE id = $1 LIMIT 1;', [channel.assignedProId]);
+      if (proRes.rows.length > 0 && proRes.rows[0].lat && proRes.rows[0].lng) {
+        const pLat = parseFloat(proRes.rows[0].lat);
+        const pLng = parseFloat(proRes.rows[0].lng);
+        channel.latestPosition = {
+          lat: pLat,
+          lng: pLng,
+          heading: 0,
+          speed: 0,
+          accuracy: 10,
+          updatedAt: Date.now()
+        };
+        if (!channel.cachedRoute && channel.destLat && channel.destLng) {
+          const routeData = await fetchRoadRoute(pLat, pLng, channel.destLat, channel.destLng);
+          channel.cachedRoute = routeData.coordinates;
+          channel.cachedDistanceKm = routeData.distanceKm;
+          channel.cachedEtaMinutes = routeData.etaMinutes;
+          channel.lastRouteCalculatedAt = Date.now();
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      tracking: {
+        jobRef: ref,
+        destLat: channel.destLat,
+        destLng: channel.destLng,
+        latestPosition: channel.latestPosition,
+        breadcrumbs: channel.breadcrumbs,
+        route: channel.cachedRoute,
+        distanceKm: channel.cachedDistanceKm,
+        etaMinutes: channel.cachedEtaMinutes,
+        assignedProId: channel.assignedProId,
+        assignedProEmail: channel.assignedProEmail
+      }
+    });
+  } catch (err) {
+    console.error('Fetch job tracking error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// SSE Customer Stream Aliases for live dispatch events and tracking
+router.get('/request/:requestRef/events', (req, res) => {
+  registerCustomerStream(req.params.requestRef, req, res);
+});
+
+router.get('/job/:ref/events', (req, res) => {
+  registerCustomerStream(req.params.ref, req, res);
 });
 
 // =========================================================================

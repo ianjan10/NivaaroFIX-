@@ -25,7 +25,7 @@ const activeJobChannels = new Map();
 /**
  * Fetch or initialize tracking channel metadata from DB.
  */
-async function getOrInitChannel(jobRef) {
+export async function getOrInitChannel(jobRef) {
   if (activeJobChannels.has(jobRef)) {
     return activeJobChannels.get(jobRef);
   }
@@ -83,7 +83,7 @@ export function cleanupJobTracking(jobRef) {
 /**
  * Calculate heading angle in degrees between two lat/lng coordinates.
  */
-function calculateHeading(lat1, lng1, lat2, lng2) {
+export function calculateHeading(lat1, lng1, lat2, lng2) {
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const y = Math.sin(dLng) * Math.cos((lat2 * Math.PI) / 180);
   const x =
@@ -96,7 +96,7 @@ function calculateHeading(lat1, lng1, lat2, lng2) {
 /**
  * Fetch real road route & ETA from OSRM driving API with graceful fallback.
  */
-async function fetchRoadRoute(fromLat, fromLng, toLat, toLng) {
+export async function fetchRoadRoute(fromLat, fromLng, toLat, toLng) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2500);

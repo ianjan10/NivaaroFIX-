@@ -4,6 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { evaluateAgentChecklist } from '../utils/profileStrength';
 import BookingToast from '../components/BookingToast';
 import UnifiedOtpInput from '../components/UnifiedOtpInput';
+import PartnerActiveNavigationMap from '../components/PartnerActiveNavigationMap';
 import '../styles/PartnerConsole.css';
 
 const API_BASE = 'http://localhost:5000/api';
@@ -1350,6 +1351,21 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
                 </div>
               )}
             </div>
+
+            {/* Live Uber/Ola-grade Turn-by-Turn Road Route & Navigation Telemetry */}
+            {(isAccepted || isEnRoute || isArrived) && (
+              <div style={{ margin: '0.85rem 0' }}>
+                <PartnerActiveNavigationMap
+                  job={activePartnerJob}
+                  currentAgent={currentAgent}
+                  onLocationUpdate={(lat, lng) => {
+                    if (updateLocation && currentAgent?.email) {
+                      updateLocation(currentAgent.email, lat, lng);
+                    }
+                  }}
+                />
+              </div>
+            )}
 
             <div className="pro-job-action-footer">
               {/* Step 1: Confirmed -> Mark On the way */}
