@@ -11399,6 +11399,363 @@ body.dark-theme .action-icon-circle.message-circle {
   to { opacity: 1; transform: scale(1); }
 }
 
+/* ==========================================================================
+   ACTIVE BOOKING IN PROGRESS BLOCKED MODAL (Dedicated Service Policy)
+   ========================================================================== */
+.active-blocked-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 18, 26, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: activeBlockedFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.active-blocked-modal-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1px solid rgba(184, 134, 47, 0.25);
+  box-shadow: 0 32px 80px -16px rgba(10, 16, 24, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+  width: 100%;
+  max-width: 540px;
+  padding: 2.25rem 2rem 2rem;
+  text-align: center;
+  animation: activeBlockedCardSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes activeBlockedFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes activeBlockedCardSlide {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.active-blocked-close-btn {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(16, 24, 32, 0.08);
+  background: rgba(16, 24, 32, 0.04);
+  color: #5A6472;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.active-blocked-close-btn:hover {
+  background: rgba(16, 24, 32, 0.08);
+  color: #101820;
+  transform: rotate(90deg);
+}
+
+.active-blocked-icon-bubble {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(184, 134, 47, 0.12);
+  border: 1px solid rgba(184, 134, 47, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem auto;
+  box-shadow: 0 8px 24px -4px rgba(184, 134, 47, 0.2);
+}
+
+.active-blocked-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #B8862F;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.active-blocked-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.65rem;
+  font-weight: 600;
+  color: #101820;
+  margin: 0 0 0.65rem 0;
+  line-height: 1.25;
+}
+
+.active-blocked-desc {
+  font-size: 0.92rem;
+  color: #5A6472;
+  line-height: 1.55;
+  margin: 0 0 1.5rem 0;
+}
+
+.active-blocked-job-box {
+  background: #fbf9f5;
+  border: 1px solid rgba(184, 134, 47, 0.22);
+  border-radius: 16px;
+  padding: 1.25rem;
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.active-blocked-job-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(16, 24, 32, 0.06);
+}
+
+.active-blocked-job-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.active-blocked-job-service {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #101820;
+}
+
+.active-blocked-job-ref {
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: monospace;
+  color: #8C7040;
+}
+
+.active-blocked-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.active-blocked-status-pill.live {
+  background: rgba(16, 185, 129, 0.12);
+  color: #065f46;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+
+.active-blocked-status-pill.quoting {
+  background: rgba(184, 134, 47, 0.12);
+  color: #92580a;
+  border: 1px solid rgba(184, 134, 47, 0.28);
+}
+
+.active-blocked-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulseDot 1.8s infinite;
+}
+
+.active-blocked-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.active-blocked-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.active-blocked-grid-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7B8594;
+}
+
+.active-blocked-grid-val {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #101820;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-blocked-grid-val.accent {
+  color: #B8862F;
+}
+
+.active-blocked-notice-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.76rem;
+  color: #657080;
+  background: rgba(16, 24, 32, 0.03);
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  line-height: 1.45;
+}
+
+.active-blocked-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.active-blocked-primary-btn {
+  width: 100%;
+  background: #B8862F;
+  color: #ffffff;
+  border: none;
+  border-radius: 14px;
+  padding: 0.85rem 1.5rem;
+  font-family: inherit;
+  font-size: 0.96rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(184, 134, 47, 0.32);
+  transition: all 0.2s ease;
+}
+
+.active-blocked-primary-btn:hover {
+  background: #9d7023;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(184, 134, 47, 0.4);
+}
+
+.active-blocked-secondary-btn {
+  width: 100%;
+  background: transparent;
+  color: #5A6472;
+  border: 1px solid rgba(16, 24, 32, 0.12);
+  border-radius: 14px;
+  padding: 0.75rem 1.5rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.active-blocked-secondary-btn:hover {
+  background: rgba(16, 24, 32, 0.04);
+  color: #101820;
+  border-color: rgba(16, 24, 32, 0.25);
+}
+
+/* Services Page Active Service Strip */
+.services-active-booking-strip {
+  background: #fbf9f5;
+  border: 1px solid rgba(184, 134, 47, 0.35);
+  border-radius: 14px;
+  padding: 0.85rem 1.25rem;
+  margin: 1rem 0 1.75rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  box-shadow: 0 4px 16px rgba(184, 134, 47, 0.08);
+}
+
+.services-active-strip-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  color: #101820;
+}
+
+.services-active-strip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  animation: pulseDot 1.8s infinite;
+}
+
+.services-active-strip-label {
+  font-weight: 500;
+  color: #5A6472;
+}
+
+.services-active-strip-title {
+  font-weight: 700;
+  color: #101820;
+}
+
+.services-active-strip-ref {
+  font-family: monospace;
+  font-size: 0.78rem;
+  color: #8C7040;
+  background: rgba(184, 134, 47, 0.1);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.services-active-strip-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.services-active-track-btn {
+  background: #B8862F;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.services-active-track-btn:hover {
+  background: #9d7023;
+}
+
+.services-active-policy-btn {
+  background: transparent;
+  color: #5A6472;
+  border: 1px solid rgba(16, 24, 32, 0.15);
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.services-active-policy-btn:hover {
+  background: rgba(16, 24, 32, 0.04);
+  color: #101820;
+}
+
+
 
 
 

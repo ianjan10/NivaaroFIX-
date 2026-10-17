@@ -269,13 +269,26 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
     addNewBooking,
     loadUserBookings,
     hasActiveCustomerRequest,
-    activeCustomerRequest
+    activeCustomerRequest,
+    hasRunningBooking,
+    runningBooking,
+    openRunningBookingBlockedModal
   } = useBooking();
   const { selectedCity } = useLocation();
   const { t, activeLanguage } = useLanguage();
 
   // Wizard Steps: 1: Describe & Photos, 2: Review & Address, 3: Confirm & Proximity Match
   const [step, setStep] = useState(1);
+
+  // If a booking is running when the drawer opens, defer immediately to the classy policy note
+  useEffect(() => {
+    if (isBookingModalOpen && (hasRunningBooking || hasActiveCustomerRequest) && step !== 3) {
+      closeBookingModal();
+      if (openRunningBookingBlockedModal) {
+        openRunningBookingBlockedModal(runningBooking || activeCustomerRequest);
+      }
+    }
+  }, [isBookingModalOpen, hasRunningBooking, hasActiveCustomerRequest, step, closeBookingModal, openRunningBookingBlockedModal, runningBooking, activeCustomerRequest]);
 
   // Step 1: Problem Description & Photos
   const [problemDescription, setProblemDescription] = useState('');

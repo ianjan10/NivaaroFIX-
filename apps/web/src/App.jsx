@@ -14,6 +14,7 @@ import AgentRoleNoticeModal from './components/AgentRoleNoticeModal';
 import LanguageSelectorModal from './components/LanguageSelectorModal';
 import UserAuthModal from './components/UserAuthModal';
 import CustomerProfileIncompleteModal from './components/CustomerProfileIncompleteModal';
+import ActiveBookingBlockedModal from './components/ActiveBookingBlockedModal';
 import PartnerConsolePage from './pages/PartnerConsolePage';
 import MyBookingsPage from './pages/MyBookingsPage';
 
@@ -41,6 +42,7 @@ function DashboardAppContent() {
     openAgentNotice,
     closeAgentNotice,
     loadUserBookings,
+    loadMyRequests,
     isProfileIncompleteModalOpen,
     closeProfileIncompleteModal
   } = useBooking();
@@ -93,8 +95,11 @@ function DashboardAppContent() {
   useEffect(() => {
     if (user?.isLoggedIn) {
       loadUserBookings(user);
+      if (loadMyRequests) {
+        loadMyRequests(user);
+      }
     }
-  }, [user, loadUserBookings]);
+  }, [user, loadUserBookings, loadMyRequests]);
 
   // Validate Customer session with PostgreSQL (purges stale/AI-generated users if not in DB)
   useEffect(() => {
@@ -365,6 +370,7 @@ function DashboardAppContent() {
             onAgentBlocked={() => openAgentNotice()}
             onNavigateToHome={() => navigateTo('home')}
             onNavigateToPartner={() => navigateTo('partner')}
+            onNavigateToBookings={() => navigateTo('bookings')}
           />
         )}
 
@@ -424,6 +430,11 @@ function DashboardAppContent() {
         isOpen={isProfileIncompleteModalOpen}
         onClose={closeProfileIncompleteModal}
         user={user}
+      />
+
+      {/* Active Service In Progress Blocked Modal (Dedicated Service Policy) */}
+      <ActiveBookingBlockedModal
+        onNavigateToBookings={() => navigateTo('bookings')}
       />
 
       {/* Interactive Booking Modal / Drawer */}

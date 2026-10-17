@@ -537,6 +537,22 @@ export default function MyBookingsPage({
     }
   };
 
+  const handleCancelAndRebroadcast = async (requestRef) => {
+    try {
+      const res = await cancelAndRebroadcast(requestRef);
+      if (res && res.success) {
+        addToast('Professional reassignment started. Re-broadcasting to nearby verified technicians.', 'brass');
+        if (currentUser && loadMyRequests) {
+          await loadMyRequests(currentUser);
+        }
+      } else {
+        addToast(res?.error || 'Could not re-broadcast request.', 'destructive');
+      }
+    } catch (err) {
+      addToast(err.message || 'Failed to re-broadcast request.', 'destructive');
+    }
+  };
+
   // Submit rating execution
   const handleExecuteRating = async (job, { rating, feedback }) => {
     try {

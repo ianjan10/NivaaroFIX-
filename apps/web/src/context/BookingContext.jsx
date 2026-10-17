@@ -35,6 +35,10 @@ export function BookingProvider({ children }) {
   const [selectedRequestQuotes, setSelectedRequestQuotes] = useState([]);
   const [quotesLoading, setQuotesLoading] = useState(false);
 
+  // Active Booking Blocked Modal State (Single active service policy)
+  const [isRunningBookingBlockedModalOpen, setIsRunningBookingBlockedModalOpen] = useState(false);
+  const [runningBookingBlockedData, setRunningBookingBlockedData] = useState(null);
+
   // Active customer request memo (Single-request mutual exclusivity check)
   const activeCustomerRequest = useMemo(() => {
     if (!Array.isArray(activeRequests)) return null;
@@ -45,6 +49,72 @@ export function BookingProvider({ children }) {
 
   const hasActiveCustomerRequest = Boolean(activeCustomerRequest);
 
+  // Unified running booking calculation (checks both activeRequests and activeBookings)
+  const runningBooking = useMemo(() => {
+    // 1. Check activeRequests
+    if (Array.isArray(activeRequests) && activeRequests.length > 0) {
+      const activeReq = activeRequests.find((r) => {
+        const s = (r.status || '').toLowerCase();
+        return !['completed', 'cancelled', 'rejected'].includes(s);
+      });
+      if (activeReq) {
+        return {
+          id: activeReq.id,
+          requestRef: activeReq.requestRef || activeReq.request_ref || `SR-${activeReq.id}`,
+          serviceTitle: activeReq.serviceTitle || activeReq.service_title || 'Home Service',
+          category: activeReq.category || 'electrician',
+          status: activeReq.status || 'Active',
+          createdAt: activeReq.createdAt || activeReq.created_at,
+          address: activeReq.address || activeReq.user_address || '',
+          technicianName: activeReq.acceptedProvider?.agentName || activeReq.technicianName || null,
+          technicianPhone: activeReq.acceptedProvider?.agentPhone || null,
+          technicianTrade: activeReq.acceptedProvider?.agentTrade || activeReq.category || 'Technician',
+          amount: activeReq.acceptedProvider?.amount || activeReq.amount || null,
+          otpCode: activeReq.otpCode || activeReq.otp_code || null,
+          source: 'service_request'
+        };
+      }
+    }
+
+    // 2. Check activeBookings
+    if (Array.isArray(activeBookings) && activeBookings.length > 0) {
+      const activeBk = activeBookings.find((b) => {
+        const s = (b.status || '').toLowerCase();
+        return !['completed', 'cancelled', 'rejected'].includes(s);
+      });
+      if (activeBk) {
+        return {
+          id: activeBk.id,
+          requestRef: activeBk.bookingRef || activeBk.booking_ref || `BK-${activeBk.id}`,
+          serviceTitle: activeBk.serviceTitle || activeBk.service_title || 'Home Service',
+          category: activeBk.category || 'electrician',
+          status: activeBk.status || 'Active',
+          createdAt: activeBk.scheduledTime || activeBk.createdAt || activeBk.created_at,
+          address: activeBk.address || activeBk.user_address || '',
+          technicianName: activeBk.technicianName || activeBk.technician_name || null,
+          technicianPhone: activeBk.technicianPhone || null,
+          technicianTrade: activeBk.category || 'Technician',
+          amount: activeBk.totalAmount || activeBk.total_amount || null,
+          source: 'booking'
+        };
+      }
+    }
+
+    return null;
+  }, [activeRequests, activeBookings]);
+
+  const hasRunningBooking = Boolean(runningBooking);
+
+  const openRunningBookingBlockedModal = useCallback((booking = null) => {
+    setRunningBookingBlockedData(booking || runningBooking);
+    setIsRunningBookingBlockedModalOpen(true);
+  }, [runningBooking]);
+
+  const closeRunningBookingBlockedModal = useCallback(() => {
+    setIsRunningBookingBlockedModalOpen(false);
+    setRunningBookingBlockedData(null);
+  }, []);
+
   // Exclusive Job-Lock: customer is locked when request is in Accepted or InProgress state
   const lockedCustomerRequest = useMemo(() => {
     if (!Array.isArray(activeRequests)) return null;
@@ -53,7 +123,7 @@ export function BookingProvider({ children }) {
     ) || null;
   }, [activeRequests]);
 
-  const isCustomerJobLocked = Boolean(lockedCustomerRequest);
+  const isCustomerJobLocked = Boolean(lockedCustomerRequest || runningBooking);
 
   // -----------------------------------------------------------------------
   // Service Request Operations (New Marketplace Pipeline)
@@ -271,12 +341,30 @@ export function BookingProvider({ children }) {
     }
   }, []);
 
+  // Automatically load customer's requests and bookings on mount / session initialization
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('nivaaro-user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u && (u.email || u.id)) {
+          loadMyRequests(u);
+          loadUserBookings(u);
+        }
+      }
+    } catch {}
+  }, [loadMyRequests, loadUserBookings]);
+
   // 1. Direct Booking Drawer Controls
-  const openBookingFor = (service, initialIssue = null) => {
+  const openBookingFor = useCallback((service, initialIssue = null) => {
+    if (runningBooking) {
+      openRunningBookingBlockedModal(runningBooking);
+      return;
+    }
     setActiveServiceForBooking(service);
     setInitialIssueForBooking(initialIssue);
     setIsBookingModalOpen(true);
-  };
+  }, [runningBooking, openRunningBookingBlockedModal]);
 
   const closeBookingModal = () => {
     setIsBookingModalOpen(false);
@@ -377,6 +465,13 @@ export function BookingProvider({ children }) {
       return { status: 'AGENT_BLOCKED' };
     }
 
+    // Single active booking policy: block new bookings when one is already running
+    if (runningBooking) {
+      closeServiceDetail();
+      openRunningBookingBlockedModal(runningBooking);
+      return { status: 'RUNNING_BOOKING_BLOCKED', booking: runningBooking };
+    }
+
     let targetService = service;
     if (typeof service === 'string') {
       const baseService = allServicesList.find(s => s.categoryId === service || s.slug === service) || allServicesList[0];
@@ -391,11 +486,12 @@ export function BookingProvider({ children }) {
     closeServiceDetail();
     openBookingFor(targetService, issue);
     return { status: 'ALLOWED' };
-  }, []);
+  }, [runningBooking, openRunningBookingBlockedModal, closeServiceDetail, openBookingFor, openAgentNotice]);
 
   // 7. Resume pending booking intent after login
   const resumeBookingIntentIfPresent = useCallback((currentUser) => {
     if (!currentUser || !currentUser.isLoggedIn || currentUser.role === 'agent') return false;
+    if (runningBooking) return false;
 
     const intent = getPendingBookingIntent();
     if (intent && intent.serviceSlug) {
@@ -405,7 +501,7 @@ export function BookingProvider({ children }) {
       return true;
     }
     return false;
-  }, [getPendingBookingIntent, clearBookingIntent]);
+  }, [runningBooking, getPendingBookingIntent, clearBookingIntent, openBookingFor]);
 
   // 8. Persist genuine new booking to PostgreSQL database (legacy)
   const addNewBooking = async (bookingData, currentUser = null) => {
@@ -479,6 +575,12 @@ export function BookingProvider({ children }) {
         hasActiveCustomerRequest,
         lockedCustomerRequest,
         isCustomerJobLocked,
+        hasRunningBooking,
+        runningBooking,
+        isRunningBookingBlockedModalOpen,
+        runningBookingBlockedData,
+        openRunningBookingBlockedModal,
+        closeRunningBookingBlockedModal,
         activeRequests,
         requestsLoading,
         createServiceRequest,
@@ -516,7 +618,13 @@ export function useBooking() {
       hasActiveCustomerRequest: false,
       activeCustomerRequest: null,
       isCustomerJobLocked: false,
-      lockedCustomerRequest: null
+      lockedCustomerRequest: null,
+      hasRunningBooking: false,
+      runningBooking: null,
+      isRunningBookingBlockedModalOpen: false,
+      runningBookingBlockedData: null,
+      openRunningBookingBlockedModal: () => {},
+      closeRunningBookingBlockedModal: () => {}
     };
   }
   return context;

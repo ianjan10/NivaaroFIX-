@@ -118,7 +118,7 @@ router.post('/request', async (req, res) => {
         `SELECT request_ref, service_title, status 
          FROM service_requests 
          WHERE (user_email = $1 OR (user_id = $2 AND $2 IS NOT NULL))
-           AND LOWER(REPLACE(status, ' ', '_')) IN ('accepted', 'confirmed', 'en_route', 'on_the_way', 'otp_verified', 'arrived', 'in_progress')
+           AND status IN ('Accepted', 'En Route', 'OTP Verified', 'In Progress')
          ORDER BY created_at DESC 
          LIMIT 1;`,
         [userEmail ? userEmail.toLowerCase().trim() : null, (userId && !isNaN(parseInt(userId, 10))) ? parseInt(userId, 10) : null]
@@ -978,7 +978,7 @@ router.get('/nearby-requests', async (req, res) => {
       FROM service_requests sr
       JOIN quotes q ON q.id = sr.accepted_quote_id
       WHERE q.agent_id = $1
-        AND LOWER(REPLACE(sr.status, ' ', '_')) IN ('accepted', 'confirmed', 'en_route', 'on_the_way', 'otp_verified', 'in_progress')
+        AND (sr.status IN ('Accepted', 'En Route', 'OTP Verified', 'In Progress') OR LOWER(REPLACE(sr.status, ' ', '_')) IN ('accepted', 'confirmed', 'en_route', 'on_the_way', 'otp_verified', 'in_progress'))
       LIMIT 1;
     `, [agent.id]);
 

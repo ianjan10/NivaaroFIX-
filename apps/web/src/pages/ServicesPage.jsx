@@ -10,11 +10,20 @@ import {
 const electricianImg = '/images/electrician.jpg';
 const plumberImg = '/images/plumber.png';
 
-export default function ServicesPage({ currentUser, currentAgent, onOpenAuth, onAgentBlocked }) {
+export default function ServicesPage({
+  currentUser,
+  currentAgent,
+  onOpenAuth,
+  onAgentBlocked,
+  onNavigateToBookings
+}) {
   const { t } = useLanguage();
   const {
     openServiceDetail,
-    initiateProtectedBooking
+    initiateProtectedBooking,
+    hasRunningBooking,
+    runningBooking,
+    openRunningBookingBlockedModal
   } = useBooking();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -208,6 +217,36 @@ export default function ServicesPage({ currentUser, currentAgent, onOpenAuth, on
         <section className="services-editorial-section" aria-label="Available services">
           <div className="section-mini-eyebrow" style={{ marginBottom: '0.5rem' }}>SERVICES</div>
           <h2 className="services-editorial-subtitle">Choose where you'd like to start.</h2>
+
+          {/* Active Booking In Progress Warning Strip */}
+          {hasRunningBooking && runningBooking && (
+            <div className="services-active-booking-strip" role="status" aria-live="polite">
+              <div className="services-active-strip-left">
+                <span className="services-active-strip-dot" />
+                <span className="services-active-strip-label">Active Service Running:</span>
+                <strong className="services-active-strip-title">{runningBooking.serviceTitle}</strong>
+                {runningBooking.requestRef && (
+                  <span className="services-active-strip-ref">Ref: {runningBooking.requestRef}</span>
+                )}
+              </div>
+              <div className="services-active-strip-right">
+                <button
+                  type="button"
+                  className="services-active-track-btn"
+                  onClick={() => onNavigateToBookings ? onNavigateToBookings() : (window.location.hash = '#/bookings')}
+                >
+                  <span>Track Live Job →</span>
+                </button>
+                <button
+                  type="button"
+                  className="services-active-policy-btn"
+                  onClick={() => openRunningBookingBlockedModal(runningBooking)}
+                >
+                  <span>Policy Note</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="services-editorial-list">
             
