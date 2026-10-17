@@ -3,6 +3,7 @@ import { useBooking } from '../context/BookingContext';
 import { useLocation } from '../context/LocationContext';
 import { useLanguage } from '../context/LanguageContext';
 import DoorstepPinMap from './DoorstepPinMap';
+import UberProximityRadarMap from './UberProximityRadarMap';
 
 /**
  * NivaaroFix Simplified 3-Step Interactive Booking Request Modal
@@ -1613,6 +1614,18 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
                     </div>
                   </div>
                 )}
+
+                {/* Uber-Style Live Proximity Radar Map (H3 Spatial Search & Real-Time ETAs) */}
+                <div style={{ margin: '1rem 0' }}>
+                  <UberProximityRadarMap
+                    customerLat={coords.lat || (confirmedBooking?.lat ? parseFloat(confirmedBooking.lat) : (currentUser?.lat ? parseFloat(currentUser.lat) : 12.9716))}
+                    customerLng={coords.lng || (confirmedBooking?.lng ? parseFloat(confirmedBooking.lng) : (currentUser?.lng ? parseFloat(currentUser.lng) : 77.5946))}
+                    providers={matchSummary?.providers || []}
+                    serviceCategory={confirmedBooking?.category || activeServiceForBooking?.categoryId || 'electrician'}
+                    matchedTierKm={matchSummary?.matchedTierKm || 3}
+                    height="230px"
+                  />
+                </div>
 
                 {/* Real-time Quotation Comparison Section */}
                 {!acceptedQuote && (

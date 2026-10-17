@@ -92,9 +92,12 @@ export function BookingProvider({ children }) {
         throw new Error(data.error || data.message || 'Failed to create service request.');
       }
 
-      const createdRequest = data.request;
+      const createdRequest = {
+        ...data.request,
+        matchSummary: data.matchSummary || null
+      };
       setActiveRequests(prev => [createdRequest, ...prev]);
-      return { success: true, request: createdRequest };
+      return { success: true, request: createdRequest, matchSummary: data.matchSummary };
     } catch (err) {
       console.error('Service request creation error:', err);
       throw err;

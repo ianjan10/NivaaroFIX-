@@ -241,6 +241,21 @@ router.post('/request', async (req, res) => {
           matchedTierKm: matchResult.matchedTierKm,
           tiersSearched: matchResult.tiersSearched,
           totalMatched: matchResult.totalMatched,
+          providers: (matchResult.providers || []).map((p) => {
+            const dist = p.distanceKm !== undefined ? Number(p.distanceKm.toFixed(2)) : 1.5;
+            return {
+              id: p.id,
+              partnerId: p.partner_id,
+              name: p.name,
+              trade: p.trade,
+              rating: p.rating ? parseFloat(p.rating) : 4.9,
+              completedJobs: p.completed_jobs || 0,
+              lat: parseFloat(p.lat),
+              lng: parseFloat(p.lng),
+              distanceKm: dist,
+              etaMinutes: Math.max(4, Math.round((dist / 25) * 60))
+            };
+          }),
           message: `Dispatched to ${matchResult.totalMatched} verified pro${matchResult.totalMatched > 1 ? 's' : ''} within ${matchResult.matchedTierKm} km.`
         };
       } else {
@@ -249,6 +264,7 @@ router.post('/request', async (req, res) => {
           matchedTierKm: null,
           tiersSearched: matchResult.tiersSearched,
           totalMatched: 0,
+          providers: [],
           message: 'No certified pros are available in your area right now — we\'ll notify you the moment one is.'
         };
       }
@@ -317,6 +333,64 @@ router.post('/match-providers', async (req, res) => {
     });
   } catch (err) {
     console.error('Proximity matching error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// =========================================================================
+// 1c. Get Nearby Professionals for Live Radar & Map (Uber-style)
+// =========================================================================
+router.get('/nearby-pros', async (req, res) => {
+  try {
+    const { lat, lng, category = 'all' } = req.query;
+
+    const numLat = parseFloat(lat);
+    const numLng = parseFloat(lng);
+
+    if (isNaN(numLat) || isNaN(numLng)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid numeric lat and lng query parameters are required.'
+      });
+    }
+
+    const h3Index = latLngToH3(numLat, numLng);
+    const matchResult = await findNearbyProvidersExpandingRadius(
+      numLat,
+      numLng,
+      category === 'all' ? 'both' : category,
+      RADIUS_EXPANSION_TIERS_KM
+    );
+
+    const providers = (matchResult.providers || []).map((p) => {
+      const distanceKm = p.distanceKm !== undefined ? Number(p.distanceKm.toFixed(2)) : 1.5;
+      const etaMinutes = Math.max(4, Math.round((distanceKm / 25) * 60));
+      return {
+        id: p.id,
+        partnerId: p.partner_id,
+        name: p.name,
+        trade: p.trade,
+        rating: p.rating ? parseFloat(p.rating) : 4.9,
+        completedJobs: p.completed_jobs || 0,
+        lat: parseFloat(p.lat),
+        lng: parseFloat(p.lng),
+        h3Index: p.h3_index_res9,
+        distanceKm,
+        etaMinutes
+      };
+    });
+
+    return res.json({
+      success: true,
+      h3Index,
+      matched: matchResult.matched,
+      matchedTierKm: matchResult.matchedTierKm,
+      totalMatched: providers.length,
+      providers,
+      closestEtaMinutes: providers.length > 0 ? providers[0].etaMinutes : null
+    });
+  } catch (err) {
+    console.error('Get nearby pros error:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

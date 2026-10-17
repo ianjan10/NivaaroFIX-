@@ -1095,13 +1095,21 @@ export default function MyBookingsPage({
                       </div>
                     )}
 
-                    {/* 5. ON THE WAY STATE: Live Location Map Card & ETA */}
-                    {isOnTheWay && (
+                    {/* 5. LIVE TRACKING MAP CARD & ETA (When Confirmed, On the way, or Arrived) */}
+                    {(isConfirmed || isOnTheWay || isArrived) && (
                       <div className="on-the-way-map-card">
                         <div className="on-the-way-status-col">
-                          <div className="on-the-way-title">Technician is On the way</div>
+                          <div className="on-the-way-title">
+                            {isOnTheWay
+                              ? 'Technician is On the way'
+                              : isArrived
+                              ? 'Technician has Arrived'
+                              : 'Technician Assigned & Confirmed'}
+                          </div>
                           <div className="on-the-way-sub">
-                            Live GPS tracking active · ETA ~{job.acceptedProvider?.etaMinutes || 20} mins
+                            {isArrived
+                              ? 'At your doorstep · Share 4-digit verification code'
+                              : `Live GPS tracking active · ETA ~${job.acceptedProvider?.etaMinutes || (isConfirmed ? 25 : 15)} mins`}
                           </div>
                         </div>
                         <button
