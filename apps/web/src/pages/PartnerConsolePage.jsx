@@ -636,32 +636,6 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     setTimeout(() => setWithdrawSuccessMsg(''), 10000);
   };
 
-  const handleUpdateTrade = async (newTrade) => {
-    if (!currentAgent?.email) return;
-    try {
-      const res = await fetch(`${API_BASE}/auth/agent-update-profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: currentAgent.email, trade: newTrade })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setCurrentAgent(prev => {
-          const updated = { ...prev, trade: newTrade };
-          try { localStorage.setItem('nivaaro-agent', JSON.stringify(updated)); } catch {}
-          return updated;
-        });
-        const label = newTrade === 'both' ? 'Both Electrician & Plumber' : (newTrade === 'plumber' ? 'Plumber' : 'Electrician');
-        addToast(`Active trade updated to: ${label}`, 'brass');
-        const targetLat = providerLocation?.lat || currentAgent?.lat || null;
-        const targetLng = providerLocation?.lng || currentAgent?.lng || null;
-        loadNearbyRequests(currentAgent.email, targetLat, targetLng);
-      }
-    } catch (err) {
-      addToast('Failed to update trade category.', 'destructive');
-    }
-  };
-
   const handleToggleOnline = async () => {
     if (isBusyOnJob) {
       addToast(
@@ -1075,64 +1049,9 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
             {partnerInitials}
           </div>
           <div className="pro-identity-details">
-            <div className="pro-name-row" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-              <h1 className="pro-name-heading" style={{ margin: 0 }}>{partnerName}</h1>
-              <div className="pro-trade-switcher" style={{ display: 'inline-flex', background: '#f1f5f9', padding: '2px', borderRadius: '8px', border: '1px solid #e2e8f0', gap: '2px' }}>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateTrade('electrician')}
-                  style={{
-                    border: 'none',
-                    background: currentAgent?.trade === 'electrician' ? '#0f172a' : 'transparent',
-                    color: currentAgent?.trade === 'electrician' ? '#ffffff' : '#475569',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                  title="Receive Electrical service requests"
-                >
-                  Electrician
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateTrade('plumber')}
-                  style={{
-                    border: 'none',
-                    background: currentAgent?.trade === 'plumber' ? '#0f172a' : 'transparent',
-                    color: currentAgent?.trade === 'plumber' ? '#ffffff' : '#475569',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                  title="Receive Plumbing service requests"
-                >
-                  Plumber
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateTrade('both')}
-                  style={{
-                    border: 'none',
-                    background: (currentAgent?.trade === 'both' || !currentAgent?.trade) ? '#059669' : 'transparent',
-                    color: (currentAgent?.trade === 'both' || !currentAgent?.trade) ? '#ffffff' : '#475569',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                  title="Receive All home service requests (Electrician & Plumber)"
-                >
-                  Both (Multi-Trade)
-                </button>
-              </div>
+            <div className="pro-name-row">
+              <h1 className="pro-name-heading">{partnerName}</h1>
+              <span className="pro-trade-label">{partnerTrade}</span>
             </div>
             <div className="pro-meta-sub">
               {partnerId && partnerId !== 'ID Pending' && (
