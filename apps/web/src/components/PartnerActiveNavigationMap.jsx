@@ -221,10 +221,11 @@ export default function PartnerActiveNavigationMap({
       attributionControl: false
     });
 
-    // Clean modern Carto Positron basemap
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    // Clean OpenStreetMap tiles (no API key required)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd'
+      subdomains: ['a', 'b', 'c'],
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     // Destination Pin

@@ -316,7 +316,7 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [matchSummary, setMatchSummary] = useState(null);
 
-  // Auto-minimize confirmation drawer state (15s inactivity timer)
+  // Auto-minimize confirmation drawer state (manual minimize only)
   const [isMinimized, setIsMinimized] = useState(false);
   const autoMinimizeTimerRef = useRef(null);
 
@@ -327,40 +327,8 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
   const [dispatchWaveInfo, setDispatchWaveInfo] = useState(null);
 
   const resetAutoMinimizeTimer = useCallback(() => {
-    if (autoMinimizeTimerRef.current) {
-      clearTimeout(autoMinimizeTimerRef.current);
-      autoMinimizeTimerRef.current = null;
-    }
-    // Only auto-minimize once a pro quote has been accepted
-    if (step === 3 && acceptedQuote && !isSubmitting) {
-      autoMinimizeTimerRef.current = setTimeout(() => {
-        setIsMinimized(true);
-      }, 15000);
-    }
-  }, [step, acceptedQuote, isSubmitting]);
-
-  // Handle auto-minimize timer on step 3
-  useEffect(() => {
-    if (step === 3 && acceptedQuote && !isSubmitting && !isMinimized) {
-      resetAutoMinimizeTimer();
-    }
-    return () => {
-      if (autoMinimizeTimerRef.current) {
-        clearTimeout(autoMinimizeTimerRef.current);
-      }
-    };
-  }, [step, acceptedQuote, isSubmitting, isMinimized, resetAutoMinimizeTimer]);
-
-  // Auto-redirect to My Bookings page after 7-8 seconds of broadcast confirmation
-  useEffect(() => {
-    if (step === 3 && confirmedBooking && !isSubmitting) {
-      const redirectTimer = setTimeout(() => {
-        closeBookingModal();
-        window.location.hash = '#/bookings';
-      }, 7500); // 7.5 seconds
-      return () => clearTimeout(redirectTimer);
-    }
-  }, [step, confirmedBooking, isSubmitting, closeBookingModal]);
+    // Keep drawer open interactively until customer decides to close or navigate
+  }, []);
 
   // Connect SSE for real-time incoming quotations
   useEffect(() => {
@@ -1622,7 +1590,7 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
                         Nearby verified professionals receive your request and submit transparent quotations.
                       </p>
                       <p style={{ margin: '0.4rem 0 0', fontSize: '0.78rem', color: '#047857', fontWeight: 600 }}>
-                        Redirecting to My Bookings in a few seconds...
+                        Active Search: Nearby verified technicians are being notified in real time...
                       </p>
                     </div>
                   </div>

@@ -101,10 +101,11 @@ export default function UberProximityRadarMap({
       scrollWheelZoom: false
     });
 
-    // Clean modern OpenStreetMap CartoDB Positron tiles (Understated, high-contrast, Uber-like)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    // Clean OpenStreetMap tiles (no API key required)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd'
+      subdomains: ['a', 'b', 'c'],
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     const markersGroup = L.layerGroup().addTo(map);

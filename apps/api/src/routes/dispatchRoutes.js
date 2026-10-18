@@ -270,6 +270,30 @@ router.post('/request', async (req, res) => {
       }
     }
 
+    // Realtime Broadcast to online providers in the service radius
+    try {
+      broadcastToProviders('request.broadcast', {
+        id: sr.id,
+        requestRef: sr.request_ref,
+        serviceTitle: sr.service_title,
+        category: sr.category,
+        problemDescription: sr.problem_description,
+        address: sr.user_address,
+        area: sr.user_address ? sr.user_address.split(',').slice(-2).join(',').trim() : 'Nearby',
+        lat: sr.lat,
+        lng: sr.lng,
+        createdAt: sr.created_at
+      });
+      broadcastToProviders('request.dispatched', {
+        id: sr.id,
+        requestRef: sr.request_ref,
+        serviceTitle: sr.service_title,
+        category: sr.category
+      });
+    } catch (broadcastErr) {
+      console.warn('Realtime provider broadcast notice:', broadcastErr.message);
+    }
+
     return res.status(201).json({
       success: true,
       message: matchSummary.matched
@@ -1007,11 +1031,13 @@ router.get('/nearby-requests', async (req, res) => {
       return res.json({ success: true, requests: [], notice: 'Please update your location to see nearby requests.' });
     }
 
-    // Query all real open customer requests matching provider's trade
-    const tradeFilter = (agent.trade && agent.trade !== 'both')
+    // Query all real open customer requests matching provider's trade or all if multi-trade
+    const reqCategory = (req.query.category || '').toLowerCase();
+    const isAllTrade = !agent.trade || agent.trade === 'both' || reqCategory === 'all' || reqCategory === 'both';
+    const tradeFilter = !isAllTrade
       ? `AND (sr.category = $2 OR sr.category = 'both')`
       : '';
-    const params = (agent.trade && agent.trade !== 'both')
+    const params = !isAllTrade
       ? [agent.id, agent.trade]
       : [agent.id];
 
