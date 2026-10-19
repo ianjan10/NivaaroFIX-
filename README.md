@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="docs/brand/source/nivaarofix-horizontal-dark.svg" alt="NivaaroFix — Elevating the Everyday" width="280" />
+  <span style="display:inline-block;background:#ffffff;border-radius:12px;padding:18px 32px;">
+    <img src="docs/brand/source/nivaarofix-horizontal-dark.svg" alt="NivaaroFix — Elevating the Everyday" width="280" />
+  </span>
 </p>
 <p align="center">
   <strong>Elevating the Everyday</strong> &bull; <em>Home repairs, handled with clarity.</em>
