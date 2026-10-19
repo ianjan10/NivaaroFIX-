@@ -1,7 +1,9 @@
 <p align="center">
-  <span style="display:inline-block;background:#ffffff;border-radius:12px;padding:18px 32px;">
-    <img src="docs/brand/source/nivaarofix-horizontal-dark.svg" alt="NivaaroFix — Elevating the Everyday" width="280" />
-  </span>
+  <picture>
+    <source media="(prefers-color-scheme: dark)"  srcset="docs/brand/source/nivaarofix-horizontal-light.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="docs/brand/source/nivaarofix-horizontal-dark.svg" />
+    <img src="docs/brand/source/nivaarofix-horizontal-dark.svg" alt="NivaaroFix" width="300" />
+  </picture>
 </p>
 <p align="center">
   <strong>Elevating the Everyday</strong> &bull; <em>Home repairs, handled with clarity.</em>
