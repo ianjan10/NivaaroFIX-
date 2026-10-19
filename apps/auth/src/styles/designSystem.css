@@ -9,11 +9,11 @@
   --bg-canvas: #ffffff;
   --header-text: #101820;
   --footer-text: #6b7280;
-  --footer-link-hover: #B8862F;
+  --footer-link-hover: #047857;
 
   /* Crisp Card Styling */
   --bg-card: #ffffff;
-  --bg-card-border: rgba(16, 24, 32, 0.09);
+  --bg-card-border: rgba(16, 24, 40, 0.08);
   --bg-input: #ffffff;
   --bg-input-border: rgba(16, 24, 32, 0.16);
   --bg-input-focus: #ffffff;
@@ -22,10 +22,24 @@
   --accent-focus-ring: rgba(30, 58, 95, 0.14);
   --accent-agent: #101820;
   --accent-agent-ring: rgba(16, 24, 32, 0.12);
-  --accent-gold: #B8862F;
-  --accent-gold-hover: #A37525;
-  --accent-luxe: #B8862F;
-  --accent-luxe-ring: rgba(184, 134, 47, 0.18);
+  /* Official Brand Logo Color System */
+  --logo-ink: #1C1C1E;
+  --logo-light: #FFFFFF;
+
+  /* Brand Green Design Tokens */
+  --brand-primary: #047857;
+  --brand-primary-hover: #065F46;
+  --brand-primary-pressed: #064E3B;
+  --brand-tint: #ECFDF5;
+  --brand-tint-strong: #D1FAE5;
+  --brand-tint-border: #A7F3D0;
+  --focus-ring: #10B981;
+  --focus-ring-offset: 2px;
+
+  --accent-gold: var(--brand-primary);
+  --accent-gold-hover: var(--brand-primary-hover);
+  --accent-luxe: var(--brand-primary);
+  --accent-luxe-ring: rgba(16, 185, 129, 0.2);
 
   --text-white: #ffffff;
   --text-primary: #101820;
@@ -43,8 +57,9 @@
   --toast-shadow: 0 20px 40px -10px rgba(16, 24, 32, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
 
   --strength-track: #e5e7eb;
-  --shadow-card: 0 4px 20px -2px rgba(16, 24, 32, 0.06), 0 1px 3px rgba(16, 24, 32, 0.04);
-  --shadow-card-hover: 0 12px 32px -4px rgba(16, 24, 32, 0.1), 0 2px 6px rgba(16, 24, 32, 0.04);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px -4px rgba(16, 24, 40, 0.08);
+  --shadow-card-hover: 0 2px 4px rgba(16, 24, 40, 0.06), 0 16px 32px -4px rgba(16, 24, 40, 0.12);
+  --shadow-card-press: 0 1px 2px rgba(16, 24, 40, 0.06), 0 6px 16px -3px rgba(16, 24, 40, 0.08);
 
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-serif: 'Fraunces', Georgia, serif;
@@ -70,10 +85,18 @@ body.dark-theme {
   --accent-focus-ring: rgba(59, 130, 246, 0.2);
   --accent-agent: #10b981;
   --accent-agent-ring: rgba(16, 185, 129, 0.2);
-  --accent-gold: #c9983e;
-  --accent-gold-hover: #dbaa4d;
-  --accent-luxe: #c9983e;
-  --accent-luxe-ring: rgba(201, 152, 62, 0.2);
+    --brand-primary: #047857;
+  --brand-primary-hover: #065F46;
+  --brand-primary-pressed: #064E3B;
+  --brand-tint: rgba(16, 185, 129, 0.12);
+  --brand-tint-strong: rgba(16, 185, 129, 0.2);
+  --brand-tint-border: rgba(16, 185, 129, 0.3);
+  --focus-ring: #10B981;
+
+  --accent-gold: var(--brand-primary);
+  --accent-gold-hover: var(--brand-primary-hover);
+  --accent-luxe: var(--brand-primary);
+  --accent-luxe-ring: rgba(16, 185, 129, 0.25);
 
   --text-primary: #f7f5f1;
   --text-secondary: #9aa5b5;
@@ -84,7 +107,9 @@ body.dark-theme {
   --toast-border: rgba(255, 255, 255, 0.15);
   --toast-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
 
-  --shadow-card: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -4px rgba(0, 0, 0, 0.65);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 18px 40px -4px rgba(0, 0, 0, 0.85);
+  --shadow-card-press: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px -3px rgba(0, 0, 0, 0.6);
 }
 
 *, *::before, *::after {
@@ -273,11 +298,12 @@ body.agent-portal .toast-indicator-dot {
   transform: translateY(-0.5px);
 }
 
-.brand-logo-img {
+.brand-logo-img,
+.nivaaro-brand-logo svg {
   display: block;
   object-fit: contain;
-  filter: drop-shadow(0 1px 2px rgba(184, 134, 47, 0.08));
-  transition: filter 0.2s ease;
+  filter: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .auth-lang-trigger-btn {
@@ -299,7 +325,7 @@ body.agent-portal .toast-indicator-dot {
 
 .auth-lang-trigger-btn:hover {
   background: #ffffff;
-  border-color: #B8862F;
+  border-color: #047857;
   box-shadow: 0 2px 8px rgba(16, 24, 32, 0.08);
 }
 
@@ -344,7 +370,7 @@ body.agent-portal .toast-indicator-dot {
   display: inline-block;
   font-size: clamp(0.72rem, 0.9vw, 0.82rem);
   font-weight: 700;
-  color: #B8862F;
+  color: #047857;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   margin-bottom: clamp(4px, 1vh, 10px);
@@ -404,7 +430,7 @@ body.agent-portal .toast-indicator-dot {
 }
 
 .account-select-card:focus-visible {
-  outline: 3px solid #B8862F;
+  outline: 3px solid #047857;
   outline-offset: 3px;
 }
 
@@ -533,7 +559,7 @@ body.agent-portal .toast-indicator-dot {
 }
 
 .footer-legal-link:hover {
-  color: #B8862F;
+  color: #047857;
 }
 
 .footer-sep-dot {
@@ -1365,7 +1391,7 @@ body.agent-portal .otp-box:focus {
 .btn-primary:hover {
   background: var(--btn-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px -8px rgba(169, 121, 60, 0.35);
+  box-shadow: 0 10px 24px -8px rgba(4, 120, 87, 0.35);
 }
 
 .btn-primary:active {
@@ -1780,9 +1806,9 @@ body.agent-portal .btn-link:hover {
 }
 
 .uber-lang-item.active {
-  background: rgba(169, 121, 60, 0.08);
-  border-color: var(--accent-luxe, #a9793c);
-  box-shadow: 0 0 0 1px var(--accent-luxe, #a9793c);
+  background: rgba(4, 120, 87, 0.08);
+  border-color: var(--accent-luxe, #047857);
+  box-shadow: 0 0 0 1px var(--accent-luxe, #047857);
 }
 
 .uber-lang-names {
@@ -1805,7 +1831,7 @@ body.agent-portal .btn-link:hover {
 }
 
 .uber-lang-checkmark {
-  color: var(--accent-luxe, #a9793c);
+  color: var(--accent-luxe, #047857);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1980,9 +2006,9 @@ body.dark-theme .profile-back-link:hover {
 
 .profile-ghost-btn {
   padding: 0.45rem 0.85rem;
-  border: 1px solid #ded7cb;
+  border: 1px solid var(--brand-tint-border, #A7F3D0);
   border-radius: 8px;
-  background: #faf8f4;
+  background: var(--brand-tint, #ECFDF5);
   color: #1e3a5f;
   font-size: 0.82rem;
   font-weight: 600;
@@ -1991,8 +2017,8 @@ body.dark-theme .profile-back-link:hover {
 }
 
 .profile-ghost-btn:hover {
-  background: #f0ece1;
-  border-color: #d1c7b5;
+  background: var(--brand-tint-strong, #D1FAE5);
+  border-color: var(--brand-primary, #047857);
 }
 
 body.dark-theme .profile-ghost-btn {
@@ -2055,7 +2081,7 @@ body.dark-theme .profile-signout-btn:hover {
   margin: 0 auto;
   border-radius: 20px;
   background: #ffffff;
-  border: 1px solid #e3ddd0;
+  border: 1px solid var(--brand-tint-border, #A7F3D0);
   box-shadow: 0 20px 45px -10px rgba(16, 24, 32, 0.08), 0 1px 3px rgba(16, 24, 32, 0.03);
   padding: clamp(1.5rem, 3.5vw, 2.75rem);
   animation: slideUpModal 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -2082,14 +2108,14 @@ body.dark-theme .profile-header-group {
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.09em;
-  color: #946E26;
+  color: var(--brand-primary, #047857);
   text-transform: uppercase;
   display: block;
   margin-bottom: 0.3rem;
 }
 
 body.agent-portal .profile-eyebrow {
-  color: #946E26;
+  color: var(--brand-primary, #047857);
 }
 
 .profile-headline {
@@ -2207,8 +2233,8 @@ body.dark-theme .field-locked-pill {
 .profile-textarea {
   width: 100%;
   padding: 0.8rem 1rem;
-  background: #faf8f4;
-  border: 1px solid #e3ddd0;
+  background: #ffffff;
+  border: 1px solid var(--brand-tint-border, #A7F3D0);
   border-radius: 11px;
   color: var(--text-primary, #101820);
   font-family: inherit;
@@ -2227,8 +2253,8 @@ body.dark-theme .field-locked-pill {
 }
 
 body.agent-portal .profile-textarea:focus {
-  border-color: #B8862F;
-  box-shadow: 0 0 0 3px rgba(184, 134, 47, 0.18);
+  border-color: #047857;
+  box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.18);
 }
 
 body.dark-theme .profile-textarea {
@@ -2245,8 +2271,8 @@ body.dark-theme .profile-textarea:focus {
 input[type="number"] {
   width: 100%;
   padding: 0.8rem 1rem;
-  background: #faf8f4;
-  border: 1px solid #e3ddd0;
+  background: #ffffff;
+  border: 1px solid var(--brand-tint-border, #A7F3D0);
   border-radius: 11px;
   color: var(--text-primary, #101820);
   font-size: 0.94rem;
@@ -2263,14 +2289,14 @@ input[type="number"]:focus {
 }
 
 body.agent-portal input[type="number"]:focus {
-  border-color: #B8862F;
-  box-shadow: 0 0 0 3px rgba(184, 134, 47, 0.18);
+  border-color: #047857;
+  box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.18);
 }
 
 /* -------------------- Avatar Photo Card -------------------- */
 .profile-avatar-card {
-  background: #faf8f4;
-  border: 1px solid #e8e2d5;
+  background: var(--brand-tint, #ECFDF5);
+  border: 1px solid var(--brand-tint-border, #A7F3D0);
   border-radius: 16px;
   padding: 1.5rem;
   display: flex;
@@ -2288,8 +2314,8 @@ body.dark-theme .profile-avatar-card {
 
 /* -------------------- Document Verification Cards (Agent Profile) -------------------- */
 .pro-document-card {
-  background: #faf8f4;
-  border: 1px solid #e8e2d5;
+  background: var(--brand-tint, #ECFDF5);
+  border: 1px solid var(--brand-tint-border, #A7F3D0);
   border-radius: 16px;
   padding: 1.2rem 1.35rem;
   box-shadow: 0 2px 8px rgba(16, 24, 32, 0.03);
@@ -2302,7 +2328,7 @@ body.dark-theme .profile-avatar-card {
 }
 
 .pro-document-card:hover {
-  border-color: #ded7cb;
+  border-color: var(--brand-tint-border, #A7F3D0);
   box-shadow: 0 4px 12px rgba(16, 24, 32, 0.05);
 }
 
@@ -2312,8 +2338,8 @@ body.dark-theme .pro-document-card {
 }
 
 .doc-dropzone:hover {
-  border-color: #946E26 !important;
-  background-color: #faf8f5 !important;
+  border-color: var(--brand-primary, #047857) !important;
+  background-color: var(--brand-tint, #ECFDF5) !important;
 }
 
 body.dark-theme .doc-dropzone {
@@ -2323,7 +2349,7 @@ body.dark-theme .doc-dropzone {
 
 body.dark-theme .doc-dropzone:hover {
   background-color: #192230 !important;
-  border-color: #c9983e !important;
+  border-color: #047857 !important;
 }
 
 .btn-replace-doc:hover {
@@ -2346,7 +2372,7 @@ body.dark-theme .btn-replace-doc:hover {
 .doc-action-btn {
   flex: 1;
   background: #fafaf9;
-  border: 1px solid #ded7cb;
+  border: 1px solid var(--brand-tint-border, #A7F3D0);
   border-radius: 8px;
   padding: 10px 8px;
   display: flex;
@@ -2361,8 +2387,8 @@ body.dark-theme .btn-replace-doc:hover {
 }
 
 .doc-action-btn:hover {
-  background: #f3f0ea !important;
-  border-color: #946E26 !important;
+  background: var(--brand-tint, #ECFDF5) !important;
+  border-color: var(--brand-primary, #047857) !important;
 }
 
 .doc-action-btn:active {
@@ -2377,7 +2403,7 @@ body.dark-theme .doc-action-btn {
 
 body.dark-theme .doc-action-btn:hover {
   background: #192230 !important;
-  border-color: #c9983e !important;
+  border-color: #047857 !important;
 }
 
 .avatar-photo-container {
@@ -2409,7 +2435,7 @@ body.dark-theme .doc-action-btn:hover {
 }
 
 .avatar-photo-frame:focus-visible {
-  outline: 3px solid #b8862f;
+  outline: 3px solid #047857;
   outline-offset: 3px;
 }
 
@@ -2527,8 +2553,8 @@ body.dark-theme .avatar-camera-pill {
 
 /* -------------------- Profile Strength & Scorecard -------------------- */
 .profile-strength-card {
-  background: #faf8f4;
-  border: 1px solid #e8e2d5;
+  background: var(--brand-tint, #ECFDF5);
+  border: 1px solid var(--brand-tint-border, #A7F3D0);
   border-radius: 16px;
   padding: 1.4rem;
   display: flex;
@@ -2557,7 +2583,7 @@ body.dark-theme .profile-strength-card.is-complete {
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: #a9793c;
+  color: #047857;
   text-transform: uppercase;
   display: block;
 }
@@ -2584,7 +2610,7 @@ body.dark-theme .strength-percentage-headline {
   justify-content: center;
   padding: 0.25rem 0.65rem;
   border-radius: 9999px;
-  background: #a9793c;
+  background: #047857;
   color: #ffffff;
   font-size: 0.78rem;
   font-weight: 700;
@@ -2609,7 +2635,7 @@ body.dark-theme .strength-progress-track {
 
 .strength-progress-fill {
   height: 100%;
-  background: #a9793c;
+  background: #047857;
   border-radius: 9999px;
   transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease;
 }
@@ -2665,11 +2691,11 @@ body.dark-theme .strength-checklist-item {
 }
 
 .ready-status {
-  color: #946E26;
+  color: var(--brand-primary, #047857);
 }
 
 .missing-status {
-  color: #a9793c;
+  color: #047857;
 }
 
 .btn-back-to-dash {
@@ -2691,8 +2717,8 @@ body.dark-theme .strength-checklist-item {
 
 /* -------------------- Enhanced Account Settings Sidebar Cards -------------------- */
 .profile-sidebar-card {
-  background: #faf8f4;
-  border: 1px solid #e8e2d5;
+  background: var(--brand-tint, #ECFDF5);
+  border: 1px solid var(--brand-tint-border, #A7F3D0);
   border-radius: 16px;
   padding: 1.35rem 1.4rem;
   display: flex;
@@ -2718,13 +2744,13 @@ body.dark-theme .profile-sidebar-card {
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.09em;
-  color: #a9793c;
+  color: #047857;
   text-transform: uppercase;
   display: block;
 }
 
 body.agent-portal .profile-sidebar-card-title {
-  color: #946E26;
+  color: var(--brand-primary, #047857);
 }
 
 /* Verification list */
@@ -2815,29 +2841,29 @@ body.dark-theme .verification-label {
 }
 
 .verification-status-pill.verified {
-  background: rgba(184, 134, 47, 0.12);
-  color: #946E26;
-  border: 1px solid rgba(184, 134, 47, 0.25);
+  background: rgba(4, 120, 87, 0.12);
+  color: var(--brand-primary, #047857);
+  border: 1px solid rgba(4, 120, 87, 0.25);
 }
 
 .verification-status-pill.actionable {
-  background: rgba(169, 121, 60, 0.12);
-  color: #a9793c;
-  border: 1px solid rgba(169, 121, 60, 0.3);
+  background: rgba(4, 120, 87, 0.12);
+  color: #047857;
+  border: 1px solid rgba(4, 120, 87, 0.3);
   cursor: pointer;
 }
 
 .verification-status-pill.actionable:hover {
-  background: #a9793c;
+  background: #047857;
   color: #ffffff;
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(169, 121, 60, 0.2);
+  box-shadow: 0 2px 6px rgba(4, 120, 87, 0.2);
 }
 
 .verification-status-pill.under-review {
-  background: rgba(169, 121, 60, 0.1);
-  color: #a9793c;
-  border: 1px solid rgba(169, 121, 60, 0.25);
+  background: rgba(4, 120, 87, 0.1);
+  color: #047857;
+  border: 1px solid rgba(4, 120, 87, 0.25);
 }
 
 .verification-status-pill.not-started {

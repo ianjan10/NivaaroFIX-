@@ -16,6 +16,7 @@ WebLogin/
 |   |   |-- AccountNotFoundModal.jsx  # Unregistered user notice dialog
 |   |   |-- AppFooter.jsx             # Bottom footer with legal links
 |   |   |-- AppHeader.jsx             # Top navigation header
+|   |   |-- Logo.jsx                  # Official handcrafted vector logo component
 |   |   |-- BrandLogo.jsx             # Official high-resolution brand logo
 |   |   |-- DateOfBirthSelector.jsx   # Segmented DOB card (Day, Month, Year)
 |   |   |-- GoogleOAuthModal.jsx      # Google Identity Services dialog

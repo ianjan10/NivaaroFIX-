@@ -45,6 +45,6 @@ export const customerTestimonials = [
     date: '1 week ago',
     comment: 'The plumber cleared a stubborn kitchen sink grease blockage using a mechanical steel snake in less than 20 minutes. No harsh chemicals, no mess on the floor, and upfront fixed pricing.',
     avatarInitials: 'KR',
-    avatarBg: '#d97706'
+    avatarBg: '#047857'
   }
 ];

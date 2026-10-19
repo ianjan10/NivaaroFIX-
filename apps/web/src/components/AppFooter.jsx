@@ -84,17 +84,15 @@ export default function AppFooter({
         {/* Main 4-Column Balanced Grid */}
         <div className="footer-columns-grid">
           
-          {/* Column 1: Brand & Tagline */}
+          {/* Column 1: Brand Logo Lockup with integrated tagline */}
           <div className="footer-col-brand">
             <BrandLogo
+              variant="horizontal-tagline"
               size="medium"
               isPartner={currentPortal === 'partner'}
               isDarkHeader={false}
               onClick={handleHomeClick}
             />
-            <p className="footer-brand-tagline">
-              Home repairs, handled with clarity.
-            </p>
           </div>
 
           {/* Column 2: Services */}

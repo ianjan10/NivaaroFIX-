@@ -838,12 +838,7 @@ export default function MyBookingsPage({
                     key={job.id}
                     className="booking-item-card"
                     style={{
-                      border: '1px solid var(--bg-card-border, #e5e7eb)',
-                      borderRadius: '16px',
-                      background: 'var(--bg-card, #ffffff)',
-                      padding: isExpanded ? '1.5rem' : '1.15rem 1.5rem',
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
-                      transition: 'all 0.2s ease'
+                      padding: isExpanded ? '1.5rem' : '1.15rem 1.5rem'
                     }}
                   >
                     {/* 1. CARD HEADER (Clickable to minimize/expand details) */}

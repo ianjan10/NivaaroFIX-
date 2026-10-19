@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <!-- Solid White Circle Background filling the favicon canvas -->
+  <circle cx="120" cy="120" r="119" fill="#FFFFFF"/>
+  
+  <!-- Big Charcoal Shelter Mark centered with bold optical weight -->
+  <g transform="translate(-9.60, 4.17) scale(1.08)">
+    
+  <!-- Roof: clean gable angle, rounded apex, plumb cut eaves -->
+  <path d="
+    M 28 100 
+    L 28 85 
+    L 116 33 
+    Q 120 30.5 124 33 
+    L 212 85 
+    L 212 100 
+    L 124 48 
+    Q 120 46 116 48 
+    Z
+  " fill="#1C1C1E"/>
+  
+  <!-- Monogram N + F -->
+  <!-- Left stem -->
+  <rect x="66" y="92" width="16" height="92" fill="#1C1C1E"/>
+  
+  <!-- Diagonal of N (miters flush at top-left and bottom-right) -->
+  <polygon points="66,92 82,92 138,184 122,184" fill="#1C1C1E"/>
+  
+  <!-- Right stem of N / Spine of F -->
+  <rect x="124" y="92" width="16" height="92" fill="#1C1C1E"/>
+  
+  <!-- F Top Arm -->
+  <rect x="138" y="92" width="36" height="16" fill="#1C1C1E"/>
+  
+  <!-- F Middle Bar -->
+  <rect x="138" y="134" width="28" height="15.5" fill="#1C1C1E"/>
+  
+  </g>
+</svg>

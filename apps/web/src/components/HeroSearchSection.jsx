@@ -175,7 +175,7 @@ export default function HeroSearchSection({ onNavigateToServices }) {
                 fontWeight: 700,
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
-                color: '#a9793c',
+                color: 'var(--brand-primary, #047857)',
                 marginBottom: '0.5rem'
               }}
             >

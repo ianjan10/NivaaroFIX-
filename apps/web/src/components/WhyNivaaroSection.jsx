@@ -20,9 +20,9 @@ export default function WhyNivaaroSection() {
   ];
 
   return (
-    <section className="why-nivaaro-editorial-section" aria-label="Why NivaaroFix">
+    <section className="why-nivaaro-editorial-section" aria-label="Why NivaaroFix" style={{ padding: 'clamp(4.5rem, 7vw, 6rem) 0', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9' }}>
       <div className="max-w-container">
-        <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3.5rem' }}>
+        <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 3.5rem' }}>
           <span
             style={{
               display: 'block',
@@ -30,8 +30,8 @@ export default function WhyNivaaroSection() {
               fontWeight: 700,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#a9793c',
-              marginBottom: '0.65rem'
+              color: 'var(--brand-primary, #047857)',
+              marginBottom: '0.75rem'
             }}
           >
             WHY NIVAAROFIX
@@ -39,10 +39,11 @@ export default function WhyNivaaroSection() {
           <h2
             style={{
               fontFamily: 'var(--font-serif, "Fraunces", serif)',
-              fontSize: 'clamp(1.85rem, 3.2vw, 2.5rem)',
-              fontWeight: 500,
-              color: '#1e3a5f',
-              lineHeight: 1.2,
+              fontSize: 'clamp(2rem, 3.5vw, 2.75rem)',
+              fontWeight: 600,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
               margin: 0
             }}
           >
@@ -50,12 +51,12 @@ export default function WhyNivaaroSection() {
           </h2>
         </div>
 
-        {/* 3 Numbered Principles */}
+        {/* 3 Numbered Principles (Apple Feature Tile Cards) */}
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '2.5rem',
+            gap: '2rem',
             maxWidth: '1060px',
             margin: '0 auto'
           }}
@@ -63,20 +64,15 @@ export default function WhyNivaaroSection() {
           {principles.map((item) => (
             <div
               key={item.num}
-              style={{
-                borderTop: '1.5px solid #ded7c8',
-                paddingTop: '1.5rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem'
-              }}
+              className="why-nivaaro-card"
             >
               <div
                 style={{
-                  fontFamily: 'var(--font-serif, "Fraunces", serif)',
+                  fontFamily: 'var(--font-mono, monospace)',
                   fontSize: '1.25rem',
-                  fontWeight: 600,
-                  color: '#a9793c'
+                  fontWeight: 700,
+                  color: 'var(--brand-primary, #047857)',
+                  letterSpacing: '-0.02em'
                 }}
               >
                 {item.num}
@@ -86,7 +82,7 @@ export default function WhyNivaaroSection() {
                   fontSize: '0.88rem',
                   fontWeight: 700,
                   letterSpacing: '0.08em',
-                  color: '#1e3a5f',
+                  color: '#0f172a',
                   margin: 0
                 }}
               >
@@ -95,8 +91,8 @@ export default function WhyNivaaroSection() {
               <p
                 style={{
                   fontSize: '0.94rem',
-                  color: '#5A6472',
-                  lineHeight: 1.55,
+                  color: '#64748b',
+                  lineHeight: 1.6,
                   margin: 0
                 }}
               >

@@ -118,7 +118,7 @@ export default function LiveCameraCaptureModal({ isOpen, onClose, onCapture }) {
       <div
         style={{
           background: 'var(--bg-card, #ffffff)',
-          border: '1px solid var(--bg-card-border, #e3ddd0)',
+          border: '1px solid var(--bg-card-border, var(--brand-tint-border, #A7F3D0))',
           borderRadius: '16px',
           width: '100%',
           maxWidth: '440px',
@@ -135,7 +135,7 @@ export default function LiveCameraCaptureModal({ isOpen, onClose, onCapture }) {
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '1.1rem 1.25rem',
-          borderBottom: '1px solid var(--bg-card-border, #e3ddd0)'
+          borderBottom: '1px solid var(--bg-card-border, var(--brand-tint-border, #A7F3D0))'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#1e3a5f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -189,8 +189,8 @@ export default function LiveCameraCaptureModal({ isOpen, onClose, onCapture }) {
               fontSize: '0.88rem',
               lineHeight: 1.5
             }}>
-              <div style={{ display: 'inline-flex', padding: '0.6rem', borderRadius: '50%', background: 'rgba(169, 121, 60, 0.15)', color: '#a9793c', marginBottom: '0.75rem' }}>
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#a9793c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div style={{ display: 'inline-flex', padding: '0.6rem', borderRadius: '50%', background: 'rgba(4, 120, 87, 0.15)', color: 'var(--brand-primary, #047857)', marginBottom: '0.75rem' }}>
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--brand-primary, #047857)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
                   <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -221,8 +221,8 @@ export default function LiveCameraCaptureModal({ isOpen, onClose, onCapture }) {
               height: '240px',
               borderRadius: '50%',
               overflow: 'hidden',
-              border: '3px solid #B8862F',
-              boxShadow: '0 0 24px rgba(184, 134, 47, 0.4)'
+              border: '3px solid var(--brand-primary, #047857)',
+              boxShadow: '0 0 24px rgba(4, 120, 87, 0.4)'
             }}>
               <img
                 src={capturedPhoto}
@@ -237,8 +237,8 @@ export default function LiveCameraCaptureModal({ isOpen, onClose, onCapture }) {
               height: '240px',
               borderRadius: '50%',
               overflow: 'hidden',
-              border: '3px solid #a9793c',
-              boxShadow: '0 0 24px rgba(169, 121, 60, 0.35)',
+              border: '3px solid var(--brand-primary, #047857)',
+              boxShadow: '0 0 24px rgba(4, 120, 87, 0.35)',
               background: '#000000'
             }}>
               <video
@@ -274,8 +274,8 @@ export default function LiveCameraCaptureModal({ isOpen, onClose, onCapture }) {
                 style={{
                   flex: 1,
                   padding: '0.75rem',
-                  background: '#faf8f4',
-                  border: '1px solid #e3ddd0',
+                  background: 'var(--brand-tint, #ECFDF5)',
+                  border: '1px solid var(--brand-tint-border, #A7F3D0)',
                   borderRadius: '9px',
                   fontWeight: 600,
                   fontSize: '0.88rem',
@@ -327,8 +327,8 @@ export default function LiveCameraCaptureModal({ isOpen, onClose, onCapture }) {
                 aria-label="Cancel live photo"
                 style={{
                   padding: '0.75rem 1.25rem',
-                  background: '#faf8f4',
-                  border: '1px solid #e3ddd0',
+                  background: 'var(--brand-tint, #ECFDF5)',
+                  border: '1px solid var(--brand-tint-border, #A7F3D0)',
                   borderRadius: '9px',
                   fontWeight: 600,
                   fontSize: '0.88rem',

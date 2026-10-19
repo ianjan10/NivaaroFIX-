@@ -20,10 +20,10 @@ export default function HowItWorksSection() {
   ];
 
   return (
-    <section className="nivaaro-how-it-works-section" aria-label="How It Works">
+    <section className="nivaaro-how-it-works-section" aria-label="How It Works" style={{ padding: 'clamp(4.5rem, 7vw, 6rem) 0', borderTop: '1px solid #f1f5f9' }}>
       <div className="max-w-container">
         {/* Section Header */}
-        <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3rem' }}>
+        <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 3.5rem' }}>
           <span
             style={{
               display: 'block',
@@ -31,8 +31,8 @@ export default function HowItWorksSection() {
               fontWeight: 700,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#a9793c',
-              marginBottom: '0.65rem'
+              color: 'var(--brand-primary, #047857)',
+              marginBottom: '0.75rem'
             }}
           >
             HOW IT WORKS
@@ -40,10 +40,11 @@ export default function HowItWorksSection() {
           <h2
             style={{
               fontFamily: 'var(--font-serif, "Fraunces", serif)',
-              fontSize: 'clamp(1.85rem, 3.2vw, 2.5rem)',
-              fontWeight: 500,
-              color: '#1e3a5f',
-              lineHeight: 1.2,
+              fontSize: 'clamp(2rem, 3.5vw, 2.75rem)',
+              fontWeight: 600,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
               margin: 0
             }}
           >
@@ -64,32 +65,25 @@ export default function HowItWorksSection() {
           {steps.map((s) => (
             <div
               key={s.num}
-              style={{
-                background: '#ffffff',
-                border: '1px solid #ded7c8',
-                borderRadius: '16px',
-                padding: '2rem 1.75rem',
-                display: 'flex',
-                flexDirection: 'column',
-                boxShadow: '0 2px 8px rgba(16, 24, 32, 0.03)'
-              }}
+              className="how-step-card nivaaro-card"
             >
               <div
                 style={{
-                  fontFamily: 'var(--font-serif, "Fraunces", serif)',
+                  fontFamily: 'var(--font-mono, monospace)',
                   fontSize: '1.25rem',
                   fontWeight: 700,
-                  color: '#a9793c',
-                  marginBottom: '0.75rem'
+                  color: 'var(--brand-primary, #047857)',
+                  marginBottom: '0.85rem',
+                  letterSpacing: '-0.02em'
                 }}
               >
                 {s.num}
               </div>
               <h3
                 style={{
-                  fontSize: '1.15rem',
-                  fontWeight: 700,
-                  color: '#1e3a5f',
+                  fontSize: '1.1rem',
+                  fontWeight: 600,
+                  color: 'var(--text-primary, #0f172a)',
                   margin: '0 0 0.5rem',
                   lineHeight: 1.3
                 }}
@@ -99,8 +93,8 @@ export default function HowItWorksSection() {
               <p
                 style={{
                   fontSize: '0.9rem',
-                  color: '#5A6472',
-                  lineHeight: 1.5,
+                  color: 'var(--text-secondary, #64748b)',
+                  lineHeight: 1.55,
                   margin: 0
                 }}
               >

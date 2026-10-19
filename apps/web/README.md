@@ -40,6 +40,7 @@ Dashboard/
 |   |   |-- BookingRescheduleModal.jsx
 |   |   |-- BookingToast.jsx
 |   |   |-- BookingTrackLiveModal.jsx
+|   |   |-- Logo.jsx                  # Official handcrafted vector logo component
 |   |   |-- BrandLogo.jsx
 |   |   |-- BrandStatementAndCtaSection.jsx
 |   |   |-- CustomerProfileIncompleteModal.jsx

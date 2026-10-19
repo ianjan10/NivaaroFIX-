@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="docs/brand/source/nivaarofix-horizontal-dark.svg" alt="NivaaroFix — Elevating the Everyday" width="280" />
+</p>
+<p align="center">
+  <strong>Elevating the Everyday</strong> &bull; <em>Home repairs, handled with clarity.</em>
+</p>
+
 # NivaaroFix
 
 NivaaroFix is an on-demand marketplace platform coordinating verified home repair services (electricians and plumbers). It provides quote broadcasting, progressive radius dispatching, mutual exclusivity job locks, real-time road route tracking, doorstep physical presence verification, photographic work proof, and automated wallet settlements.

@@ -147,7 +147,7 @@ body.dark-theme .bg-mesh-texture {
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1.5px solid rgba(184, 134, 47, 0.35);
+  border: 1.5px solid rgba(4, 120, 87, 0.35);
   border-radius: 9999px;
   box-shadow: 
     0 12px 32px -4px rgba(20, 24, 31, 0.16),
@@ -157,15 +157,15 @@ body.dark-theme .bg-mesh-texture {
 
 body.dark-theme .bg-showcase-dock {
   background: rgba(20, 24, 31, 0.94);
-  border-color: rgba(201, 152, 62, 0.38);
+  border-color: rgba(4, 120, 87, 0.38);
   box-shadow: 
     0 14px 38px -4px rgba(0, 0, 0, 0.6),
     0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .bg-showcase-dock:hover {
-  border-color: var(--accent-primary, #b8862f);
-  box-shadow: 0 16px 40px -4px rgba(184, 134, 47, 0.28);
+  border-color: var(--accent-primary, #047857);
+  box-shadow: 0 16px 40px -4px rgba(4, 120, 87, 0.28);
 }
 
 /* Dock Buttons */
@@ -198,9 +198,9 @@ body.dark-theme .dock-btn:hover {
 }
 
 .dock-btn.active {
-  background: var(--accent-primary, #b8862f);
+  background: var(--accent-primary, #047857);
   color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(184, 134, 47, 0.35);
+  box-shadow: 0 2px 8px rgba(4, 120, 87, 0.35);
 }
 
 /* Live Auto-Scroll Progress Fill inside Play/Pause button */
@@ -214,7 +214,7 @@ body.dark-theme .dock-btn:hover {
   bottom: 0;
   left: 0;
   height: 2.5px;
-  background: var(--accent-primary, #b8862f);
+  background: var(--accent-primary, #047857);
   border-radius: 9999px;
   animation: dockProgressFill linear forwards;
 }
@@ -280,8 +280,8 @@ body.dark-theme .dock-icon-btn:hover {
   align-items: center;
   gap: 0.45rem;
   padding: 0.3rem 0.65rem;
-  background: rgba(184, 134, 47, 0.1);
-  border: 1px solid rgba(184, 134, 47, 0.25);
+  background: rgba(4, 120, 87, 0.1);
+  border: 1px solid rgba(4, 120, 87, 0.25);
   border-radius: 9999px;
   font-size: 0.74rem;
   color: var(--text-primary, #14181f);
@@ -292,18 +292,18 @@ body.dark-theme .dock-icon-btn:hover {
 
 body.dark-theme .dock-active-badge {
   color: #f7f5f1;
-  background: rgba(201, 152, 62, 0.15);
-  border-color: rgba(201, 152, 62, 0.3);
+  background: rgba(4, 120, 87, 0.15);
+  border-color: rgba(4, 120, 87, 0.3);
 }
 
 .dock-active-badge:hover {
-  background: rgba(184, 134, 47, 0.2);
-  border-color: var(--accent-primary, #b8862f);
+  background: rgba(4, 120, 87, 0.2);
+  border-color: var(--accent-primary, #047857);
 }
 
 .badge-count {
   font-weight: 800;
-  color: var(--accent-primary, #b8862f);
+  color: var(--accent-primary, #047857);
   font-size: 0.7rem;
 }
 
@@ -327,14 +327,14 @@ body.dark-theme .dock-active-badge {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(184, 134, 47, 0.32);
+  border: 1px solid rgba(4, 120, 87, 0.32);
   border-radius: 9999px;
   box-shadow: 0 8px 24px -4px rgba(20, 24, 31, 0.12);
 }
 
 body.dark-theme .bg-showcase-dots {
   background: rgba(20, 24, 31, 0.85);
-  border-color: rgba(201, 152, 62, 0.25);
+  border-color: rgba(4, 120, 87, 0.25);
   box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
 }
 
@@ -354,14 +354,14 @@ body.dark-theme .showcase-dot {
 }
 
 .showcase-dot:hover {
-  background: var(--accent-primary, #b8862f);
+  background: var(--accent-primary, #047857);
   transform: scale(1.2);
 }
 
 .showcase-dot.active {
   width: 22px;
-  background: var(--accent-primary, #b8862f);
-  box-shadow: 0 0 8px rgba(184, 134, 47, 0.5);
+  background: var(--accent-primary, #047857);
+  box-shadow: 0 0 8px rgba(4, 120, 87, 0.5);
 }
 
 /* Lightbox Modal */
@@ -454,15 +454,15 @@ body.dark-theme .cat-pill {
 }
 
 .cat-pill:hover {
-  background: rgba(184, 134, 47, 0.12);
-  color: var(--accent-primary, #b8862f);
-  border-color: var(--accent-primary, #b8862f);
+  background: rgba(4, 120, 87, 0.12);
+  color: var(--accent-primary, #047857);
+  border-color: var(--accent-primary, #047857);
 }
 
 .cat-pill.active {
-  background: var(--accent-primary, #b8862f);
+  background: var(--accent-primary, #047857);
   color: #ffffff !important;
-  border-color: var(--accent-primary, #b8862f);
+  border-color: var(--accent-primary, #047857);
 }
 
 .lightbox-title {
@@ -498,8 +498,8 @@ body.dark-theme .lightbox-title {
 }
 
 body.dark-theme .lightbox-action-btn {
-  background: var(--accent-primary, #c9983e);
-  color: #101820;
+  background: var(--accent-primary, #047857);
+  color: #ffffff;
 }
 
 .lightbox-action-btn:hover {
@@ -540,7 +540,7 @@ body.dark-theme .lightbox-close-btn:hover {
   flex: 1;
   overflow: auto;
   padding: 1.5rem;
-  background: #faf8f5;
+  background: var(--brand-tint, #ECFDF5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -622,8 +622,8 @@ body.dark-theme .lightbox-desc p {
 
 .thumb-btn.active {
   opacity: 1;
-  border-color: var(--accent-primary, #b8862f);
-  box-shadow: 0 0 0 1px var(--accent-primary, #b8862f);
+  border-color: var(--accent-primary, #047857);
+  box-shadow: 0 0 0 1px var(--accent-primary, #047857);
 }
 
 @media (max-width: 768px) {

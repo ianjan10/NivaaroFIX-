@@ -561,10 +561,10 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
           gap: '4px',
           fontSize: '0.76rem',
           fontWeight: 600,
-          color: '#15803d',
+          color: 'var(--brand-primary, #047857)',
           lineHeight: 1
         }}>
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#15803d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--brand-primary, #047857)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="20 6 9 17 4 12" />
           </svg>
           <span>Verified</span>
@@ -579,10 +579,10 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
           gap: '4px',
           fontSize: '0.76rem',
           fontWeight: 600,
-          color: '#946E26',
+          color: 'var(--color-warning, #d97706)',
           lineHeight: 1
         }}>
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#946E26" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-warning, #d97706)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
@@ -751,8 +751,8 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
         key={docKey}
         className="pro-document-card"
         style={{
-          background: '#faf8f4',
-          border: '1px solid #e8e2d5',
+          background: 'var(--brand-tint, #ECFDF5)',
+          border: '1px solid var(--brand-tint-border, #A7F3D0)',
           borderRadius: '16px',
           padding: '1.2rem 1.35rem',
           boxShadow: '0 2px 8px rgba(16, 24, 32, 0.03)',
@@ -812,8 +812,8 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
               if (file) handleProcessDocUpload(docKey, file);
             }}
             style={{
-              border: isDragging[docKey] ? '1.5px dashed #946E26' : '1.5px dashed #ded7cb',
-              backgroundColor: isDragging[docKey] ? '#faf8f5' : '#ffffff',
+              border: isDragging[docKey] ? '1.5px dashed var(--brand-primary, #047857)' : '1.5px dashed var(--brand-tint-border, #A7F3D0)',
+              backgroundColor: isDragging[docKey] ? 'var(--brand-tint, #ECFDF5)' : '#ffffff',
               borderRadius: '10px',
               padding: '14px 12px',
               display: 'flex',
@@ -845,7 +845,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
               >
                 <div style={{
                   width: '28px', height: '28px', borderRadius: '50%',
-                  backgroundColor: '#f3f0ea', border: '1px solid #ded7cb',
+                  backgroundColor: 'var(--brand-tint, #ECFDF5)', border: '1px solid var(--brand-tint-border, #A7F3D0)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#101820" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -866,7 +866,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
               >
                 <div style={{
                   width: '28px', height: '28px', borderRadius: '50%',
-                  backgroundColor: '#f3f0ea', border: '1px solid #ded7cb',
+                  backgroundColor: 'var(--brand-tint, #ECFDF5)', border: '1px solid var(--brand-tint-border, #A7F3D0)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#101820" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -887,7 +887,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
               justifyContent: 'space-between',
               padding: '10px 12px',
               backgroundColor: '#ffffff',
-              border: '1px solid #ded7cb',
+              border: '1px solid var(--brand-tint-border, #A7F3D0)',
               borderRadius: '10px',
               gap: '10px'
             }}>
@@ -901,7 +901,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
                       height: '36px',
                       borderRadius: '6px',
                       objectFit: 'cover',
-                      border: '1px solid #ded7cb',
+                      border: '1px solid var(--brand-tint-border, #A7F3D0)',
                       flexShrink: 0
                     }}
                   />
@@ -910,8 +910,8 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
                     width: '36px',
                     height: '36px',
                     borderRadius: '6px',
-                    backgroundColor: '#faf8f5',
-                    border: '1px solid #ded7cb',
+                    backgroundColor: 'var(--brand-tint, #ECFDF5)',
+                    border: '1px solid var(--brand-tint-border, #A7F3D0)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -954,8 +954,8 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
                 onClick={() => inputRef.current?.click()}
                 className="btn-replace-doc"
                 style={{
-                  background: '#faf8f5',
-                  border: '1px solid #ded7cb',
+                  background: 'var(--brand-tint, #ECFDF5)',
+                  border: '1px solid var(--brand-tint-border, #A7F3D0)',
                   borderRadius: '6px',
                   padding: '5px 9px',
                   fontSize: '0.76rem',
@@ -1026,20 +1026,20 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
             <div style={{
               width: '100%',
               height: '3px',
-              backgroundColor: '#ded7cb',
+              backgroundColor: 'var(--brand-tint-border, #A7F3D0)',
               borderRadius: '2px',
               overflow: 'hidden'
             }}>
               <div style={{
                 height: '100%',
                 width: `${uploadProgress[docKey]}%`,
-                backgroundColor: '#946E26',
+                backgroundColor: 'var(--brand-primary, #047857)',
                 transition: 'width 0.15s ease'
               }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '3px' }}>
               <span style={{ fontSize: '0.7rem', color: '#5A6472' }}>Uploading document...</span>
-              <span style={{ fontSize: '0.7rem', color: '#946E26', fontWeight: 600 }}>{uploadProgress[docKey]}%</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--brand-primary, #047857)', fontWeight: 600 }}>{uploadProgress[docKey]}%</span>
             </div>
           </div>
         )}
@@ -1229,7 +1229,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
             
             {/* Header Title */}
             <div className="profile-header-group">
-              <span className="profile-eyebrow" style={{ color: '#946E26' }}>
+              <span className="profile-eyebrow" style={{ color: 'var(--brand-primary, #047857)' }}>
                 PROFESSIONAL OPERATIONS
               </span>
               <h1 className="profile-headline" style={{ color: '#101820', fontFamily: "var(--font-sans, 'Plus Jakarta Sans', sans-serif)" }}>
@@ -1255,17 +1255,17 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
                       alignItems: 'flex-start',
                       gap: '12px',
                       padding: '12px 14px',
-                      backgroundColor: '#faf8f5',
-                      border: '1.5px solid rgba(184, 134, 47, 0.3)',
+                      backgroundColor: 'var(--brand-tint, #ECFDF5)',
+                      border: '1.5px solid var(--brand-tint-border, #A7F3D0)',
                       borderRadius: '8px',
                       marginBottom: '18px',
                       color: '#101820',
                       fontSize: '0.85rem',
                       lineHeight: 1.5,
-                      boxShadow: '0 4px 14px rgba(184, 134, 47, 0.12), 0 2px 4px rgba(16, 24, 32, 0.04)'
+                      boxShadow: '0 4px 14px rgba(4, 120, 87, 0.12), 0 2px 4px rgba(16, 24, 32, 0.04)'
                     }}
                   >
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#B8862F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--brand-primary, #047857)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
                       <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
                       <circle cx="12" cy="10" r="3" />
                     </svg>
@@ -1323,9 +1323,9 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
                         aria-readonly="true"
                         style={{
                           width: '100%',
-                          background: '#faf8f5',
+                          background: 'var(--brand-tint, #ECFDF5)',
                           color: '#101820',
-                          borderColor: '#ded7cb',
+                          borderColor: 'var(--brand-tint-border, #A7F3D0)',
                           cursor: 'not-allowed',
                           fontWeight: 600
                         }}
@@ -1336,8 +1336,8 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
                       <div style={{
                         marginTop: '0.45rem',
                         padding: '0.55rem 0.75rem',
-                        background: '#faf8f5',
-                        border: '1px solid rgba(184, 134, 47, 0.25)',
+                        background: 'var(--brand-tint, #ECFDF5)',
+                        border: '1px solid var(--brand-tint-border, #A7F3D0)',
                         borderRadius: '6px',
                         fontSize: '0.8rem',
                         color: '#5a6472',
@@ -1568,14 +1568,14 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
                           fontSize: '0.78rem',
                           fontWeight: 600,
                           color: '#101820',
-                          backgroundColor: '#faf8f5',
-                          border: '1.5px solid rgba(16, 24, 32, 0.15)',
+                          backgroundColor: 'var(--brand-tint, #ECFDF5)',
+                          border: '1.5px solid var(--brand-tint-border, #A7F3D0)',
                           borderRadius: '6px',
                           cursor: isDetectingGps ? 'not-allowed' : 'pointer',
                           transition: 'all 0.15s ease'
                         }}
                       >
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#946E26" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--brand-primary, #047857)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                           <circle cx="12" cy="12" r="10" />
                           <line x1="22" y1="12" x2="18" y2="12" />
                           <line x1="6" y1="12" x2="2" y2="12" />
@@ -1608,7 +1608,7 @@ export default function AgentProfilePage({ initialAgent, onSwitchPortal, onLogou
                       style={{
                         width: '100%',
                         background: '#101820',
-                        boxShadow: gpsNotice ? '0 0 0 3px rgba(184,134,47,0.35)' : undefined
+                        boxShadow: gpsNotice ? '0 0 0 3px rgba(4, 120, 87, 0.35)' : undefined
                       }}
                     >
                       {isSaving ? 'Saving Operations Profile...' : 'Save Professional Profile'}

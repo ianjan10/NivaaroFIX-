@@ -728,7 +728,7 @@ fs.writeFileSync(path.join(docsDir, '06_FRONTEND_APPLICATIONS_AND_UI_STANDARDS.m
 ## Header Navigation Standard
 
 Across all pages and portals, the top navigation header strictly adheres to the standard order:
-1. Brand Logo (**NivaaroFix: Beyond the Fix**)
+1. Brand Logo (**NivaaroFix: Elevating the Everyday**)
 2. **Home**
 3. **Services**
 4. **My Bookings** (when logged in as Customer) OR **Professional Console** (when logged in as Partner)

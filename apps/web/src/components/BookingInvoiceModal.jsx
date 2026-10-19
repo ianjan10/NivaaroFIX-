@@ -37,24 +37,24 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
         <style>
           @page { size: A4; margin: 15mm; }
           body { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; color: #101820; margin: 0; padding: 20px; background: #ffffff; }
-          .invoice-sheet { max-width: 780px; margin: 0 auto; border: 1px solid #e3ddd0; padding: 32px; border-radius: 8px; }
+          .invoice-sheet { max-width: 780px; margin: 0 auto; border: 1px solid #A7F3D0; padding: 32px; border-radius: 8px; }
           .inv-header { display: flex; justify-content: space-between; border-bottom: 2px solid #1e3a5f; padding-bottom: 20px; margin-bottom: 24px; }
           .inv-brand h1 { margin: 0; font-size: 24px; font-family: Georgia, serif; color: #1e3a5f; }
           .inv-brand p { margin: 4px 0 0 0; font-size: 12px; color: #5a6472; }
           .inv-meta { text-align: right; }
-          .inv-meta h2 { margin: 0; font-size: 18px; color: #a9793c; }
+          .inv-meta h2 { margin: 0; font-size: 18px; color: #047857; }
           .inv-meta p { margin: 3px 0; font-size: 12px; color: #5a6472; }
           .inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; padding: 16px; background: #f7f5f1; border-radius: 6px; }
           .inv-col h3 { margin: 0 0 6px 0; font-size: 12px; text-transform: uppercase; color: #1e3a5f; letter-spacing: 0.5px; }
           .inv-col p { margin: 2px 0; font-size: 13px; color: #101820; }
           table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
           th { text-align: left; padding: 10px; background: #1e3a5f; color: #ffffff; font-size: 12px; }
-          td { padding: 12px 10px; border-bottom: 1px solid #e3ddd0; font-size: 13px; }
+          td { padding: 12px 10px; border-bottom: 1px solid #A7F3D0; font-size: 13px; }
           .text-right { text-align: right; }
           .totals-table { width: 280px; margin-left: auto; margin-bottom: 24px; }
           .totals-table td { padding: 6px 10px; }
           .total-row td { font-weight: bold; font-size: 15px; color: #0f4d3c; border-top: 2px solid #1e3a5f; }
-          .inv-footer { border-top: 1px solid #e3ddd0; padding-top: 16px; display: flex; justify-content: space-between; font-size: 11px; color: #5a6472; }
+          .inv-footer { border-top: 1px solid #A7F3D0; padding-top: 16px; display: flex; justify-content: space-between; font-size: 11px; color: #5a6472; }
           .warranty-seal { border: 1px solid #0f4d3c; background: rgba(15, 77, 60, 0.06); color: #0f4d3c; padding: 8px 12px; border-radius: 4px; font-weight: 600; font-size: 12px; display: inline-block; }
         </style>
       </head>

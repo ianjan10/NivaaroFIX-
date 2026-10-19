@@ -589,7 +589,7 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
             
             {/* Header Title */}
             <div className="profile-header-group">
-              <span className="profile-eyebrow" style={{ color: '#946E26' }}>CUSTOMER ACCOUNT</span>
+              <span className="profile-eyebrow" style={{ color: 'var(--brand-primary, #047857)' }}>CUSTOMER ACCOUNT</span>
               <h1 className="profile-headline" style={{ color: '#101820', fontFamily: "var(--font-sans, 'Plus Jakarta Sans', sans-serif)" }}>
                 Personal Information &amp; Saved Address
               </h1>
@@ -613,17 +613,17 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
                       alignItems: 'flex-start',
                       gap: '12px',
                       padding: '12px 14px',
-                      backgroundColor: '#faf8f5',
-                      border: '1.5px solid rgba(184, 134, 47, 0.3)',
+                      backgroundColor: 'var(--brand-tint, #ECFDF5)',
+                      border: '1.5px solid var(--brand-tint-border, #A7F3D0)',
                       borderRadius: '8px',
                       marginBottom: '18px',
                       color: '#101820',
                       fontSize: '0.85rem',
                       lineHeight: 1.5,
-                      boxShadow: '0 4px 14px rgba(184, 134, 47, 0.12), 0 2px 4px rgba(16, 24, 32, 0.04)'
+                      boxShadow: '0 4px 14px rgba(4, 120, 87, 0.12), 0 2px 4px rgba(16, 24, 32, 0.04)'
                     }}
                   >
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#B8862F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--brand-primary, #047857)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
                       <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
                       <circle cx="12" cy="10" r="3" />
                     </svg>
@@ -667,7 +667,7 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
                       {showNameLockedNotice && (
                         <span style={{
                           fontSize: '0.78rem',
-                          color: '#946E26',
+                          color: 'var(--brand-primary, #047857)',
                           fontWeight: 600,
                           transition: 'opacity 0.25s ease'
                         }}>
@@ -690,9 +690,9 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
                         aria-readonly="true"
                         style={{
                           width: '100%',
-                          background: '#faf8f5',
+                          background: 'var(--brand-tint, #ECFDF5)',
                           color: '#101820',
-                          borderColor: '#ded7cb',
+                          borderColor: 'var(--brand-tint-border, #A7F3D0)',
                           cursor: 'not-allowed',
                           fontWeight: 600,
                           paddingRight: '2.5rem'
@@ -704,7 +704,7 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
                           right: '12px',
                           top: '50%',
                           transform: 'translateY(-50%)',
-                          color: '#946E26',
+                          color: 'var(--brand-primary, #047857)',
                           display: 'flex',
                           alignItems: 'center',
                           pointerEvents: 'none'
@@ -722,8 +722,8 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
                       <div style={{
                         marginTop: '0.45rem',
                         padding: '0.55rem 0.75rem',
-                        background: '#faf8f5',
-                        border: '1px solid rgba(184, 134, 47, 0.25)',
+                        background: 'var(--brand-tint, #ECFDF5)',
+                        border: '1px solid var(--brand-tint-border, #A7F3D0)',
                         borderRadius: '6px',
                         fontSize: '0.8rem',
                         color: '#5a6472',
@@ -905,14 +905,14 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
                           fontSize: '0.78rem',
                           fontWeight: 600,
                           color: '#101820',
-                          backgroundColor: '#faf8f5',
-                          border: '1.5px solid rgba(16, 24, 32, 0.15)',
+                          backgroundColor: 'var(--brand-tint, #ECFDF5)',
+                          border: '1.5px solid var(--brand-tint-border, #A7F3D0)',
                           borderRadius: '6px',
                           cursor: isDetectingGps ? 'not-allowed' : 'pointer',
                           transition: 'all 0.15s ease'
                         }}
                       >
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#946E26" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--brand-primary, #047857)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                           <circle cx="12" cy="12" r="10" />
                           <line x1="22" y1="12" x2="18" y2="12" />
                           <line x1="6" y1="12" x2="2" y2="12" />
@@ -1054,10 +1054,10 @@ export default function CustomerProfilePage({ initialUser, onSwitchPortal, onLog
                             gap: '0.25rem',
                             fontSize: '0.72rem',
                             fontWeight: 600,
-                            color: '#946E26',
+                            color: 'var(--brand-primary, #047857)',
                             lineHeight: 1
                           }}>
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#946E26" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="var(--brand-primary, #047857)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
                             <span>Verified</span>

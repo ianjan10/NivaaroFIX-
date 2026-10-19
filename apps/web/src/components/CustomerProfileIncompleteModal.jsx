@@ -70,13 +70,13 @@ export default function CustomerProfileIncompleteModal({
               width: '52px',
               height: '52px',
               borderRadius: '50%',
-              background: '#fcf8f2',
-              border: '2px solid #a9793c',
+              background: 'var(--brand-tint, #ECFDF5)',
+              border: '2px solid var(--brand-primary, #047857)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: '0.85rem',
-              color: '#a9793c'
+              color: 'var(--brand-primary, #047857)'
             }}
           >
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -113,8 +113,8 @@ export default function CustomerProfileIncompleteModal({
         {/* Profile Strength Progress Bar */}
         <div
           style={{
-            background: '#faf8f4',
-            border: '1px solid #e8e2d5',
+            background: 'var(--brand-tint, #ECFDF5)',
+            border: '1px solid var(--brand-tint-border, #A7F3D0)',
             borderRadius: '14px',
             padding: '1.15rem 1.25rem',
             marginBottom: '1.25rem'
@@ -133,7 +133,7 @@ export default function CustomerProfileIncompleteModal({
                 fontSize: '0.72rem',
                 fontWeight: 700,
                 letterSpacing: '0.08em',
-                color: '#a9793c',
+                color: 'var(--brand-primary, #047857)',
                 textTransform: 'uppercase'
               }}
             >
@@ -165,7 +165,7 @@ export default function CustomerProfileIncompleteModal({
               style={{
                 height: '100%',
                 width: `${completionPercentage}%`,
-                background: completionPercentage === 100 ? '#0f4d3c' : '#a9793c',
+                background: completionPercentage === 100 ? '#0f4d3c' : 'var(--brand-primary, #047857)',
                 borderRadius: '9999px',
                 transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
@@ -219,7 +219,7 @@ export default function CustomerProfileIncompleteModal({
                       gap: '0.3rem',
                       fontSize: '0.78rem',
                       fontWeight: 700,
-                      color: '#a9793c'
+                      color: 'var(--brand-primary, #047857)'
                     }}
                   >
                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2">
@@ -248,7 +248,7 @@ export default function CustomerProfileIncompleteModal({
             marginBottom: '1.35rem'
           }}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#a9793c" strokeWidth="2" style={{ flexShrink: 0 }}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--brand-primary, #047857)" strokeWidth="2" style={{ flexShrink: 0 }}>
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />

@@ -1,32 +1,28 @@
 import React from 'react';
+import Logo from './Logo';
 
 /**
  * BrandLogo
- * Official NivaaroFix Brand Identity featuring the authentic metallic golden house & infinity-tools
- * emblem and refined typography ("NIVAAROFIX - BEYOND THE FIX").
+ * Official NivaaroFix Brand Identity featuring the handcrafted architectural shelter & monogram
+ * and refined typography ("NIVAAROFIX — Elevating the Everyday").
  */
 export default function BrandLogo({
   className = '',
   size = 'medium',
-  variant = 'horizontal', // 'horizontal' | 'stacked' | 'emblem'
+  variant = 'horizontal', // 'horizontal' | 'horizontal-tagline' | 'stacked' | 'full' | 'emblem' | 'mark'
   isPartner = false,
   isDarkHeader = false,
   onClick
 }) {
-  const logoHeights = {
-    small: { height: 30, maxW: 165 },
-    medium: { height: 40, maxW: 215 },
-    large: { height: 54, maxW: 285 }
-  };
-
-  const currentSize = logoHeights[size] || logoHeights.medium;
-
-  let imageSrc = '/brand/logo-horizontal.png';
-  if (variant === 'stacked') {
-    imageSrc = '/brand/logo-stacked.png';
-  } else if (variant === 'emblem') {
-    imageSrc = '/brand/logo-emblem.png';
-  }
+  const normalizedVariant = (variant === 'stacked' || variant === 'full')
+    ? 'full'
+    : (variant === 'horizontal-tagline')
+      ? 'horizontal-tagline'
+      : (variant === 'emblem')
+        ? 'emblem'
+        : (variant === 'mark')
+          ? 'mark'
+          : 'horizontal';
 
   const handleLogoClick = (e) => {
     if (onClick) {
@@ -45,37 +41,20 @@ export default function BrandLogo({
     <div
       className={`brand-logo-wrapper ${className}`}
       onClick={handleLogoClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleLogoClick(e);
-        }
-      }}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '0.65rem',
         cursor: 'pointer',
-        textDecoration: 'none',
-        userSelect: 'none',
-        transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease'
+        textDecoration: 'none'
       }}
-      aria-label="NivaaroFix Home"
     >
-      <img
-        src={imageSrc}
-        alt="NivaaroFix — Beyond The Fix"
-        className="brand-logo-img"
-        style={{
-          height: `${currentSize.height}px`,
-          width: 'auto',
-          maxWidth: `${currentSize.maxW}px`,
-          display: 'block',
-          objectFit: 'contain',
-          filter: isDarkHeader ? 'brightness(1.18) contrast(1.05)' : 'none'
-        }}
+      <Logo
+        variant={normalizedVariant}
+        tone={isDarkHeader ? 'light' : 'dark'}
+        size={size}
+        isPartner={isPartner}
+        alt="NivaaroFix — Elevating the Everyday"
+        onClick={handleLogoClick}
       />
     </div>
   );

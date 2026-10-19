@@ -28,6 +28,11 @@
     "bundle:llm": "node scripts/build_full_project_knowledge_bundle.mjs",
     "bundle:db": "node scripts/build_database_knowledge_bundle.mjs",
     "lint": "eslint . --ext .js,.jsx,.mjs",
+    "lint:brand": "node scripts/lint_no_banned_brand_colors.mjs",
     "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "opentype.js": "^2.0.0"
   }
 }

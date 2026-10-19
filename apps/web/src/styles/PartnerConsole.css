@@ -4,17 +4,26 @@
    ========================================================================== */
 
 :root {
-  --pro-font: var(--font-sans, 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-  --pro-accent: #059669;
-  --pro-accent-hover: #047857;
-  --pro-accent-subtle: rgba(5, 150, 105, 0.06);
-  --pro-accent-border: rgba(5, 150, 105, 0.18);
-  --pro-accent-ring: rgba(5, 150, 105, 0.12);
+    --pro-font: var(--font-sans, 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  --brand-primary: #047857;
+  --brand-primary-hover: #065F46;
+  --brand-primary-pressed: #064E3B;
+  --brand-tint: #ECFDF5;
+  --brand-tint-strong: #D1FAE5;
+  --brand-tint-border: #A7F3D0;
+  --focus-ring: #10B981;
+
+  --pro-accent: var(--brand-primary);
+  --pro-accent-hover: var(--brand-primary-hover);
+  --pro-accent-pressed: var(--brand-primary-pressed);
+  --pro-accent-subtle: var(--brand-tint);
+  --pro-accent-border: var(--brand-tint-border);
+  --pro-accent-ring: rgba(16, 185, 129, 0.2);
   --pro-surface: #ffffff;
   --pro-surface-subtle: #f8fafc;
   --pro-surface-hover: #f1f5f9;
-  --pro-border: #e2e8f0;
-  --pro-border-subtle: #edf2f7;
+  --pro-border: rgba(16, 24, 40, 0.08);
+  --pro-border-subtle: rgba(16, 24, 40, 0.05);
   --pro-text-main: #0f172a;
   --pro-text-secondary: #475569;
   --pro-text-muted: #94a3b8;
@@ -25,11 +34,11 @@
 }
 
 body.dark-theme {
-  --pro-surface: #0f172a;
-  --pro-surface-subtle: #1e293b;
-  --pro-surface-hover: #334155;
-  --pro-border: #334155;
-  --pro-border-subtle: #1e293b;
+  --pro-surface: #151c26;
+  --pro-surface-subtle: #1a2330;
+  --pro-surface-hover: #1e2838;
+  --pro-border: rgba(255, 255, 255, 0.09);
+  --pro-border-subtle: rgba(255, 255, 255, 0.05);
   --pro-text-main: #f8fafc;
   --pro-text-secondary: #94a3b8;
   --pro-text-muted: #64748b;
@@ -298,7 +307,7 @@ body.dark-theme .pro-meta-hub {
   border-radius: 50%;
   background: var(--pro-accent);
   display: inline-block;
-  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15);
+  box-shadow: 0 0 0 2px rgba(4, 120, 87, 0.15);
   transition: all 200ms ease;
 }
 
@@ -536,9 +545,10 @@ body.dark-theme .pro-btn-complete-profile:hover {
   grid-template-columns: repeat(4, 1fr);
   background: var(--pro-surface);
   border: 1px solid var(--pro-border);
-  border-radius: 8px;
+  border-radius: 12px;
   margin-bottom: 1.5rem;
   overflow: hidden;
+  box-shadow: var(--shadow-card);
 }
 
 .pro-stat-cell {
@@ -675,11 +685,21 @@ body.dark-theme .pro-btn-complete-profile:hover {
 /* -------------------- 4. Active Job In Progress Card -------------------- */
 .pro-active-job-card {
   background: var(--pro-surface);
-  border: 1px solid var(--pro-accent-border);
-  border-radius: 8px;
+  border: 1px solid var(--pro-border);
+  border-radius: 12px;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
   position: relative;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pro-active-job-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--pro-border);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .pro-active-job-header {
@@ -707,7 +727,7 @@ body.dark-theme .pro-btn-complete-profile:hover {
   height: 6px;
   border-radius: 50%;
   background: var(--pro-accent);
-  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+  box-shadow: 0 0 0 2px rgba(4, 120, 87, 0.2);
 }
 
 .pro-job-payout-hero {
@@ -968,16 +988,24 @@ body.dark-theme .pro-btn-complete-profile:hover {
 
 .pro-request-card {
   background: var(--pro-surface, #ffffff);
-  border: 1px solid var(--pro-border, #e2e8f0);
+  border: 1px solid var(--pro-border);
   border-radius: 12px;
   padding: 1.35rem 1.5rem;
-  box-shadow: 0 1px 3px rgba(16, 24, 32, 0.04), 0 4px 12px rgba(16, 24, 32, 0.02);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .pro-request-card:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 4px 16px rgba(16, 24, 32, 0.06);
+  transform: translateY(-2px);
+  border-color: var(--pro-border);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.pro-request-card:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-card-press);
 }
 
 .pro-card-top-row {
@@ -1029,7 +1057,7 @@ body.dark-theme .pro-btn-complete-profile:hover {
 
 .pro-card-customer-note-box {
   background: #fbfbf9;
-  border-left: 3px solid #059669;
+  border-left: 3px solid var(--pro-accent, #047857);
   border-radius: 0 8px 8px 0;
   padding: 0.7rem 0.95rem;
   margin: 0.85rem 0;
@@ -1039,7 +1067,7 @@ body.dark-theme .pro-btn-complete-profile:hover {
 }
 
 .pro-card-note-mark {
-  color: #059669;
+  color: var(--pro-accent, #047857);
   font-size: 1.15rem;
   font-weight: 800;
   line-height: 1;
@@ -1092,20 +1120,20 @@ body.dark-theme .pro-btn-complete-profile:hover {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  background: #059669;
+  background: var(--pro-accent, #047857);
   color: #ffffff;
   border: none;
-  border-radius: 8px;
+  border-radius: 980px;
   font-size: 0.84rem;
   font-weight: 600;
-  padding: 0.55rem 1.1rem;
+  padding: 0.55rem 1.25rem;
   cursor: pointer;
   transition: background 150ms ease;
   letter-spacing: 0.01em;
 }
 
 .pro-btn-view-quote:hover:not(:disabled) {
-  background: #047857;
+  background: var(--pro-accent-hover, #065F46);
 }
 
 .pro-btn-view-quote:disabled {
@@ -1117,7 +1145,7 @@ body.dark-theme .pro-btn-complete-profile:hover {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: #059669;
+  color: var(--pro-accent, #047857);
   background: #ecfdf5;
   border: 1px solid #a7f3d0;
   border-radius: 6px;
@@ -1192,13 +1220,13 @@ body.dark-theme .pro-btn-complete-profile:hover {
   line-height: 1;
 }
 
-/* Proper primary button for settlement — NOT a capsule */
+/* Proper primary button for settlement — Apple pill style */
 .pro-btn-settlement {
   background: var(--pro-accent);
   color: #ffffff;
   border: none;
-  padding: 0.55rem 1rem;
-  border-radius: 6px;
+  padding: 0.55rem 1.25rem;
+  border-radius: 980px;
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
@@ -1409,8 +1437,9 @@ body.dark-theme .pro-btn-complete-profile:hover {
   grid-template-columns: repeat(3, 1fr);
   background: var(--pro-surface);
   border: 1px solid var(--pro-border);
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: var(--shadow-card);
 }
 
 .pro-summary-stat-cell {
@@ -1538,18 +1567,23 @@ body.dark-theme .pro-btn-complete-profile:hover {
 .pro-completed-job-card {
   background: var(--pro-surface);
   border: 1px solid var(--pro-border);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .pro-completed-job-card:hover {
-  border-color: var(--pro-accent-border);
+  transform: translateY(-1px);
+  border-color: var(--pro-border);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .pro-completed-job-card.expanded {
-  border-color: var(--pro-accent-border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  border-color: var(--pro-border);
+  box-shadow: var(--shadow-card-hover);
 }
 
 /* Collapsed Single Clean Row */

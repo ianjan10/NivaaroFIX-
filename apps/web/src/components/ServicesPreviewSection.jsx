@@ -27,9 +27,9 @@ export default function ServicesPreviewSection({ onSelectCategory, onExploreServ
   };
 
   return (
-    <section className="services-preview-section" aria-label="Services Preview">
+    <section className="services-preview-section" aria-label="Services Preview" style={{ padding: 'clamp(4rem, 6vw, 5.5rem) 0' }}>
       <div className="max-w-container">
-        <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3rem' }}>
+        <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 3rem' }}>
           <span
             style={{
               display: 'block',
@@ -37,8 +37,8 @@ export default function ServicesPreviewSection({ onSelectCategory, onExploreServ
               fontWeight: 700,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#a9793c',
-              marginBottom: '0.65rem'
+              color: 'var(--brand-primary, #047857)',
+              marginBottom: '0.75rem'
             }}
           >
             SERVICES
@@ -46,10 +46,11 @@ export default function ServicesPreviewSection({ onSelectCategory, onExploreServ
           <h2
             style={{
               fontFamily: 'var(--font-serif, "Fraunces", serif)',
-              fontSize: 'clamp(1.85rem, 3.2vw, 2.5rem)',
-              fontWeight: 500,
-              color: '#1e3a5f',
-              lineHeight: 1.2,
+              fontSize: 'clamp(2rem, 3.5vw, 2.75rem)',
+              fontWeight: 600,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
               margin: 0
             }}
           >
@@ -57,7 +58,7 @@ export default function ServicesPreviewSection({ onSelectCategory, onExploreServ
           </h2>
         </div>
 
-        {/* 2 Restrained Trade Cards */}
+        {/* 2 Restrained Trade Cards (Apple Bento Style) */}
         <div
           style={{
             display: 'grid',
@@ -71,26 +72,16 @@ export default function ServicesPreviewSection({ onSelectCategory, onExploreServ
             <div
               key={item.id}
               className="services-preview-card"
-              style={{
-                background: '#ffffff',
-                border: '1px solid #ded7c8',
-                borderRadius: '18px',
-                padding: '2.25rem 2rem',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                boxShadow: '0 4px 20px -2px rgba(16, 24, 32, 0.04)',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-              }}
             >
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
                   <h3
                     style={{
                       fontFamily: 'var(--font-serif, "Fraunces", serif)',
                       fontSize: '1.65rem',
                       fontWeight: 600,
-                      color: '#1e3a5f',
+                      color: '#0f172a',
+                      letterSpacing: '-0.02em',
                       margin: 0
                     }}
                   >
@@ -100,11 +91,17 @@ export default function ServicesPreviewSection({ onSelectCategory, onExploreServ
                     type="button"
                     onClick={() => handleServiceClick(item.category)}
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#a9793c',
-                      fontSize: '1.25rem',
+                      background: '#f5f5f7',
+                      border: '1px solid rgba(0, 0, 0, 0.06)',
+                      color: 'var(--brand-primary, #047857)',
+                      fontSize: '1.1rem',
                       cursor: 'pointer',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       padding: 0
                     }}
                     aria-label={`Explore ${item.title} services`}
@@ -116,27 +113,27 @@ export default function ServicesPreviewSection({ onSelectCategory, onExploreServ
                 <p
                   style={{
                     fontSize: '0.92rem',
-                    color: '#5A6472',
+                    color: '#64748b',
                     lineHeight: 1.55,
-                    margin: '0 0 1.5rem'
+                    margin: '0 0 1.35rem'
                   }}
                 >
                   {item.description}
                 </p>
 
-                {/* Specific Problem Links */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.75rem' }}>
+                {/* Specific Problem Links (Apple Pill Chips) */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', marginBottom: '1.75rem' }}>
                   {item.problems.map((prob, idx) => (
                     <span
                       key={idx}
                       style={{
                         fontSize: '0.8rem',
-                        fontWeight: 600,
-                        color: '#1e3a5f',
-                        background: '#faf8f4',
-                        border: '1px solid #e8e2d5',
-                        borderRadius: '6px',
-                        padding: '0.3rem 0.65rem'
+                        fontWeight: 500,
+                        color: '#1d1d1f',
+                        background: '#f5f5f7',
+                        border: '1px solid rgba(0, 0, 0, 0.06)',
+                        borderRadius: '980px',
+                        padding: '0.28rem 0.75rem'
                       }}
                     >
                       {prob}
@@ -145,7 +142,7 @@ export default function ServicesPreviewSection({ onSelectCategory, onExploreServ
                 </div>
               </div>
 
-              <div>
+              <div style={{ paddingTop: '1.1rem', borderTop: '1px solid #f1f5f9' }}>
                 <button
                   type="button"
                   onClick={() => handleServiceClick(item.category)}
@@ -153,13 +150,15 @@ export default function ServicesPreviewSection({ onSelectCategory, onExploreServ
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.45rem',
-                    background: 'none',
-                    border: 'none',
-                    color: '#1e3a5f',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
+                    background: 'transparent',
+                    border: '1px solid var(--brand-primary, #047857)',
+                    borderRadius: '980px',
+                    color: 'var(--brand-primary, #047857)',
+                    fontSize: '0.86rem',
+                    fontWeight: 600,
                     cursor: 'pointer',
-                    padding: 0
+                    padding: '0.42rem 1.15rem',
+                    transition: 'all 0.16s ease'
                   }}
                 >
                   <span>Explore {item.title} Services</span>

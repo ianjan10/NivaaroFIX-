@@ -18,7 +18,7 @@ import UberProximityRadarMap from './UberProximityRadarMap';
  *  - Diagnostic questions ("When did it start?", "Is it constant/intermittent?") are behind a collapsed
  *    "Add more details (optional)" toggle with no default pre-selections.
  *  - Proximity Matching: Matches nearby verified pros via server-side expanding radius (1km -> 3km -> 5km -> 10km).
- *  - Design: Ivory #f7f5f1, Navy #1e3a5f, Forest #0f4d3c, Brass #a9793c. No emojis. Calm ease-out motion.
+ *  - Design: Ivory #f7f5f1, Navy #1e3a5f, Brand Green #047857. No emojis. Calm ease-out motion.
  */
 
 /**

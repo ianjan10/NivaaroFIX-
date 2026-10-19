@@ -39,7 +39,7 @@ export default function AgentRoleNoticeModal({ onSwitchToCustomer }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="agent-notice-icon-bubble">
-          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#B8862F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--brand-primary, #047857)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
             <circle cx="9" cy="7" r="4" />
             <path d="M22 21v-2a4 4 0 0 0-3-3.87" />

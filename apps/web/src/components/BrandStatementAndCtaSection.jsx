@@ -13,16 +13,17 @@ export default function BrandStatementAndCtaSection({ onNavigateToServices }) {
     <section className="brand-statement-cta-section" aria-label="Closing Brand Statement and Call to Action">
       <div className="max-w-container">
         {/* 1. Quiet Brand Statement */}
-        <div style={{ textAlign: 'center', padding: '3.5rem 1rem 3rem', borderBottom: '1px solid #ded7c8' }}>
+        <div style={{ textAlign: 'center', padding: '4.5rem 1rem 3.5rem', borderBottom: '1px solid #f1f5f9' }}>
           <p
             style={{
               fontFamily: 'var(--font-serif, "Fraunces", serif)',
-              fontSize: 'clamp(1.75rem, 3.2vw, 2.45rem)',
+              fontSize: 'clamp(1.85rem, 3.5vw, 2.6rem)',
               fontWeight: 500,
               fontStyle: 'italic',
-              color: '#1e3a5f',
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
               lineHeight: 1.25,
-              maxWidth: '680px',
+              maxWidth: '700px',
               margin: '0 auto'
             }}
           >
@@ -31,7 +32,7 @@ export default function BrandStatementAndCtaSection({ onNavigateToServices }) {
         </div>
 
         {/* 2. Quiet Editorial Final CTA */}
-        <div style={{ textAlign: 'center', padding: '4rem 1rem 2rem', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', padding: '4.5rem 1rem 3.5rem', maxWidth: '600px', margin: '0 auto' }}>
           <span
             style={{
               display: 'block',
@@ -39,8 +40,8 @@ export default function BrandStatementAndCtaSection({ onNavigateToServices }) {
               fontWeight: 700,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#a9793c',
-              marginBottom: '0.5rem'
+              color: 'var(--brand-primary, #047857)',
+              marginBottom: '0.75rem'
             }}
           >
             NOT SURE WHERE TO START?
@@ -48,11 +49,12 @@ export default function BrandStatementAndCtaSection({ onNavigateToServices }) {
           <h3
             style={{
               fontFamily: 'var(--font-serif, "Fraunces", serif)',
-              fontSize: 'clamp(1.6rem, 2.5vw, 2rem)',
+              fontSize: 'clamp(1.75rem, 2.8vw, 2.25rem)',
               fontWeight: 600,
-              color: '#1e3a5f',
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
               margin: '0 0 1.5rem',
-              lineHeight: 1.25
+              lineHeight: 1.2
             }}
           >
             Tell us what's wrong.
@@ -66,8 +68,15 @@ export default function BrandStatementAndCtaSection({ onNavigateToServices }) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.5rem',
-              padding: '0.9rem 1.85rem',
-              fontSize: '0.95rem'
+              padding: '0.85rem 2.25rem',
+              fontSize: '0.94rem',
+              fontWeight: 600,
+              borderRadius: '980px',
+              background: 'var(--brand-primary, #047857)',
+              color: '#ffffff',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background 0.15s ease'
             }}
           >
             <span>Tell us what's wrong</span>

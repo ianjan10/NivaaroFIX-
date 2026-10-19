@@ -232,7 +232,7 @@ export default function AccountNotFoundModal({
             style={{
               height: '100%',
               width: `${100 - progressPercent}%`,
-              background: 'var(--accent-luxe, #a9793c)',
+              background: 'var(--brand-primary, #047857)',
               transition: 'width 1s linear'
             }}
           />
@@ -287,8 +287,8 @@ export default function AccountNotFoundModal({
               justifyContent: 'space-between',
               padding: '1rem 1.25rem',
               width: '100%',
-              border: '2px solid var(--accent-luxe, #a9793c)',
-              background: 'rgba(169, 121, 60, 0.08)',
+              border: '2px solid var(--brand-primary, #047857)',
+              background: 'var(--brand-tint, #ECFDF5)',
               borderRadius: '12px',
               cursor: 'pointer',
               textAlign: 'left',
@@ -304,7 +304,7 @@ export default function AccountNotFoundModal({
               </span>
             </div>
 
-            <div className="uber-lang-checkmark" style={{ color: 'var(--accent-luxe, #a9793c)', display: 'flex', alignItems: 'center' }}>
+            <div className="uber-lang-checkmark" style={{ color: 'var(--brand-primary, #047857)', display: 'flex', alignItems: 'center' }}>
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
                 <polyline points="12 5 19 12 12 19"></polyline>
@@ -364,7 +364,7 @@ export default function AccountNotFoundModal({
                 width: '7px',
                 height: '7px',
                 borderRadius: '50%',
-                background: 'var(--accent-luxe, #a9793c)',
+                background: 'var(--brand-primary, #047857)',
                 display: 'inline-block'
               }}
             />
