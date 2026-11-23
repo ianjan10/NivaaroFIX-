@@ -51,9 +51,10 @@ export default function AnimatedStatNumber({ endValue, duration = 1400, suffix =
     return () => observer.disconnect();
   }, [endValue, duration, hasAnimated]);
 
+  const num = Number(displayValue || 0);
   const formattedValue = decimals > 0
-    ? displayValue.toFixed(decimals)
-    : Math.floor(displayValue).toLocaleString();
+    ? num.toFixed(decimals)
+    : Math.floor(num).toLocaleString('en-IN');
 
   return (
     <span ref={elementRef} className="stat-animated-num">

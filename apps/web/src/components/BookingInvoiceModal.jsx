@@ -9,73 +9,32 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
 
   if (!isOpen || !booking) return null;
 
-  const invoiceNum = `INV-${(booking.bookingId || booking.bookingRef || 'NVF-24090000').replace(/[^0-9A-Z]/gi, '')}`;
+  const invoiceNum = `SUM-${(booking.bookingId || booking.bookingRef || 'NVF-PREVIEW').replace(/[^0-9A-Z]/gi, '')}`;
   const invoiceDate = booking.completedAt
     ? new Date(booking.completedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    : (booking.date || '14 Aug 2026');
+    : (booking.date || new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }));
 
-  const totalAmount = parseFloat(booking.totalAmount || booking.price || 450);
+  const totalAmount = parseFloat(booking.totalAmount || booking.price || booking.approvedCharges || booking.estimatedTotal || 0);
   const partsAmount = booking.partsAmount ? parseFloat(booking.partsAmount) : (booking.breakdown?.parts || 0);
-  const taxableLabor = Math.max(0, Math.round((totalAmount - partsAmount) / 1.18));
-  const gstAmount = Math.max(0, Math.round(taxableLabor * 0.18));
-  const cgst = Math.round(gstAmount / 2);
-  const sgst = gstAmount - cgst;
+  const laborAmount = Math.max(0, totalAmount - partsAmount);
+
+  // Authoritative platform commission configuration
+  const PLATFORM_COMMISSION_PERCENT = 15;
+  const platformCommission = (totalAmount * PLATFORM_COMMISSION_PERCENT) / 100;
+
+  // Strict payment status derivation: Completed does NOT imply Paid.
+  // Must be verified via explicit ledger/transaction status.
+  const isExplicitlyPaid = booking.paymentStatus === 'PAID' || 
+                           booking.payment_status === 'PAID' || 
+                           booking.isPaid === true ||
+                           Boolean(booking.transactionId && booking.settledAt);
+
+  const paymentStatusDisplay = isExplicitlyPaid
+    ? 'Paid & Settled'
+    : (booking.paymentStatus ? String(booking.paymentStatus) : 'Payment Pending Verification');
 
   const handlePrint = () => {
     window.print();
-  };
-
-  const handleDownload = () => {
-    // Generate styled printable HTML Blob and trigger download
-    const printableContent = invoiceRef.current ? invoiceRef.current.innerHTML : '';
-    const fullHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>NivaaroFix Tax Invoice - ${invoiceNum}</title>
-        <style>
-          @page { size: A4; margin: 15mm; }
-          body { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; color: #101820; margin: 0; padding: 20px; background: #ffffff; }
-          .invoice-sheet { max-width: 780px; margin: 0 auto; border: 1px solid #A7F3D0; padding: 32px; border-radius: 8px; }
-          .inv-header { display: flex; justify-content: space-between; border-bottom: 2px solid #1e3a5f; padding-bottom: 20px; margin-bottom: 24px; }
-          .inv-brand h1 { margin: 0; font-size: 24px; font-family: Georgia, serif; color: #1e3a5f; }
-          .inv-brand p { margin: 4px 0 0 0; font-size: 12px; color: #5a6472; }
-          .inv-meta { text-align: right; }
-          .inv-meta h2 { margin: 0; font-size: 18px; color: #047857; }
-          .inv-meta p { margin: 3px 0; font-size: 12px; color: #5a6472; }
-          .inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; padding: 16px; background: #f7f5f1; border-radius: 6px; }
-          .inv-col h3 { margin: 0 0 6px 0; font-size: 12px; text-transform: uppercase; color: #1e3a5f; letter-spacing: 0.5px; }
-          .inv-col p { margin: 2px 0; font-size: 13px; color: #101820; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-          th { text-align: left; padding: 10px; background: #1e3a5f; color: #ffffff; font-size: 12px; }
-          td { padding: 12px 10px; border-bottom: 1px solid #A7F3D0; font-size: 13px; }
-          .text-right { text-align: right; }
-          .totals-table { width: 280px; margin-left: auto; margin-bottom: 24px; }
-          .totals-table td { padding: 6px 10px; }
-          .total-row td { font-weight: bold; font-size: 15px; color: #0f4d3c; border-top: 2px solid #1e3a5f; }
-          .inv-footer { border-top: 1px solid #A7F3D0; padding-top: 16px; display: flex; justify-content: space-between; font-size: 11px; color: #5a6472; }
-          .warranty-seal { border: 1px solid #0f4d3c; background: rgba(15, 77, 60, 0.06); color: #0f4d3c; padding: 8px 12px; border-radius: 4px; font-weight: 600; font-size: 12px; display: inline-block; }
-        </style>
-      </head>
-      <body>
-        <div class="invoice-sheet">
-          ${printableContent}
-        </div>
-        <script>window.onload = function() { window.print(); };</script>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob([fullHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Invoice_${invoiceNum}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -99,7 +58,7 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <span>Official Tax Invoice</span>
+              <span>Service Summary & Invoice Preview</span>
             </span>
             <h2 id="invoice-modal-title" className="booking-modal-title">
               {invoiceNum}
@@ -107,22 +66,13 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
           </div>
 
           <div className="modal-header-actions">
-            <button type="button" className="btn-icon-action" onClick={handlePrint} title="Print Invoice">
+            <button type="button" className="btn-icon-action primary" onClick={handlePrint} title="Print / Save as PDF">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="6 9 6 2 18 2 18 9" />
                 <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
                 <rect x="6" y="14" width="12" height="8" />
               </svg>
-              <span>Print</span>
-            </button>
-
-            <button type="button" className="btn-icon-action primary" onClick={handleDownload} title="Download HTML/PDF Invoice">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>Download</span>
+              <span>Print / Save as PDF</span>
             </button>
 
             <button type="button" className="uber-lang-close-btn" onClick={onClose} aria-label="Close invoice">
@@ -146,24 +96,24 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
                   style={{ height: '36px', width: 'auto', display: 'block', marginBottom: '6px' }}
                 />
               </div>
-              <p className="inv-company-name">NivaaroFix Home Services Private Limited</p>
-              <p className="inv-company-addr">GSTIN: 33AABCN1234F1Z8 · State: Tamil Nadu (33)</p>
-              <p className="inv-company-addr">Doorstep Verification Hub, Chennai - 600040</p>
+              <p className="inv-company-name">NivaaroFix Marketplace</p>
+              <p className="inv-company-addr">Hyperlocal On-Demand Home Services</p>
+              <p className="inv-company-addr">Platform Service Receipt & Statement</p>
             </div>
 
             <div className="inv-meta">
-              <h3 className="inv-tax-heading">TAX INVOICE</h3>
-              <p><strong>Invoice No:</strong> {invoiceNum}</p>
+              <h3 className="inv-tax-heading" style={{ color: '#047857' }}>SERVICE SUMMARY</h3>
+              <p><strong>Reference No:</strong> {invoiceNum}</p>
               <p><strong>Date:</strong> {invoiceDate}</p>
-              <p><strong>Booking Ref:</strong> {booking.bookingId || booking.bookingRef}</p>
-              <p><strong>Payment:</strong> {booking.paymentMethod || 'UPI / Instant Verified'}</p>
+              <p><strong>Booking Ref:</strong> {booking.bookingId || booking.bookingRef || 'N/A'}</p>
+              <p><strong>Payment Status:</strong> {paymentStatusDisplay}</p>
             </div>
           </div>
 
           {/* Customer & Technician Grid */}
           <div className="inv-grid">
             <div className="inv-col">
-              <h4 className="inv-section-title">Billed To (Customer)</h4>
+              <h4 className="inv-section-title">Customer Details</h4>
               <p className="inv-customer-name"><strong>{booking.userName || 'Customer'}</strong></p>
               <p>{booking.userPhone || '+91 ••••• •••••'}</p>
               <p>{booking.userEmail || 'customer@nivaarofix.in'}</p>
@@ -171,11 +121,11 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
             </div>
 
             <div className="inv-col">
-              <h4 className="inv-section-title">Professional</h4>
+              <h4 className="inv-section-title">Service Professional</h4>
               <p><strong>{booking.technicianName || 'Assigned Professional'}</strong></p>
               <p>Professional ID: FIX-{booking.technicianPhone ? booking.technicianPhone.slice(-4) : (booking.partnerId ? booking.partnerId.slice(-4) : 'PRO')}</p>
-              <p>Trade: {booking.technicianRole || (booking.category === 'plumber' ? 'Certified Master Plumber' : 'Certified Master Electrician')}</p>
-              <p>Service Status: Completed & Verified</p>
+              <p>Trade: {booking.technicianRole || (booking.category === 'plumber' ? 'Verified Plumber' : 'Verified Electrician')}</p>
+              <p>Status: {booking.status || 'Verified Visit'}</p>
             </div>
           </div>
 
@@ -183,32 +133,29 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
           <table className="inv-table" role="table">
             <thead>
               <tr>
-                <th scope="col" style={{ width: '45%' }}>Description of Service</th>
-                <th scope="col" style={{ width: '15%' }} className="text-center">SAC Code</th>
-                <th scope="col" style={{ width: '15%' }} className="text-right">Qty</th>
+                <th scope="col" style={{ width: '60%' }}>Service Description</th>
+                <th scope="col" style={{ width: '15%' }} className="text-right">Units</th>
                 <th scope="col" style={{ width: '25%' }} className="text-right">Amount (₹)</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>
-                  <strong>{booking.serviceTitle || 'Inspection & Repair Visit'}</strong>
+                  <strong>{booking.serviceTitle || 'Doorstep Diagnostic & Repair Visit'}</strong>
                   <div className="inv-table-sub">
-                    {booking.issueType || 'Standard doorstep diagnostic and professional repair'}
+                    {booking.issueType || 'Standard doorstep diagnostic and professional repair service'}
                   </div>
                 </td>
-                <td className="text-center">998719</td>
                 <td className="text-right">1 Visit</td>
-                <td className="text-right">₹{taxableLabor.toFixed(2)}</td>
+                <td className="text-right">₹{laborAmount.toFixed(2)}</td>
               </tr>
 
               {partsAmount > 0 && (
                 <tr>
                   <td>
-                    <strong>Genuine Replacement Parts</strong>
-                    <div className="inv-table-sub">Approved OEM-grade replacement hardware</div>
+                    <strong>Replacement Materials / Hardware</strong>
+                    <div className="inv-table-sub">Approved technician replacement parts</div>
                   </td>
-                  <td className="text-center">998729</td>
                   <td className="text-right">1 Lot</td>
                   <td className="text-right">₹{partsAmount.toFixed(2)}</td>
                 </tr>
@@ -221,19 +168,17 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
             <table className="inv-totals-table">
               <tbody>
                 <tr>
-                  <td>Taxable Value:</td>
-                  <td className="text-right">₹{(taxableLabor + partsAmount).toFixed(2)}</td>
+                  <td>Labor & Inspection:</td>
+                  <td className="text-right">₹{laborAmount.toFixed(2)}</td>
                 </tr>
-                <tr>
-                  <td>CGST (9%):</td>
-                  <td className="text-right">₹{cgst.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td>SGST (9%):</td>
-                  <td className="text-right">₹{sgst.toFixed(2)}</td>
-                </tr>
+                {partsAmount > 0 && (
+                  <tr>
+                    <td>Parts & Hardware:</td>
+                    <td className="text-right">₹{partsAmount.toFixed(2)}</td>
+                  </tr>
+                )}
                 <tr className="inv-total-final-row">
-                  <td><strong>Total Paid (INR):</strong></td>
+                  <td><strong>Total Service Charges:</strong></td>
                   <td className="text-right"><strong>₹{totalAmount.toFixed(2)}</strong></td>
                 </tr>
               </tbody>
@@ -251,8 +196,8 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
             </div>
 
             <div className="inv-digital-auth">
-              <span className="auth-stamp-text">Digitally Authorized by NivaaroFix</span>
-              <span className="auth-stamp-sub">Computer generated invoice. No physical signature required.</span>
+              <span className="auth-stamp-text">Electronically Generated Record</span>
+              <span className="auth-stamp-sub">Official tax invoices are issued upon payment gateway settlement.</span>
             </div>
           </div>
         </div>
@@ -260,7 +205,7 @@ export default function BookingInvoiceModal({ isOpen, onClose, booking }) {
         {/* Modal Bottom Footer */}
         <div className="booking-modal-footer no-print">
           <button type="button" className="btn-secondary-neutral" onClick={onClose}>
-            Close Invoice
+            Close Preview
           </button>
         </div>
       </div>

@@ -97,7 +97,7 @@ export const RADIUS_EXPANSION_TIERS_KM = [1, 3, 5, 10];
  * - Real-time provider GPS coordinates and live heartbeat status depend on the provider
  *   mobile client/app actively reporting telemetry (`provider_locations` / `agent_login.lat/lng`).
  * - Geocoding fallback: If client browser GPS is blocked, the request coordinates fall back to
- *   city-center reference coordinates or profile-saved locality geocoding.
+ *   profile-saved locality geocoding or user map pin placement.
  *
  * @param {number} lat - Request service address latitude
  * @param {number} lng - Request service address longitude
@@ -143,8 +143,8 @@ export async function findNearbyProvidersExpandingRadius(
         if (Math.abs(a.distanceKm - b.distanceKm) > 0.05) {
           return a.distanceKm - b.distanceKm;
         }
-        const ratingA = parseFloat(a.rating || 5.0);
-        const ratingB = parseFloat(b.rating || 5.0);
+        const ratingA = a.rating !== null && a.rating !== undefined ? parseFloat(a.rating) : 0;
+        const ratingB = b.rating !== null && b.rating !== undefined ? parseFloat(b.rating) : 0;
         if (ratingB !== ratingA) {
           return ratingB - ratingA;
         }
@@ -201,6 +201,7 @@ export async function findNearbyProviders(lat, lng, category = 'electrician', ra
              rating, completed_jobs, is_online, lat, lng, h3_index_res9
       FROM agent_login
       WHERE is_online = true
+        AND LOWER(COALESCE(kyc_status, '')) = 'verified'
         AND h3_index_res9 IN (${placeholders})
         AND lat IS NOT NULL
         AND lng IS NOT NULL
@@ -217,6 +218,7 @@ export async function findNearbyProviders(lat, lng, category = 'electrician', ra
              rating, completed_jobs, is_online, lat, lng, h3_index_res9
       FROM agent_login
       WHERE is_online = true
+        AND LOWER(COALESCE(kyc_status, '')) = 'verified'
         AND lat IS NOT NULL
         AND lng IS NOT NULL
         AND ($1::text IN ('both', 'all') OR trade = $1 OR trade = 'both')
@@ -249,40 +251,5 @@ export function radiusToRingSize(radiusKm) {
   const edgeLengthKm = 0.201; // H3 res 9 average edge length
   const approxCellDiameter = edgeLengthKm * 2;
   return Math.max(1, Math.ceil(radiusKm / approxCellDiameter));
-}
-
-/**
- * Standard coordinates for major Indian metropolitan hubs.
- * Provides fallback coordinates for H3 indexing when browser GPS is unavailable.
- */
-export const CITY_COORDINATES = {
-  bengaluru: { lat: 12.9716, lng: 77.5946 },
-  bangalore: { lat: 12.9716, lng: 77.5946 },
-  mumbai: { lat: 19.0760, lng: 72.8777 },
-  delhi: { lat: 28.7041, lng: 77.1025 },
-  'new delhi': { lat: 28.6139, lng: 77.2090 },
-  chennai: { lat: 13.0827, lng: 80.2707 },
-  hyderabad: { lat: 17.3850, lng: 78.4867 },
-  kolkata: { lat: 22.5726, lng: 88.3639 },
-  pune: { lat: 18.5204, lng: 73.8567 },
-  ahmedabad: { lat: 23.0225, lng: 72.5714 },
-  jaipur: { lat: 26.9124, lng: 75.7873 },
-  surat: { lat: 21.1702, lng: 72.8311 },
-  lucknow: { lat: 26.8467, lng: 80.9462 },
-  kanpur: { lat: 26.4499, lng: 80.3319 },
-  nagpur: { lat: 21.1458, lng: 79.0882 },
-  indore: { lat: 22.7196, lng: 75.8577 },
-  thane: { lat: 19.2183, lng: 72.9781 },
-  bhopal: { lat: 23.2599, lng: 77.4126 },
-  visakhapatnam: { lat: 17.6868, lng: 83.2185 },
-  patna: { lat: 25.5941, lng: 85.1376 },
-  vadodara: { lat: 22.3072, lng: 73.1812 },
-  coimbatore: { lat: 11.0168, lng: 76.9558 }
-};
-
-export function getCityCoordinates(city) {
-  if (!city || typeof city !== 'string') return null;
-  const normalized = city.trim().toLowerCase();
-  return CITY_COORDINATES[normalized] || null;
 }
 

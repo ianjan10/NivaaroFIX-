@@ -152,6 +152,7 @@ const PATTERN_RULES = [
 
 // Helper to hash string for localStorage key
 function hashStr(str) {
+  if (!str || typeof str !== 'string') return '0';
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = (hash << 5) - hash + str.charCodeAt(i);
@@ -162,6 +163,7 @@ function hashStr(str) {
 
 // Deep fallback async translator using Google Translate public endpoint
 async function fetchDeepTranslation(text, targetLang) {
+  if (!text || typeof text !== 'string') return text || '';
   const cacheKey = `${targetLang}:${text}`;
   if (runtimeCache.has(cacheKey)) {
     return runtimeCache.get(cacheKey);
@@ -341,7 +343,7 @@ class UniversalDOMTranslator {
     }
 
     const origText = node.__nivaaro_orig;
-    if (!origText || !origText.trim()) return;
+    if (!origText || typeof origText !== 'string' || !origText.trim()) return;
 
     if (lang === 'en') {
       if (node.nodeValue !== origText) {

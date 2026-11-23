@@ -6,8 +6,8 @@ import { fileURLToPath, pathToFileURL } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dashboardLangPath = path.resolve(__dirname, '../Dashboard/src/data/languageData.js');
-const webloginLangPath = path.resolve(__dirname, '../WebLogin/src/data/languageData.js');
+const dashboardLangPath = path.resolve(__dirname, '../apps/web/src/data/languageData.js');
+const webloginLangPath = path.resolve(__dirname, '../apps/auth/src/data/languageData.js');
 
 describe('End-to-End Multi-Language & Translation Verification', async () => {
   const dashMod = await import(pathToFileURL(dashboardLangPath).href);
@@ -71,7 +71,7 @@ describe('End-to-End Multi-Language & Translation Verification', async () => {
   });
 
   it('Universal Translator service loads cleanly and translates synchronous phrases', async () => {
-    const translatorPath = path.resolve(__dirname, '../Dashboard/src/services/universalTranslator.js');
+    const translatorPath = path.resolve(__dirname, '../apps/web/src/services/universalTranslator.js');
     const { universalTranslator, translateStringSync } = await import(pathToFileURL(translatorPath).href);
 
     assert.ok(universalTranslator, 'Universal translator instance must exist');

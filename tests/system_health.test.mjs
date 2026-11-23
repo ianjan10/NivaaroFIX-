@@ -40,7 +40,7 @@ async function runSystemHealthSuite() {
       active = res.status === 200 && html.includes('NivaaroFix');
     } catch {
       const fs = await import('node:fs');
-      active = fs.existsSync('Dashboard/dist/index.html') || fs.existsSync('Dashboard/index.html');
+      active = fs.existsSync('apps/web/dist/index.html') || fs.existsSync('apps/web/index.html');
       details = 'Production Bundle Verified';
     }
     report('2. Dashboard Application (Marketplace)', active, details);
@@ -66,68 +66,67 @@ async function runSystemHealthSuite() {
     report('3. WebLogin Authentication Portal', false, e.message);
   }
 
-  // 4. Customer Google OAuth Integration
+  // 4. Customer Registration Integration
   try {
     const customerPayload = {
-      role: 'customer',
-      profile: {
-        name: 'Aarav Sharma',
-        email: 'aarav.sharma.test@gmail.com',
-        picture: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-        sub: 'google-sub-aarav-test-01'
-      }
+      name: 'Aarav Sharma',
+      email: 'aarav.sharma.test@gmail.com',
+      phone: '+91 9888877771',
+      password: 'SecureTestPassword123!',
+      address: 'Flat 101, Test Residency, Bangalore',
+      isPhoneVerified: true
     };
-    const res = await fetch('http://localhost:5000/api/auth/google', {
+    const res = await fetch('http://localhost:5000/api/auth/customer-register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(customerPayload)
     });
     const data = await res.json();
-    report('4. Customer Google OAuth', data.success === true && data.user?.email === 'aarav.sharma.test@gmail.com', `Logged in as: ${data.user?.name}`);
+    report('4. Customer Registration', data.success === true && data.user?.email === 'aarav.sharma.test@gmail.com', `Logged in as: ${data.user?.name}`);
   } catch (e) {
-    report('4. Customer Google OAuth', false, e.message);
+    report('4. Customer Registration', false, e.message);
   }
 
-  // 5. Partner Google OAuth Integration
+  // 5. Partner Registration Integration
   try {
     const partnerPayload = {
-      role: 'agent',
-      trade: 'both',
-      profile: {
-        name: 'Devendra Mehra',
-        email: 'devendra.mehra.test@gmail.com',
-        picture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-        sub: 'google-sub-devendra-test-02'
-      }
+      name: 'Devendra Mehra',
+      email: 'devendra.mehra.test@gmail.com',
+      phone: '+91 9888877772',
+      password: 'SecurePartnerPassword123!',
+      trade: 'electrician',
+      experienceYears: 4,
+      address: '45 Trade Street, Bangalore',
+      isPhoneVerified: true
     };
-    const res = await fetch('http://localhost:5000/api/auth/google', {
+    const res = await fetch('http://localhost:5000/api/auth/agent-register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(partnerPayload)
     });
     const data = await res.json();
     const isPartnerIdValid = !!(data.agent?.partnerId && (/^[0-9]{9}$/.test(data.agent.partnerId) || data.agent.partnerId.startsWith('FIX-PRO-')));
-    report('5. Partner Google OAuth', data.success === true && isPartnerIdValid, `Partner ID: ${data.agent?.partnerId}`);
+    report('5. Partner Registration', data.success === true && isPartnerIdValid, `Partner ID: ${data.agent?.partnerId}`);
   } catch (e) {
-    report('5. Partner Google OAuth', false, e.message);
+    report('5. Partner Registration', false, e.message);
   }
 
   // 6. PostgreSQL Users Persistence Verification
   try {
-    const res = await fetch('http://localhost:5000/api/auth/users');
-    const data = await res.json();
-    const userFound = data.users.find(u => u.email === 'aarav.sharma.test@gmail.com');
-    report('6. PostgreSQL user_login Persistence', userFound && userFound.auth_provider === 'google', `User ID: ${userFound?.id}`);
+    const { pool } = await import('../apps/api/src/config/db.js');
+    const userRes = await pool.query("SELECT id, email, phone FROM user_login WHERE email = 'aarav.sharma.test@gmail.com'");
+    const userFound = userRes.rows[0];
+    report('6. PostgreSQL user_login Persistence', !!userFound && userFound.email === 'aarav.sharma.test@gmail.com', `User ID: ${userFound?.id}`);
   } catch (e) {
     report('6. PostgreSQL user_login Persistence', false, e.message);
   }
 
-    // 7. PostgreSQL Agents Persistence Verification
+  // 7. PostgreSQL Agents Persistence Verification
   try {
-    const res = await fetch('http://localhost:5000/api/auth/agents');
-    const data = await res.json();
-    const agentFound = data.agents.find(a => a.email === 'devendra.mehra.test@gmail.com');
-    report('7. PostgreSQL agent_login Persistence', agentFound && agentFound.auth_provider === 'google', `Agent ID: ${agentFound?.partner_id}`);
+    const { pool } = await import('../apps/api/src/config/db.js');
+    const agentRes = await pool.query("SELECT id, partner_id, email, trade FROM agent_login WHERE email = 'devendra.mehra.test@gmail.com'");
+    const agentFound = agentRes.rows[0];
+    report('7. PostgreSQL agent_login Persistence', !!agentFound && agentFound.email === 'devendra.mehra.test@gmail.com', `Agent ID: ${agentFound?.partner_id}`);
   } catch (e) {
     report('7. PostgreSQL agent_login Persistence', false, e.message);
   }

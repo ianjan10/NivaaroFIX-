@@ -23,9 +23,6 @@ The NivaaroFix backend handles:
 | `name` | `VARCHAR(150)` | `NOT NULL` | Full name of the customer |
 | `email` | `VARCHAR(150)` | `UNIQUE NOT NULL` | Verified login email address |
 | `phone` | `VARCHAR(50)` | | Indian mobile number (`+91 ...`) |
-| `dob` | `VARCHAR(50)` | | Formatted date of birth (`DD/MM/YYYY`) |
-| `state` | `VARCHAR(100)` | | Indian State / Union Territory |
-| `city` | `VARCHAR(100)` | `DEFAULT 'Bengaluru'` | Customer home city |
 | `address` | `TEXT` | | Detailed residential street address |
 | `password` | `VARCHAR(255)` | | Hashed/secure user password |
 | `auth_provider` | `VARCHAR(50)` | `CHECK IN ('email', 'phone_otp', 'google')` | Authentication mechanism |
@@ -46,10 +43,7 @@ The NivaaroFix backend handles:
 | `phone` | `VARCHAR(50)` | | Technician mobile contact |
 | `trade` | `VARCHAR(100)` | `CHECK IN ('electrician', 'plumber', 'both')` | Core trade domain |
 | `experience_years` | `INT` | `DEFAULT 5` | Years of verified experience |
-| `dob` | `VARCHAR(50)` | | Formatted date of birth |
-| `state` | `VARCHAR(100)` | | Operating State / Region |
-| `city` | `VARCHAR(100)` | `DEFAULT 'Bengaluru'` | Primary operating hub city |
-| `address` | `TEXT` | | Service hub base address |
+| `address` | `TEXT` | | Service base address |
 | `password` | `VARCHAR(255)` | | Hashed partner password |
 | `auth_provider` | `VARCHAR(50)` | `CHECK IN ('agent_id', 'phone_otp', 'google')` | Partner authentication method |
 | `google_id` | `VARCHAR(100)` | | Unique Google ID |

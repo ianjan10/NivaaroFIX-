@@ -57,7 +57,7 @@ export default function IndianPhoneInput({ id, value, onChange, placeholder = "E
 
   return (
     <div className="phone-input-wrapper">
-      <span className="phone-prefix-badge">🇮🇳 +91</span>
+      <span className="phone-prefix-badge">IN +91</span>
       <input
         ref={inputRef}
         type="tel"

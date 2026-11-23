@@ -123,10 +123,15 @@ export async function resolveServiceSearch(rawQuery) {
       if (query.includes(pattern) || pattern.includes(query)) {
         // Fetch full service row from database
         const dbRes = await pool.query(
-          'SELECT * FROM services WHERE id = $1 LIMIT 1',
+          'SELECT * FROM services WHERE slug = $1 OR id::text = $1 LIMIT 1',
           [item.serviceId]
         );
-        const serviceData = dbRes.rows[0] || {
+        const row = dbRes.rows[0];
+        const serviceData = row ? {
+          ...row,
+          title: row.name || item.title,
+          category_id: item.category
+        } : {
           id: item.serviceId,
           title: item.title,
           category_id: item.category
@@ -137,6 +142,7 @@ export async function resolveServiceSearch(rawQuery) {
           confidence: item.confidence,
           category: item.category,
           service: serviceData,
+          matchedServiceTitle: item.title,
           action: 'direct',
           matchType: 'exact_alias'
         };
@@ -148,10 +154,10 @@ export async function resolveServiceSearch(rawQuery) {
   const dbServices = await pool.query(`
     SELECT * FROM services 
     WHERE 
-      LOWER(title) LIKE $1 
-      OR LOWER(short_desc) LIKE $1 
-      OR LOWER(category_id) LIKE $1
-    ORDER BY is_popular DESC, rating DESC
+      LOWER(name) LIKE $1 
+      OR LOWER(description) LIKE $1 
+      OR LOWER(slug) LIKE $1
+    ORDER BY id ASC
     LIMIT 6;
   `, [`%${query}%`]);
 

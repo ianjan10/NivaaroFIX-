@@ -61,12 +61,10 @@ export default function AboutPage({ onNavigateToServices }) {
         
         {/* 1. Editorial Hero Section (Confident Brand Manifesto) */}
         <header className="about-hero-section">
-          <div className="about-eyebrow">
-            ABOUT NIVAAROFIX
-          </div>
+          <div className="about-eyebrow">ABOUT NIVAAROFIX</div>
 
           <h1 className="about-hero-headline">
-            Better home repairs<br className="about-break-desktop" /> start with better trust.
+            Better home repairs<br className="about-break-desktop" />start with better trust.
           </h1>
 
           <p className="about-hero-lead">

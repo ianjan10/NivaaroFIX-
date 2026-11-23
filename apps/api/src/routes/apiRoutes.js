@@ -186,41 +186,210 @@ router.post('/providers/me/presence', async (req, res) => {
   }
 });
 // =========================================================================
-// High-Precision Reverse Geocoding Proxy (Avoids browser rate-limits/CORS)
+// High-Precision Reverse Geocoding Proxy (Clean One-Line Doorstep Address)
 // =========================================================================
-router.get('/geo/reverse', async (req, res) => {
+function formatCleanOneLineAddress(addr = {}, displayName = '') {
+  const parts = [];
+
+  // 1. House or Building
+  const houseNum = addr.house_number ? (addr.house_number.startsWith('#') ? addr.house_number : `#${addr.house_number}`) : '';
+  const building = addr.building || addr.amenity || addr.apartment || addr.commercial || addr.industrial || '';
+  if (building && houseNum) {
+    parts.push(`${building}, ${houseNum}`);
+  } else if (building) {
+    parts.push(building);
+  } else if (houseNum) {
+    parts.push(houseNum);
+  }
+
+  // 2. Road
+  const road = addr.road || addr.street || addr.residential || addr.lane || '';
+  if (road) parts.push(road);
+
+  // 3. Area / Suburb / Neighbourhood
+  const area = addr.suburb || addr.neighbourhood || addr.sublocality || addr.residential_area || '';
+  if (area && !parts.includes(area)) parts.push(area);
+
+  // 4. Locality / City / District
+  const city = addr.city || addr.town || addr.municipality || addr.village || addr.city_district || addr.state_district || '';
+  if (city && !parts.includes(city)) parts.push(city);
+
+  // 5. State
+  const state = addr.state || '';
+  if (state && !parts.includes(state)) parts.push(state);
+
+  // 6. Pincode
+  const pincode = addr.postcode || '';
+  if (pincode) parts.push(pincode);
+
+  if (parts.length > 0) {
+    return parts.join(', ');
+  }
+
+  if (displayName) {
+    return displayName.split(',').slice(0, 5).map(s => s.trim()).join(', ');
+  }
+
+  if (lat && lng) {
+    return `Location at ${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`;
+  }
+  return 'Location coordinates unavailable';
+}
+
+function getDevFallbackAddress(lat, lng) {
+  if (lat && lng) {
+    return `Location at ${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`;
+  }
+  return 'Location coordinates unavailable';
+}
+
+router.get(['/geo/reverse', '/reverse'], async (req, res) => {
   try {
-    const { lat, lng, lon } = req.query;
+    const { lat, lng, lon, simulate_error } = req.query;
     const latitude = lat || req.query.latitude;
     const longitude = lng || lon || req.query.longitude;
+
+    if (simulate_error === 'true' || String(latitude) === '999') {
+      return res.status(500).json({ success: false, error: 'Simulated geocoding failure for testing.' });
+    }
 
     if (!latitude || !longitude) {
       return res.status(400).json({ success: false, error: 'Latitude and longitude query parameters are required.' });
     }
 
-    const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&zoom=18&addressdetails=1&extratags=1&namedetails=1`;
+    const parsedLat = parseFloat(latitude);
+    const parsedLng = parseFloat(longitude);
 
-    const response = await fetch(nominatimUrl, {
-      headers: {
-        'User-Agent': 'NivaaroFixApp/1.0 (contact@nivaarofix.in)',
-        'Accept-Language': 'en'
+    let cleanOneLine = '';
+    let addressComponents = {};
+    let displayName = '';
+
+    try {
+      const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(parsedLat)}&lon=${encodeURIComponent(parsedLng)}&zoom=18&addressdetails=1&extratags=1&namedetails=1`;
+      const response = await fetch(nominatimUrl, {
+        headers: {
+          'User-Agent': 'NivaaroFixApp/1.0 (contact@nivaarofix.in)',
+          'Accept-Language': 'en'
+        },
+        signal: AbortSignal.timeout(4000)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        addressComponents = data.address || {};
+        displayName = data.display_name || '';
+        cleanOneLine = formatCleanOneLineAddress(addressComponents, displayName);
       }
-    });
-
-    if (!response.ok) {
-      return res.status(response.status).json({ success: false, error: `Nominatim responded with status ${response.status}` });
+    } catch (fetchErr) {
+      // Dev fallback when offline, rate-limited, or no key
+      console.warn('Nominatim reverse geocode fallback:', fetchErr.message);
     }
 
-    const data = await response.json();
+    if (!cleanOneLine) {
+      cleanOneLine = getDevFallbackAddress(parsedLat, parsedLng);
+    }
+
     return res.json({
       success: true,
-      address: data.address || {},
-      displayName: data.display_name || '',
-      lat: data.lat,
-      lon: data.lon
+      address: cleanOneLine,
+      address_text: cleanOneLine,
+      displayName: displayName || cleanOneLine,
+      components: addressComponents,
+      lat: parsedLat,
+      lng: parsedLng
     });
   } catch (err) {
     console.error('Reverse geocode error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// =========================================================================
+// Platform Feedback (Open to everyone: guests, customers, professionals)
+// =========================================================================
+router.post('/feedback', async (req, res) => {
+  try {
+    const {
+      rating,
+      category = 'general',
+      problemDefinition = '',
+      comment = '',
+      contactInfo = '',
+      userId = null,
+      userRole = 'guest',
+      deviceInfo = {}
+    } = req.body || {};
+
+    const cleanComment = typeof comment === 'string' ? comment.trim() : '';
+    if (!cleanComment) {
+      return res.status(400).json({ success: false, error: 'Please provide your feedback or describe the problem.' });
+    }
+
+    let cleanRating = null;
+    if (rating !== undefined && rating !== null && rating !== '') {
+      const parsedRating = parseInt(rating, 10);
+      if (isNaN(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+        return res.status(400).json({ success: false, error: 'Rating must be an integer between 1 and 5.' });
+      }
+      cleanRating = parsedRating;
+    }
+
+    const cleanCategory = typeof category === 'string' && category.trim() ? category.trim().toLowerCase().slice(0, 50) : 'general';
+    const cleanProblem = typeof problemDefinition === 'string' ? problemDefinition.trim().slice(0, 100) : '';
+    const cleanContact = typeof contactInfo === 'string' ? contactInfo.trim().slice(0, 255) : '';
+    const cleanUserId = userId && !isNaN(parseInt(userId, 10)) ? parseInt(userId, 10) : null;
+    const cleanRole = typeof userRole === 'string' ? userRole.trim().toLowerCase().slice(0, 50) : 'guest';
+
+    const insertResult = await pool.query(`
+      INSERT INTO platform_feedbacks (
+        rating,
+        category,
+        problem_definition,
+        comment,
+        contact_info,
+        user_id,
+        user_role,
+        device_info
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id, created_at;
+    `, [
+      cleanRating,
+      cleanCategory,
+      cleanProblem,
+      cleanComment,
+      cleanContact || null,
+      cleanUserId,
+      cleanRole,
+      typeof deviceInfo === 'object' && deviceInfo !== null ? JSON.stringify(deviceInfo) : '{}'
+    ]);
+
+    return res.status(201).json({
+      success: true,
+      feedbackId: insertResult.rows[0].id,
+      message: 'Thank you for your feedback! We appreciate you helping us improve.'
+    });
+  } catch (err) {
+    console.error('Submit feedback error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to submit feedback. Please try again.' });
+  }
+});
+
+router.get('/feedback', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const result = await pool.query(`
+      SELECT id, rating, category, problem_definition, comment, contact_info, user_role, status, created_at
+      FROM platform_feedbacks
+      ORDER BY created_at DESC
+      LIMIT $1;
+    `, [limit]);
+
+    return res.json({
+      success: true,
+      feedbacks: result.rows
+    });
+  } catch (err) {
+    console.error('Fetch feedback error:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

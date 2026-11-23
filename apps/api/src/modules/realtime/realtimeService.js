@@ -1,4 +1,5 @@
 import EventEmitter from 'events';
+import { pool } from '../../config/db.js';
 
 class RealtimeBus extends EventEmitter {}
 const eventBus = new RealtimeBus();
@@ -107,6 +108,17 @@ export function notifyCustomer(requestRef, eventName, payload) {
     });
   }
   eventBus.emit(`customer:${requestRef}`, { eventName, payload });
+
+  // Persist into PostgreSQL realtime_events table for zero data loss
+  pool.query(`
+    INSERT INTO realtime_events (channel, event_type, payload, actor_type)
+    VALUES ($1, $2, $3, $4);
+  `, [
+    `request:${requestRef}`,
+    eventName,
+    JSON.stringify(payload || {}),
+    'system'
+  ]).catch(() => {});
 }
 
 /**
@@ -126,6 +138,18 @@ export function notifyProvider(email, eventName, payload) {
     });
   }
   eventBus.emit(`provider:${normalizedEmail}`, { eventName, payload });
+
+  // Persist into PostgreSQL realtime_events table for zero data loss
+  pool.query(`
+    INSERT INTO realtime_events (channel, event_type, payload, actor_type, actor_id)
+    VALUES ($1, $2, $3, $4, $5);
+  `, [
+    `provider:${normalizedEmail}`,
+    eventName,
+    JSON.stringify(payload || {}),
+    'system',
+    normalizedEmail
+  ]).catch(() => {});
 }
 
 /**

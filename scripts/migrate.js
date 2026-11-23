@@ -1,139 +1,151 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { pool } from '../apps/api/src/config/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function runMigrations() {
-  console.log('--- NivaaroFix Migration Runner ---');
+function getChecksum(content) {
+  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+async function ensureMigrationRegistry(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version     VARCHAR(50) PRIMARY KEY,
+      name        VARCHAR(255) NOT NULL,
+      checksum    VARCHAR(64) NOT NULL,
+      applied_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+}
+
+async function isPopulatedDatabase(client) {
+  const res = await client.query(`
+    SELECT table_name 
+    FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+      AND table_name IN ('users', 'customers', 'professionals', 'service_requests', 'bookings', 'user_login', 'agent_login');
+  `);
+  return res.rows.length >= 3;
+}
+
+export async function runSafeMigrations() {
+  console.log('--- NivaaroFix Safe Migration Runner ---');
   const client = await pool.connect();
+
   try {
-    const migrationFile = path.resolve(__dirname, '../database/migrations/001_initial_schema.sql');
-    const catalogFile = path.resolve(__dirname, '../database/reference-data/service_catalog.sql');
+    // 1. Ensure registry table exists
+    await ensureMigrationRegistry(client);
 
-    console.log('1. Executing 001_initial_schema.sql...');
-    const schemaSql = fs.readFileSync(migrationFile, 'utf8');
-    await client.query(schemaSql);
-    console.log('   Schema migration applied successfully.');
+    // 2. Discover migration files
+    const migrationsDir = path.resolve(__dirname, '../database/migrations');
+    const migrationFiles = fs.readdirSync(migrationsDir)
+      .filter(f => f.endsWith('.sql'))
+      .sort();
 
-    console.log('2. Executing service_catalog.sql...');
-    const catalogSql = fs.readFileSync(catalogFile, 'utf8');
-    await client.query(catalogSql);
-    console.log('   Reference data catalog seeded successfully.');
+    // 3. Query already applied migrations
+    const appliedRes = await client.query('SELECT version, name, checksum FROM schema_migrations;');
+    const appliedMap = new Map();
+    for (const row of appliedRes.rows) {
+      appliedMap.set(row.version, row);
+    }
 
-    // Compatibility Views ensuring zero downtime with existing endpoints
-    console.log('3. Ensuring compatibility views...');
-    await client.query(`
+    // 4. Check if this is an existing populated database that predates schema_migrations
+    const isPopulated = await isPopulatedDatabase(client);
 
-      CREATE OR REPLACE VIEW bookings AS
-      SELECT
-        sr.id,
-        sr.service_request_code AS booking_ref,
-        c.user_id,
-        c.email AS user_email,
-        c.name AS user_name,
-        c.phone AS user_phone,
-        sr.user_address,
-        sr.service_title,
-        sr.category,
-        sr.issue_type,
-        sr.problem_description,
-        sr.problem_timing,
-        sr.problem_frequency,
-        COALESCE(q.amount, 0.00) AS total_amount,
-        d.otp_code,
-        sr.status,
-        p.name AS technician_name,
-        p.phone AS technician_phone,
-        COALESCE(q.estimated_duration_minutes, 30) AS eta_minutes,
-        sr.id AS request_id,
-        sr.accepted_quote_id,
-        sr.assigned_professional_id AS assigned_agent_id,
-        sr.started_at,
-        sr.arrived_at,
-        sr.completed_at,
-        sr.otp_verified_at,
-        sr.completion_photos,
-        sr.completion_remarks,
-        sr.created_at,
-        sr.updated_at,
-        sr.cancel_reason,
-        f.rating,
-        f.comment AS review_feedback,
-        COALESCE(f.tags, '[]'::jsonb) AS review_tags,
-        p.lat AS technician_lat,
-        p.lng AS technician_lng,
-        sr.lat,
-        sr.lng
-      FROM service_requests sr
-      LEFT JOIN customers c ON c.id = sr.customer_id
-      LEFT JOIN professionals p ON p.id = sr.assigned_professional_id
-      LEFT JOIN quotes q ON q.id = sr.accepted_quote_id
-      LEFT JOIN door_otps d ON d.service_request_id = sr.id
-      LEFT JOIN feedback f ON f.service_request_id = sr.id;
+    if (isPopulated && !appliedMap.has('001')) {
+      console.log('ℹ️ Existing populated database detected without migration records.');
+      console.log('   Safely establishing baseline migration state (001 and 002) without re-running destructive scripts.');
 
-      CREATE OR REPLACE FUNCTION fn_bookings_update()
-      RETURNS TRIGGER AS $$
-      DECLARE
-        v_pro_id BIGINT;
-      BEGIN
-        IF NEW.assigned_agent_id IS NOT NULL THEN
-          IF EXISTS (SELECT 1 FROM professionals WHERE id = NEW.assigned_agent_id) THEN
-            v_pro_id := NEW.assigned_agent_id;
-          ELSE
-            SELECT p.id INTO v_pro_id FROM professionals p JOIN agent_login a ON a.email = p.email WHERE a.id = NEW.assigned_agent_id LIMIT 1;
-            IF v_pro_id IS NULL THEN
-              SELECT id INTO v_pro_id FROM professionals ORDER BY id ASC LIMIT 1;
-            END IF;
-          END IF;
-        END IF;
+      // Baseline 001
+      const f001 = '001_initial_schema.sql';
+      const c001 = fs.existsSync(path.join(migrationsDir, f001)) ? getChecksum(fs.readFileSync(path.join(migrationsDir, f001), 'utf8')) : 'baseline';
+      await client.query(
+        'INSERT INTO schema_migrations (version, name, checksum) VALUES ($1, $2, $3) ON CONFLICT (version) DO NOTHING;',
+        ['001', f001, c001]
+      );
+      appliedMap.set('001', { version: '001', name: f001, checksum: c001 });
 
-        UPDATE service_requests
-        SET
-          status = COALESCE(NEW.status, service_requests.status),
-          accepted_quote_id = COALESCE(NEW.accepted_quote_id, service_requests.accepted_quote_id),
-          assigned_professional_id = COALESCE(v_pro_id, service_requests.assigned_professional_id),
-          started_at = COALESCE(NEW.started_at, service_requests.started_at),
-          arrived_at = COALESCE(NEW.arrived_at, service_requests.arrived_at),
-          completed_at = COALESCE(NEW.completed_at, service_requests.completed_at),
-          otp_verified_at = COALESCE(NEW.otp_verified_at, service_requests.otp_verified_at),
-          completion_photos = COALESCE(NEW.completion_photos, service_requests.completion_photos),
-          completion_remarks = COALESCE(NEW.completion_remarks, service_requests.completion_remarks),
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = OLD.id OR service_request_code = OLD.booking_ref OR request_ref = OLD.booking_ref;
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;
+      // Baseline 002 if tables/columns exist
+      const checkProgress = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'service_requests' AND column_name = 'in_progress_at';
+      `);
+      if (checkProgress.rows.length > 0) {
+        const f002 = '002_booking_progress_timestamps.sql';
+        const c002 = fs.existsSync(path.join(migrationsDir, f002)) ? getChecksum(fs.readFileSync(path.join(migrationsDir, f002), 'utf8')) : 'baseline';
+        await client.query(
+          'INSERT INTO schema_migrations (version, name, checksum) VALUES ($1, $2, $3) ON CONFLICT (version) DO NOTHING;',
+          ['002', f002, c002]
+        );
+        appliedMap.set('002', { version: '002', name: f002, checksum: c002 });
+      }
+    }
 
-      DROP TRIGGER IF EXISTS trg_bookings_update ON bookings;
-      CREATE TRIGGER trg_bookings_update
-        INSTEAD OF UPDATE ON bookings
-        FOR EACH ROW EXECUTE FUNCTION fn_bookings_update();
+    // 5. Apply any unapplied migrations in sequential order
+    let appliedCount = 0;
+    for (const file of migrationFiles) {
+      const version = file.split('_')[0];
+      if (appliedMap.has(version)) {
+        console.log(`✓ Migration [${version}] ${file} already applied.`);
+        continue;
+      }
 
-      CREATE OR REPLACE FUNCTION fn_bookings_delete()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        DELETE FROM service_requests WHERE id = OLD.id OR service_request_code = OLD.booking_ref OR request_ref = OLD.booking_ref;
-        RETURN OLD;
-      END;
-      $$ LANGUAGE plpgsql;
+      console.log(`⚙️ Applying unapplied migration [${version}] ${file}...`);
+      const filePath = path.join(migrationsDir, file);
+      const sqlContent = fs.readFileSync(filePath, 'utf8');
+      const checksum = getChecksum(sqlContent);
 
-      DROP TRIGGER IF EXISTS trg_bookings_delete ON bookings;
-      CREATE TRIGGER trg_bookings_delete
-        INSTEAD OF DELETE ON bookings
-        FOR EACH ROW EXECUTE FUNCTION fn_bookings_delete();
-    `);
+      await client.query('BEGIN;');
+      try {
+        await client.query(sqlContent);
+        await client.query(
+          'INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP);',
+          [version, file, checksum]
+        );
+        await client.query('COMMIT;');
+        console.log(`✅ Applied migration [${version}] ${file} successfully.`);
+        appliedCount++;
+      } catch (migrationErr) {
+        await client.query('ROLLBACK;');
+        console.error(`❌ Migration [${version}] failed:`, migrationErr.message);
+        throw migrationErr;
+      }
+    }
 
-    console.log('--- Migration & Views Verified Successfully! ---');
+    // 6. Ensure reference service catalog is seeded if missing
+    const catCheck = await client.query("SELECT COUNT(*) FROM service_categories;").catch(() => ({ rows: [{ count: 0 }] }));
+    if (parseInt(catCheck.rows[0].count, 10) === 0) {
+      const catalogFile = path.resolve(__dirname, '../database/reference-data/service_catalog.sql');
+      if (fs.existsSync(catalogFile)) {
+        console.log('Seeding reference service catalog...');
+        await client.query(fs.readFileSync(catalogFile, 'utf8'));
+        console.log('Reference service catalog seeded.');
+      }
+    }
+
+    console.log(`--- Migration check complete: ${appliedCount} new migrations applied. Database is safe and up-to-date. ---`);
   } catch (err) {
-    console.error('Migration error:', err);
-    process.exit(1);
+    console.error('Migration runner error:', err.message);
+    process.exitCode = 1;
+    throw err;
   } finally {
     client.release();
-    await pool.end();
   }
 }
 
-runMigrations();
+// Direct execution from CLI
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  runSafeMigrations()
+    .then(async () => {
+      await pool.end();
+      process.exit(0);
+    })
+    .catch(async () => {
+      await pool.end();
+      process.exit(1);
+    });
+}

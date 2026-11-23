@@ -4,6 +4,7 @@ import WhyNivaaroSection from '../components/WhyNivaaroSection';
 import ServicesPreviewSection from '../components/ServicesPreviewSection';
 import HowItWorksSection from '../components/HowItWorksSection';
 import BrandStatementAndCtaSection from '../components/BrandStatementAndCtaSection';
+import PublishedFeedbackSection from '../components/PublishedFeedbackSection';
 import AppFooter from '../components/AppFooter';
 import ScrollRevealSection from '../components/ScrollRevealSection';
 
@@ -14,12 +15,18 @@ export default function HomePage({
   onNavigateToBookings,
   onOpenAuth,
   user,
-  agent
+  agent,
+  onLogoutUser,
+  onLogoutAgent
 }) {
   return (
     <div className="home-page-view">
       {/* 1. Hero Search Section */}
-      <HeroSearchSection onNavigateToServices={onNavigateToServices} />
+      <HeroSearchSection
+        onNavigateToServices={onNavigateToServices}
+        currentUser={user}
+        onOpenAuth={onOpenAuth}
+      />
 
       {/* 2. Why NivaaroFix (Editorial Principles: Verification, Clarity, Accountability) */}
       <ScrollRevealSection as="section">
@@ -41,10 +48,17 @@ export default function HomePage({
 
       {/* 5. Quiet Brand Statement & Final Editorial CTA */}
       <ScrollRevealSection as="section">
-        <BrandStatementAndCtaSection onNavigateToServices={onNavigateToServices} />
+        <BrandStatementAndCtaSection
+          onNavigateToServices={onNavigateToServices}
+          currentUser={user}
+          onOpenAuth={onOpenAuth}
+        />
       </ScrollRevealSection>
 
-      {/* 6. Footer (Multi-Column Grid, Understated & Truthful) */}
+      {/* 6. Published Feedback Testimonials ("In Their Words") — Appears only when published */}
+      <PublishedFeedbackSection />
+
+      {/* 7. Footer (Multi-Column Grid, Understated & Truthful) */}
       <AppFooter
         currentPortal="customer"
         user={user}
@@ -55,6 +69,8 @@ export default function HomePage({
         onNavigateBookings={onNavigateToBookings}
         onOpenAuth={onOpenAuth}
         onSwitchPortal={onNavigateToPartner}
+        onLogoutUser={onLogoutUser}
+        onLogoutAgent={onLogoutAgent}
       />
     </div>
   );

@@ -38,6 +38,7 @@ coverage/
 *.pem
 *.key
 *.cert
+*.cer
 *.crt
 id_rsa*
 *.sql
@@ -58,6 +59,18 @@ backend/uploads/booking_photos/*
 !backend/uploads/booking_photos/.gitkeep
 uploads/booking_photos/*
 !uploads/booking_photos/.gitkeep
+storage/*
+!storage/.gitkeep
+storage/secure_documents/*
+!storage/secure_documents/.gitkeep
+storage/photos/*
+!storage/photos/.gitkeep
+apps/api/uploads/support_attachments/*
+!apps/api/uploads/support_attachments/.gitkeep
+
+# Test Run Screenshots & Artifacts
+tests/screenshots/
+
 
 # Logs, Diagnostics & Crash Dumps
 *.log

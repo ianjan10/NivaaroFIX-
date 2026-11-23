@@ -8,8 +8,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 describe('Language Modal Horizontal Layout Verification', () => {
-  const dashCssPath = path.resolve(__dirname, '../Dashboard/src/styles/dashboardDesignSystem.css');
-  const webloginCssPath = path.resolve(__dirname, '../WebLogin/src/styles/designSystem.css');
+  const dashCssPath = path.resolve(__dirname, '../apps/web/src/styles/dashboardDesignSystem.css');
+  const webloginCssPath = path.resolve(__dirname, '../apps/auth/src/styles/designSystem.css');
 
   const dashCss = fs.readFileSync(dashCssPath, 'utf8');
   const webCss = fs.readFileSync(webloginCssPath, 'utf8');

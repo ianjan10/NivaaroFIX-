@@ -23,9 +23,6 @@ export default function CustomerProfileIncompleteModal({
   const handleNavigateToProfile = () => {
     onClose();
     const sanitizedUser = user ? { ...user } : null;
-    if (sanitizedUser?.dob && (JSON.stringify(sanitizedUser.dob).includes('1992') || JSON.stringify(sanitizedUser.dob).includes('2050'))) {
-      sanitizedUser.dob = null;
-    }
     const userDigits = (sanitizedUser?.phone || '').replace(/\D/g, '');
     if (userDigits === '9876543210' || userDigits === '9876543220' || userDigits === '9876543211' || userDigits === '9840123456') {
       sanitizedUser.phone = null;
@@ -43,12 +40,21 @@ export default function CustomerProfileIncompleteModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="profile-incomplete-title"
+      style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
     >
       <div
         ref={modalRef}
         className="modal-card customer-profile-incomplete-modal"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '520px', width: '100%', padding: '2rem 1.85rem' }}
+        style={{
+          maxWidth: '520px',
+          width: '100%',
+          maxHeight: 'min(92vh, 92dvh)',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          margin: 'auto',
+          padding: '2rem 1.85rem'
+        }}
       >
         {/* Close Button */}
         <button

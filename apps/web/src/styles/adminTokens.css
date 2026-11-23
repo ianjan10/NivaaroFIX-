@@ -1,0 +1,80 @@
+/* ==============================================================================
+   NivaaroFix Admin Tokens — Single Source of Truth for Typography
+   Inter (400, 500, 600) with fallback stack.
+   No serif anywhere under /admin.
+   Tabular numerals on all numeric values. Sentence case only.
+   ============================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  /* Unified Font Family */
+  --admin-font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --admin-font-ui: var(--admin-font-family);
+  --admin-font-display: var(--admin-font-family);
+  --admin-font-mono: var(--admin-font-family);
+
+  /* Brand & Neutral Palette */
+  --admin-brand-green: #0f4d3c;
+  --admin-brand-green-hover: #0b3d2f;
+  --admin-brand-green-tint: rgba(15, 77, 60, 0.08);
+
+  --admin-ink: #14181f;
+  --admin-muted: #5a5648;
+  --admin-meta: #64748b;
+  --admin-border-hairline: rgba(16, 32, 26, 0.10);
+
+  /* Status Colors */
+  --admin-status-green: #059669;
+  --admin-status-amber: #d97706;
+  --admin-status-gray: #64748b;
+  --admin-status-red: #dc2626;
+
+  /* Strict Type Scale Definitions (only these 9 styles exist) */
+  --admin-type-page-title-size: 28px;
+  --admin-type-page-title-line: 32px;
+  --admin-type-page-title-weight: 600;
+  --admin-type-page-title-spacing: -0.01em;
+
+  --admin-type-section-title-size: 16px;
+  --admin-type-section-title-line: 24px;
+  --admin-type-section-title-weight: 600;
+
+  --admin-type-value-size: 14px;
+  --admin-type-value-line: 20px;
+  --admin-type-value-weight: 500;
+
+  --admin-type-body-size: 14px;
+  --admin-type-body-line: 20px;
+  --admin-type-body-weight: 400;
+
+  --admin-type-label-size: 13px;
+  --admin-type-label-line: 20px;
+  --admin-type-label-weight: 400;
+
+  --admin-type-meta-size: 12px;
+  --admin-type-meta-line: 16px;
+  --admin-type-meta-weight: 400;
+
+  --admin-type-metric-size: 24px;
+  --admin-type-metric-line: 32px;
+  --admin-type-metric-weight: 600;
+
+  --admin-type-button-size: 14px;
+  --admin-type-button-line: 20px;
+  --admin-type-button-weight: 500;
+
+  --admin-type-link-size: 14px;
+  --admin-type-link-line: 20px;
+  --admin-type-link-weight: 500;
+}
+
+@keyframes adminSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}

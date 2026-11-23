@@ -1,18 +1,34 @@
 import { Router } from 'express';
 import { pool } from '../config/db.js';
 import { latLngToH3 } from '../utils/geoDispatch.js';
+import { requireAgentAuth, requireAdminAuth, requireAnyAuth } from '../middleware/authMiddleware.js';
+import { PaymentService } from '../modules/payments/paymentService.js';
+import {
+  updateProviderLocation,
+  updateProviderPresence,
+  checkAndExpireHeartbeats
+} from '../modules/providers/providerService.js';
 
 const router = Router();
 
-// Get Agent Console profile & stats from PostgreSQL
-router.get('/profile/:email', async (req, res) => {
+// Get Agent Console profile & stats from PostgreSQL (Ownership Enforced)
+router.get('/profile/:email', requireAgentAuth, async (req, res) => {
   try {
     const { email } = req.params;
+    if (req.userRole === 'agent' && req.userEmail && req.userEmail.toLowerCase() !== email.toLowerCase()) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'You are not authorized to view another partner\'s profile.' });
+    }
+    await checkAndExpireHeartbeats();
     const result = await pool.query('SELECT * FROM agent_login WHERE email = $1 LIMIT 1;', [email.toLowerCase()]);
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Agent profile not found' });
     }
     const agent = result.rows[0];
+    const exp = agent.years_of_experience !== null && agent.years_of_experience !== undefined
+      ? Number(agent.years_of_experience)
+      : (agent.experience_years !== null && agent.experience_years !== undefined ? Number(agent.experience_years) : 0);
+    const addr = agent.permanent_address || agent.address || '';
+
     res.json({
       success: true,
       agent: {
@@ -22,17 +38,29 @@ router.get('/profile/:email', async (req, res) => {
         email: agent.email,
         phone: agent.phone,
         trade: agent.trade,
-        experienceYears: agent.experience_years,
-        city: agent.city,
-        state: agent.state,
-        address: agent.address,
+        yearsOfExperience: exp,
+        experienceYears: exp,
+        permanentAddress: addr,
+        permanent_address: addr,
+        address: addr,
         rating: (agent.rating !== null && agent.rating !== undefined && !isNaN(parseFloat(agent.rating))) ? parseFloat(agent.rating) : null,
         completedJobs: parseInt(agent.completed_jobs || 0, 10),
         walletBalance: parseFloat(agent.wallet_balance || 0),
         isOnline: agent.is_online,
+        kycStatus: agent.kyc_status || 'under_review',
+        rejectionReason: agent.kyc_status === 'verified' ? null : (agent.verification_checklist?.rejection_note || null),
+        availabilityStatus: agent.availability_status || (agent.is_online ? 'AVAILABLE' : 'OFFLINE'),
+        currentLatitude: agent.current_latitude ? parseFloat(agent.current_latitude) : null,
+        currentLongitude: agent.current_longitude ? parseFloat(agent.current_longitude) : null,
+        currentLocality: agent.current_locality || null,
+        currentAccuracyM: agent.current_accuracy_m ? parseFloat(agent.current_accuracy_m) : null,
+        currentH3Cell: agent.current_h3_cell || agent.h3_index_res9 || null,
         lat: agent.lat ? parseFloat(agent.lat) : null,
         lng: agent.lng ? parseFloat(agent.lng) : null,
-        h3Index: agent.h3_index_res9 || null
+        h3Index: agent.h3_index_res9 || null,
+        avatarUrl: agent.avatar_url || (agent.photo_verified ? `/api/verification/photo/stream?id=${agent.partner_id || agent.id}` : null),
+        offlineReason: agent.offline_reason || null,
+        offlineExplanation: null
       }
     });
   } catch (err) {
@@ -41,7 +69,7 @@ router.get('/profile/:email', async (req, res) => {
 });
 
 // Update Provider Location (lat/lng/h3 for dispatch)
-router.patch('/location', async (req, res) => {
+router.patch('/location', requireAgentAuth, async (req, res) => {
   try {
     const { email, lat, lng } = req.body;
 
@@ -49,88 +77,51 @@ router.patch('/location', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Provider email is required.' });
     }
 
-    const parsedLat = parseFloat(lat);
-    const parsedLng = parseFloat(lng);
-
-    if (isNaN(parsedLat) || isNaN(parsedLng) || parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
-      return res.status(400).json({ success: false, error: 'Valid latitude and longitude are required.' });
-    }
-
-    const h3Index = latLngToH3(parsedLat, parsedLng);
-
-    const result = await pool.query(`
-      UPDATE agent_login
-      SET lat = $1, lng = $2, h3_index_res9 = $3, updated_at = CURRENT_TIMESTAMP
-      WHERE email = $4
-      RETURNING id, lat, lng, h3_index_res9;
-    `, [parsedLat, parsedLng, h3Index, email.toLowerCase()]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Provider not found.' });
-    }
+    const result = await updateProviderLocation(email, {
+      latitude: lat,
+      longitude: lng,
+      accuracy_m: req.body.accuracy_m || req.body.location_accuracy_m || 10,
+      ...req.body
+    });
 
     return res.json({
       success: true,
       message: 'Location updated.',
       location: {
-        lat: parseFloat(result.rows[0].lat),
-        lng: parseFloat(result.rows[0].lng),
-        h3Index: result.rows[0].h3_index_res9
+        lat: result.currentLatitude,
+        lng: result.currentLongitude,
+        h3Index: result.currentH3Cell,
+        locality: result.currentLocality
       }
     });
   } catch (err) {
-    console.error('Update location error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(400).json({ success: false, error: err.message });
   }
 });
 
 // Toggle Online/Offline Status
-router.patch('/toggle-online', async (req, res) => {
+router.patch('/toggle-online', requireAgentAuth, async (req, res) => {
   try {
     const { email, isOnline } = req.body;
     if (!email) {
       return res.status(400).json({ success: false, error: 'Provider email is required.' });
     }
 
-    // Exclusive Job-Lock: Reject manual override to Available/Online if provider is locked to an active job
-    if (isOnline) {
-      const activeJobCheck = await pool.query(`
-        SELECT sr.request_ref, sr.service_title, sr.status
-        FROM service_requests sr
-        JOIN quotes q ON q.id = sr.accepted_quote_id
-        JOIN agent_login a ON a.id = q.agent_id
-        WHERE a.email = $1
-          AND sr.status IN ('Accepted', 'En Route', 'OTP Verified', 'In Progress')
-        LIMIT 1;
-      `, [email.toLowerCase().trim()]);
+    const targetPresence = isOnline ? 'AVAILABLE' : 'OFFLINE';
+    const result = await updateProviderPresence(email, targetPresence);
 
-      if (activeJobCheck.rows.length > 0) {
-        const job = activeJobCheck.rows[0];
-        return res.status(403).json({
-          success: false,
-          code: 'PROVIDER_LOCKED_BUSY',
-          error: `PROVIDER_LOCKED_BUSY: You cannot set availability to Available/Online while locked to active job (${job.request_ref}: ${job.service_title}). Complete the service to unlock.`
-        });
-      }
-    }
-
-    const result = await pool.query(
-      'UPDATE agent_login SET is_online = $1, availability_status = $2, updated_at = CURRENT_TIMESTAMP WHERE email = $3 RETURNING is_online, availability_status;',
-      [!!isOnline, isOnline ? 'AVAILABLE' : 'OFFLINE', email.toLowerCase().trim()]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Provider not found.' });
-    }
-
-    return res.json({ success: true, isOnline: result.rows[0].is_online, availabilityStatus: result.rows[0].availability_status });
+    return res.json({
+      success: true,
+      isOnline: result.isOnline,
+      availabilityStatus: result.availabilityStatus
+    });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
 // Verify OTP & Start Job (Legacy compatibility -- dispatch routes have their own)
-router.post('/verify-otp', async (req, res) => {
+router.post('/verify-otp', requireAgentAuth, async (req, res) => {
   try {
     const { bookingId, otp } = req.body;
     const result = await pool.query('SELECT * FROM bookings WHERE booking_ref = $1 LIMIT 1;', [bookingId]);
@@ -150,53 +141,33 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
-// Complete Job and Credit Wallet (Legacy compatibility -- dispatch routes have their own)
-router.post('/complete-job', async (req, res) => {
-  try {
-    const { bookingId, agentEmail, payoutAmount } = req.body;
-    const payout = parseFloat(payoutAmount || 0);
-
-    if (!bookingId) {
-      return res.status(400).json({ success: false, error: 'Booking ID is required.' });
-    }
-
-    await pool.query("UPDATE bookings SET status = 'Completed' WHERE booking_ref = $1;", [bookingId]);
-
-    if (agentEmail) {
-      const agentResult = await pool.query(`
-        UPDATE agent_login 
-        SET 
-          wallet_balance = wallet_balance + $1,
-          completed_jobs = completed_jobs + 1
-        WHERE email = $2
-        RETURNING *;
-      `, [payout, agentEmail.toLowerCase()]);
-
-      const updatedAgent = agentResult.rows[0];
-      res.json({
-        success: true,
-        message: `Job completed. ${payout.toFixed(2)} credited to wallet.`,
-        newWalletBalance: updatedAgent ? parseFloat(updatedAgent.wallet_balance) : 0,
-        totalCompletedJobs: updatedAgent ? updatedAgent.completed_jobs : 0
-      });
-    } else {
-      res.json({ success: true, message: 'Job completed.' });
-    }
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+// Complete Job and Credit Wallet (Legacy Fake Wallet Credit Strictly Disabled)
+router.post('/complete-job', requireAgentAuth, async (req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: 'LEGACY_WALLET_CREDIT_DISABLED',
+    message: 'Direct client-supplied wallet credit is disabled for financial integrity. Job completions and settlements are processed strictly through verified booking workflows.'
+  });
 });
 
 // ---------------------------------------------------------------------------
 // Document Verification Endpoints (Aadhaar Card, Driving License)
 // ---------------------------------------------------------------------------
 
-// Fetch verification documents for an agent (by email or partner_id)
-router.get('/documents/:identifier', async (req, res) => {
+// Fetch verification documents for an agent (by email or partner_id) - Ownership Enforced
+router.get('/documents/:identifier', requireAnyAuth, async (req, res) => {
   try {
     const identifier = decodeURIComponent(req.params.identifier || '').trim();
     if (!identifier) {
       return res.status(400).json({ success: false, message: 'Agent email or Partner ID is required.' });
+    }
+
+    const isAdmin = req.userRole === 'admin';
+    const isOwner = (req.userEmail && req.userEmail.toLowerCase() === identifier.toLowerCase()) || 
+                    (req.agentPartnerId && req.agentPartnerId.toLowerCase() === identifier.toLowerCase());
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'You are not authorized to view another partner\'s documents.' });
     }
 
     const result = await pool.query(
@@ -251,7 +222,7 @@ router.get('/documents/:identifier', async (req, res) => {
 });
 
 // Upload or replace verification document
-router.post('/upload-document', async (req, res) => {
+router.post('/upload-document', requireAgentAuth, async (req, res) => {
   try {
     const { email, partnerId, documentType, fileName, fileType, fileSize, fileData, status } = req.body;
     
@@ -343,8 +314,8 @@ router.post('/upload-document', async (req, res) => {
   }
 });
 
-// Update verification status (e.g. Verified, Rejected with reason, Under Review)
-router.patch('/document-status', async (req, res) => {
+// Update verification status (Admin Only - Agents cannot self-approve KYC)
+router.patch('/document-status', requireAdminAuth, async (req, res) => {
   try {
     const { email, partnerId, documentType, status, rejectionReason } = req.body;
     
@@ -390,11 +361,14 @@ router.patch('/document-status', async (req, res) => {
   }
 });
 
-// Get genuine completed jobs history for professional
-router.get('/completed-jobs/:email', async (req, res) => {
+// Get genuine completed jobs history for professional (Ownership Enforced)
+router.get('/completed-jobs/:email', requireAgentAuth, async (req, res) => {
   try {
     const { email } = req.params;
     const cleanEmail = (email || '').toLowerCase().trim();
+    if (req.userRole === 'agent' && req.userEmail && req.userEmail.toLowerCase() !== cleanEmail) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'You are not authorized to view another partner\'s completed jobs.' });
+    }
     const agentRes = await pool.query('SELECT id FROM agent_login WHERE LOWER(email) = $1 LIMIT 1;', [cleanEmail]);
     if (agentRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Provider not found.' });
@@ -405,53 +379,51 @@ router.get('/completed-jobs/:email', async (req, res) => {
 
     const jobsRes = await pool.query(`
       SELECT 
-        b.id,
-        b.booking_ref,
-        b.service_title,
-        b.category,
-        b.total_amount,
-        b.user_name as customer_name,
-        b.user_address as service_address,
-        b.otp_verified_at,
-        b.completed_at,
-        b.created_at,
-        COALESCE(b.rating, sr.rating, r.rating) as rating,
-        COALESCE(b.review_feedback, sr.rating_feedback, r.feedback) as feedback,
-        COALESCE(b.review_tags::text, r.tags::text) as tags
-      FROM bookings b
-      LEFT JOIN service_requests sr ON (sr.id = b.request_id OR sr.request_ref = b.booking_ref)
-      LEFT JOIN reviews r ON (r.request_id = b.request_id OR r.request_id = sr.id)
+        sr.id,
+        COALESCE(sr.service_request_code, sr.request_ref) AS booking_ref,
+        sr.service_title,
+        sr.category,
+        COALESCE(p.amount, q.amount, 0)::NUMERIC AS total_amount,
+        COALESCE(c.name, sr.user_name, 'Verified Customer') AS customer_name,
+        sr.user_address AS service_address,
+        sr.otp_verified_at,
+        sr.completed_at,
+        sr.created_at,
+        sr.confirmed_at,
+        sr.on_the_way_at,
+        sr.arrived_at,
+        COALESCE(sr.in_progress_at, sr.otp_verified_at) AS in_progress_at,
+        COALESCE(r.rating, f.rating, sr.rating) AS rating,
+        COALESCE(r.feedback, f.comment, sr.rating_feedback) AS feedback,
+        COALESCE(r.tags, f.tags, '[]'::jsonb) AS tags,
+        COALESCE(p.status, 'pending') AS payment_status,
+        COALESCE(p.method, 'online') AS payment_method,
+        p.provider_payment_id AS payment_id,
+        COALESCE(p.platform_fee, 0)::NUMERIC AS platform_fee,
+        COALESCE(p.professional_amount, q.amount, 0)::NUMERIC AS professional_amount
+      FROM service_requests sr
+      LEFT JOIN customers c ON c.id = sr.customer_id
+      LEFT JOIN quotes q ON q.id = sr.accepted_quote_id
+      LEFT JOIN LATERAL (
+        SELECT * FROM payments p WHERE p.service_request_id = sr.id ORDER BY p.id DESC LIMIT 1
+      ) p ON true
+      LEFT JOIN LATERAL (
+        SELECT * FROM reviews r WHERE r.request_id = sr.id ORDER BY r.id DESC LIMIT 1
+      ) r ON true
+      LEFT JOIN LATERAL (
+        SELECT * FROM feedback f WHERE f.service_request_id = sr.id ORDER BY f.id DESC LIMIT 1
+      ) f ON true
       WHERE (
-        b.assigned_agent_id IN ($1, $2)
-        OR b.accepted_quote_id IN (SELECT id FROM quotes WHERE agent_id = $1 OR professional_id = $2 OR LOWER(agent_email) = $3)
-        OR sr.accepted_quote_id IN (SELECT id FROM quotes WHERE agent_id = $1 OR professional_id = $2 OR LOWER(agent_email) = $3)
-        OR sr.assigned_professional_id IN ($1, $2)
-      )
-      AND (b.status = 'Completed' OR sr.status = 'Completed' OR LOWER(b.status) = 'completed' OR LOWER(sr.status) = 'completed')
-      UNION ALL
-      SELECT
-        sr2.id,
-        sr2.request_ref as booking_ref,
-        sr2.service_title,
-        sr2.category,
-        COALESCE(q.amount, 0) as total_amount,
-        sr2.user_name as customer_name,
-        sr2.user_address as service_address,
-        sr2.otp_verified_at,
-        sr2.completed_at,
-        sr2.created_at,
-        COALESCE(sr2.rating, r2.rating) as rating,
-        COALESCE(sr2.rating_feedback, r2.feedback) as feedback,
-        r2.tags::text as tags
-      FROM service_requests sr2
-      JOIN quotes q ON (q.id = sr2.accepted_quote_id)
-      LEFT JOIN reviews r2 ON (r2.request_id = sr2.id)
-      WHERE (q.agent_id = $1 OR q.professional_id = $2 OR LOWER(q.agent_email) = $3 OR sr2.assigned_professional_id IN ($1, $2))
-        AND (sr2.status = 'Completed' OR LOWER(sr2.status) = 'completed')
-        AND NOT EXISTS (
-          SELECT 1 FROM bookings bk WHERE bk.request_id = sr2.id OR bk.booking_ref = sr2.request_ref
+        sr.assigned_professional_id IN ($1, $2)
+        OR q.agent_id = $1 OR q.professional_id = $2 OR LOWER(q.agent_email) = $3
+        OR EXISTS (
+          SELECT 1 FROM quotes q2 
+          WHERE (q2.agent_id = $1 OR q2.professional_id = $2 OR LOWER(q2.agent_email) = $3)
+            AND (q2.id = sr.accepted_quote_id OR (q2.service_request_id = sr.id AND q2.status = 'accepted'))
         )
-      ORDER BY completed_at DESC NULLS LAST, created_at DESC
+      )
+      AND (sr.status = 'Completed' OR LOWER(sr.status) = 'completed')
+      ORDER BY sr.completed_at DESC NULLS LAST, sr.created_at DESC
       LIMIT 50;
     `, [agentId, profId, cleanEmail]);
 
@@ -465,10 +437,20 @@ router.get('/completed-jobs/:email', async (req, res) => {
         amount: parseFloat(j.total_amount || 0),
         customerName: j.customer_name || 'Verified Customer',
         serviceAddress: j.service_address,
+        confirmed_at: j.confirmed_at,
+        on_the_way_at: j.on_the_way_at,
+        arrived_at: j.arrived_at,
+        in_progress_at: j.in_progress_at,
+        completed_at: j.completed_at,
+        status: 'Completed',
         completedAt: j.completed_at || j.otp_verified_at || j.created_at,
         otpVerifiedAt: j.otp_verified_at,
         createdAt: j.created_at,
-        paymentMethod: 'UPI / Cash on completion',
+        paymentStatus: j.payment_status || 'pending',
+        paymentMethod: j.payment_method || 'online',
+        paymentId: j.payment_id || null,
+        platformFee: parseFloat(j.platform_fee || 0),
+        professionalAmount: parseFloat(j.professional_amount || j.total_amount || 0),
         rating: j.rating ? parseFloat(j.rating) : null,
         feedback: j.feedback || '',
         tags: Array.isArray(j.tags) ? j.tags : []
@@ -480,11 +462,14 @@ router.get('/completed-jobs/:email', async (req, res) => {
   }
 });
 
-// Get genuine verified customer reviews for professional
-router.get('/reviews/:email', async (req, res) => {
+// Get genuine verified customer reviews for professional (Ownership Enforced)
+router.get('/reviews/:email', requireAgentAuth, async (req, res) => {
   try {
     const { email } = req.params;
     const cleanEmail = (email || '').toLowerCase().trim();
+    if (req.userRole === 'agent' && req.userEmail && req.userEmail.toLowerCase() !== cleanEmail) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'You are not authorized to view another partner\'s reviews.' });
+    }
     const agentRes = await pool.query('SELECT id FROM agent_login WHERE LOWER(email) = $1 LIMIT 1;', [cleanEmail]);
     if (agentRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Provider not found.' });
@@ -522,6 +507,119 @@ router.get('/reviews/:email', async (req, res) => {
   } catch (err) {
     console.error('Fetch reviews error:', err);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * Professional Payout Setup Endpoint
+ * Links bank account through provider (Razorpay Route) and activates payout status.
+ * Never stores or logs raw PAN or full account number.
+ */
+router.post('/payout-setup', requireAgentAuth, async (req, res) => {
+  try {
+    const { email, name, accountNumber, ifsc, pan } = req.body;
+    const authEmail = req.userEmail || req.user?.email;
+
+    const targetEmail = (email || authEmail || '').toLowerCase().trim();
+    if (!targetEmail) {
+      return res.status(400).json({ success: false, error: 'Professional email is required.' });
+    }
+
+    if (authEmail && authEmail.toLowerCase() !== targetEmail) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to configure payout for another professional.' });
+    }
+
+    if (!accountNumber || !ifsc || !pan) {
+      return res.status(400).json({ success: false, error: 'PAN, Bank Account Number, and IFSC are required.' });
+    }
+
+    const proRes = await pool.query(
+      'SELECT id, name, email, phone FROM professionals WHERE LOWER(email) = $1 LIMIT 1;',
+      [targetEmail]
+    );
+
+    if (proRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Professional profile not found.' });
+    }
+
+    const pro = proRes.rows[0];
+    const payout = await PaymentService.saveProfessionalPayout({
+      professionalId: pro.id,
+      name: name || pro.name,
+      email: pro.email,
+      phone: pro.phone,
+      accountNumber,
+      ifsc,
+      pan
+    });
+
+    res.json({
+      success: true,
+      message: 'Payout setup successfully linked and verified.',
+      payout
+    });
+  } catch (err) {
+    console.error('Payout setup error:', err);
+    res.status(err.status || 500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * Professional Payout Status Check
+ */
+router.get('/payout-status', requireAgentAuth, async (req, res) => {
+  try {
+    const email = (req.query.email || req.userEmail || req.user?.email || '').toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Professional email required.' });
+    }
+
+    const proRes = await pool.query(
+      'SELECT id FROM professionals WHERE LOWER(email) = $1 LIMIT 1;',
+      [email]
+    );
+
+    if (proRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Professional not found.' });
+    }
+
+    const statusInfo = await PaymentService.checkProfessionalPayoutStatus(proRes.rows[0].id);
+    res.json({
+      success: true,
+      ...statusInfo
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * Professional Earnings & Payout Breakdown Endpoint
+ */
+router.get('/earnings', requireAgentAuth, async (req, res) => {
+  try {
+    const email = (req.query.email || req.userEmail || req.user?.email || '').toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Professional email required.' });
+    }
+
+    const proRes = await pool.query(
+      'SELECT id FROM professionals WHERE LOWER(email) = $1 LIMIT 1;',
+      [email]
+    );
+
+    if (proRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Professional not found.' });
+    }
+
+    const earnings = await PaymentService.getProfessionalEarnings(proRes.rows[0].id);
+    res.json({
+      success: true,
+      ...earnings
+    });
+  } catch (err) {
+    console.error('Fetch earnings error:', err);
+    res.status(err.status || 500).json({ success: false, error: err.message });
   }
 });
 

@@ -256,3 +256,137 @@ Financial transactions and earnings credits.
 - `platform_fee` (NUMERIC(12,2)): Commission deduction (15%).
 - `net_payout` (NUMERIC(12,2)): Net amount credited to wallet (85%).
 - `status` (VARCHAR(32)): Ledger status (`credited`, `settled`, `reversed`).
+
+
+### 10. `payments`
+Online customer payments captured via Razorpay Standard Checkout.
+- `id` (BIGINT, PK): Identity column.
+- `payment_code` (VARCHAR(32), UNIQUE): Sequential human-readable code (`YYYY` + 6 digits).
+- `service_request_id` (BIGINT, FK): References `service_requests(id)`.
+- `customer_id` (BIGINT, FK): References `customers(id)`.
+- `amount` (NUMERIC(12,2)): Gross total paid in INR.
+- `amount_paise` (BIGINT): Integer amount in paise (1 INR = 100 paise).
+- `currency` (VARCHAR(10)): Defaults to `'INR'`.
+- `status` (VARCHAR(32)): Payment state (`due`, `processing`, `paid`, `failed`, `refunded`).
+- `provider` (VARCHAR(32)): Payment driver (`razorpay` or `mock`).
+- `gateway_order_id` (VARCHAR(128)): Razorpay order identifier (`order_...`).
+- `gateway_payment_id` (VARCHAR(128)): Captured payment identifier (`pay_...`).
+- `platform_fee` (NUMERIC(12,2)): Platform commission deduction.
+- `platform_fee_paise` (BIGINT): Platform fee in paise.
+- `agent_amount` (NUMERIC(12,2)): Professional share.
+- `agent_amount_paise` (BIGINT): Professional share in paise.
+- `captured_at` (TIMESTAMPTZ): Gateway capture timestamp.
+
+### 11. `payment_attempts`
+Audit log of individual checkout and gateway attempts.
+- `id` (BIGINT, PK): Identity column.
+- `payment_id` (BIGINT, FK): References `payments(id)`.
+- `gateway_order_id` (VARCHAR(128)): Associated order ID.
+- `gateway_payment_id` (VARCHAR(128)): Associated payment ID.
+- `method` (VARCHAR(32)): Gateway payment method (`upi`, `card`, `netbanking`, `wallet`).
+- `status` (VARCHAR(32)): Attempt outcome (`initiated`, `authorized`, `captured`, `failed`).
+- `error_code` (VARCHAR(64)): Gateway error code on rejection.
+- `error_description` (TEXT): Human-readable error message.
+
+### 12. `payment_transfers`
+Route automated settlements transferring professional shares to linked bank accounts.
+- `id` (BIGINT, PK): Identity column.
+- `payment_id` (BIGINT, FK): References `payments(id)`.
+- `professional_id` (BIGINT, FK): References `professionals(id)`.
+- `recipient_account_id` (VARCHAR(128)): Gateway linked account (`acc_...`).
+- `amount` (NUMERIC(12,2)): Transferred professional share in INR.
+- `amount_paise` (BIGINT): Transferred share in paise.
+- `currency` (VARCHAR(10)): Defaults to `'INR'`.
+- `gateway_transfer_id` (VARCHAR(128)): Gateway transfer reference (`trf_...`).
+- `status` (VARCHAR(32)): Route status (`pending`, `processed`, `failed`, `reversed`).
+- `failure_reason` (TEXT): Diagnostic note on settlement error.
+
+### 13. `refunds`
+Administrative payment reversals and pro share debit records.
+- `id` (BIGINT, PK): Identity column.
+- `payment_id` (BIGINT, FK): References `payments(id)`.
+- `amount` (NUMERIC(12,2)): Reversal amount in INR.
+- `amount_paise` (BIGINT): Reversal amount in paise.
+- `gateway_refund_id` (VARCHAR(128)): Gateway refund identifier (`rfnd_...`).
+- `status` (VARCHAR(32)): Status (`initiated`, `processed`, `failed`).
+- `reason` (TEXT): Justification for the refund.
+
+### 14. `webhook_events`
+Idempotent log of raw webhooks received from payment gateways.
+- `id` (BIGINT, PK): Identity column.
+- `event_id` (VARCHAR(128), UNIQUE): Gateway webhook event identifier.
+- `event_type` (VARCHAR(64)): Webhook action (`payment.captured`, `transfer.processed`, etc.).
+- `payload` (JSONB): Full raw webhook event body.
+- `processed_at` (TIMESTAMPTZ): Server handling timestamp.
+- `status` (VARCHAR(32)): Processing state (`processed`, `ignored`, `failed`).
+
+### Updated Professional Permanent Address, Experience & Working Location Columns
+On `professionals` and `agent_login`:
+- `permanent_address` (TEXT): Doorstep permanent residence address, never overwritten by live GPS coordinates.
+- `years_of_experience` (SMALLINT, 0..50): Experience years. `0` represents "Fresher" across quotes and profiles.
+- `current_latitude` (DOUBLE PRECISION): Live working GPS latitude, active only while Available.
+- `current_longitude` (DOUBLE PRECISION): Live working GPS longitude, active only while Available.
+- `current_accuracy_m` (DOUBLE PRECISION): Hardware GPS accuracy in meters.
+- `current_h3_cell` (VARCHAR(32)): Spatial H3 index cell for dispatch matching.
+- `current_locality` (VARCHAR(255)): Cached human-readable locality string ("Working near <locality>").
+- `location_updated_at` (TIMESTAMPTZ): Timestamp of last GPS heartbeat or positional update.
+- `offline_reason` (VARCHAR(64)): Inactivity reason (e.g. `'heartbeat_timeout'`) when 2-minute threshold lapses.
+
+### 15. `mobile_verifications`
+Cryptographically secure mobile OTP storage with HMAC hashes and attempt tracking.
+- `id` (BIGINT, PK): Identity column.
+- `phone` (VARCHAR(32)): E.164 or normalized 10-digit mobile number.
+- `code_hash` (VARCHAR(128)): HMAC-SHA256 hex digest using server secret. Plain OTP is never stored.
+- `attempts` (INT): Failed verification attempts counter (max 5).
+- `max_attempts` (INT): Attempt ceiling.
+- `ip_address` (VARCHAR(64)): Client IP address for hourly rate limiting.
+- `expires_at` (TIMESTAMPTZ): 5-minute expiration timestamp.
+- `consumed_at` (TIMESTAMPTZ): Consumption timestamp preventing replay.
+
+### 16. `professional_documents`
+Encrypted government documents with automated compliance checks and privacy retention.
+- `id` (BIGINT, PK): Identity column.
+- `professional_id` (BIGINT, FK): References `professionals(id)`.
+- `document_type` (VARCHAR(32)): `'aadhaar'` or `'driving_licence'`.
+- `status` (VARCHAR(32)): `'not_uploaded'`, `'uploading'`, `'under_review'`, `'verified'`, `'needs_attention'`, `'rejected'`.
+- `encrypted_file_path` (TEXT): Encrypted file path (AES-256-GCM ciphertext).
+- `file_iv` (VARCHAR(64)): 12-byte hex initialization vector.
+- `file_auth_tag` (VARCHAR(64)): 16-byte hex authentication tag.
+- `mime_type` (VARCHAR(64)): Verified mime type via magic bytes.
+- `file_size_bytes` (INT): File size (max 5 MB).
+- `aadhaar_last4` (VARCHAR(4)): Strictly last 4 digits of Aadhaar (full number never stored).
+- `document_expiry` (DATE): Expiry date for driving licences.
+- `consent_at` (TIMESTAMPTZ): Professional consent timestamp.
+- `checks` (JSONB): Automated check results (quality, OCR, Verhoeff, QR signature, name similarity).
+- `rejection_reason` (TEXT): Human administrator explanation on rejection.
+- `reviewed_by` (BIGINT, FK): Admin user ID.
+- `reviewed_at` (TIMESTAMPTZ): Review timestamp.
+- `delete_after` (TIMESTAMPTZ): File retention cutoff date (default 30 days).
+
+### 17. `professional_photos`
+Live portrait captures with facial hint scores and privacy retention.
+- `id` (BIGINT, PK): Identity column.
+- `professional_id` (BIGINT, FK): References `professionals(id)`.
+- `encrypted_file_path` (TEXT): Encrypted file path (AES-256-GCM).
+- `file_iv` (VARCHAR(64)): GCM initialization vector.
+- `file_auth_tag` (VARCHAR(64)): GCM authentication tag.
+- `mime_type` (VARCHAR(64)): Image mime type.
+- `is_upload_fallback` (BOOLEAN): True if captured via upload fallback when camera unavailable.
+- `face_similarity_score` (NUMERIC(5,2)): Automated comparison score against Aadhaar photo. Advisory hint only.
+- `status` (VARCHAR(32)): `'under_review'`, `'verified'`, `'rejected'`.
+- `checks` (JSONB): Image quality and facial presence metrics.
+- `delete_after` (TIMESTAMPTZ): File retention cutoff date.
+
+### 18. `verification_audit_log`
+Immutable audit ledger for administrative review decisions and verification actions.
+- `id` (BIGINT, PK): Identity column.
+- `professional_id` (BIGINT, FK): References `professionals(id)`.
+- `actor_id` (BIGINT, FK): Admin or system user ID.
+- `actor_email` (VARCHAR(255)): Admin email.
+- `action` (VARCHAR(64)): Specific action (`mobile_sent`, `mobile_verified`, `document_uploaded`, `document_approved`, etc.).
+- `target_type` (VARCHAR(32)): `'mobile'`, `'document'`, `'photo'`, `'professional'`.
+- `target_id` (BIGINT): Target entity ID.
+- `reason` (TEXT): Admin note or template reason.
+- `metadata` (JSONB): Contextual action parameters.
+- `ip_address` (VARCHAR(64)): Request IP address.
+

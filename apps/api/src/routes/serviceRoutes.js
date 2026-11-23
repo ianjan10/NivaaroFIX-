@@ -17,10 +17,10 @@ router.get('/', async (req, res) => {
 
     if (search) {
       params.push(`%${search}%`);
-      query += ` AND (title ILIKE $${params.length} OR short_desc ILIKE $${params.length})`;
+      query += ` AND (name ILIKE $${params.length} OR description ILIKE $${params.length})`;
     }
 
-    query += ' ORDER BY is_popular DESC, starting_price ASC';
+    query += ' ORDER BY base_price ASC';
 
     const result = await pool.query(query, params);
     res.json({

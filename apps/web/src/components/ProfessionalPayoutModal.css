@@ -1,0 +1,337 @@
+/* ==============================================================================
+   NivaaroFix Professional Payout Setup Modal Styles
+   Elevated solid card, clean typography, strict validation feedback, no emojis.
+   ============================================================================== */
+
+.payout-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background-color: rgba(10, 20, 16, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: payoutFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes payoutFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.payout-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  max-height: min(92vh, 92dvh);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: auto;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
+  padding: 28px 24px;
+  color: #111827;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+body.dark-theme .payout-card {
+  background: #18221c;
+  color: #f9fafb;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.payout-close-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.payout-close-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #111827;
+}
+
+body.dark-theme .payout-close-btn {
+  color: #9ca3af;
+}
+
+body.dark-theme .payout-close-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f9fafb;
+}
+
+.payout-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.payout-step-indicator {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #047857;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+body.dark-theme .payout-step-indicator {
+  color: #34d399;
+}
+
+.payout-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 6px 0 0 0;
+  color: #111827;
+}
+
+body.dark-theme .payout-modal-title {
+  color: #f9fafb;
+}
+
+.payout-modal-desc {
+  font-size: 0.84rem;
+  color: #4b5563;
+  line-height: 1.45;
+  margin: 6px 0 0 0;
+}
+
+body.dark-theme .payout-modal-desc {
+  color: #9ca3af;
+}
+
+.payout-alert-error {
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+body.dark-theme .payout-alert-error {
+  background: rgba(185, 28, 28, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.payout-field-group {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.payout-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+body.dark-theme .payout-label {
+  color: #d1d5db;
+}
+
+.payout-input {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+body.dark-theme .payout-input {
+  background: #111914;
+  border-color: #2e3e34;
+  color: #f9fafb;
+}
+
+.payout-input:focus {
+  outline: none;
+  border-color: #047857;
+  box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.15);
+}
+
+.font-uppercase {
+  text-transform: uppercase;
+}
+
+.payout-hint {
+  font-size: 0.72rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+body.dark-theme .payout-hint {
+  color: #9ca3af;
+}
+
+.payout-bank-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #047857;
+  background: #ecfdf5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+body.dark-theme .payout-bank-tag {
+  background: rgba(4, 120, 87, 0.18);
+  color: #34d399;
+}
+
+.payout-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.payout-btn-primary {
+  height: 48px;
+  border-radius: 12px;
+  background: #047857;
+  color: #ffffff;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.payout-btn-primary:hover:not(:disabled) {
+  background: #065f46;
+}
+
+.payout-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.payout-btn-secondary {
+  height: 40px;
+  border-radius: 10px;
+  background: transparent;
+  color: #6b7280;
+  border: none;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.payout-btn-secondary:hover:not(:disabled) {
+  color: #111827;
+}
+
+body.dark-theme .payout-btn-secondary:hover:not(:disabled) {
+  color: #f9fafb;
+}
+
+/* Success View */
+.payout-success-view {
+  align-items: center;
+  text-align: center;
+}
+
+.payout-success-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #ecfdf5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(4, 120, 87, 0.2);
+}
+
+body.dark-theme .payout-success-circle {
+  background: rgba(4, 120, 87, 0.18);
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.payout-active-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 20px;
+  text-align: left;
+}
+
+body.dark-theme .payout-active-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.payout-active-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #10b981;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+}
+
+.payout-active-meta {
+  flex: 1;
+}
+
+.payout-active-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+body.dark-theme .payout-active-name {
+  color: #f9fafb;
+}
+
+.payout-active-sub {
+  font-size: 0.74rem;
+  color: #047857;
+  margin-top: 1px;
+}
+
+body.dark-theme .payout-active-sub {
+  color: #34d399;
+}
+

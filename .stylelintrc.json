@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "property-disallowed-list": [
+      "font-family"
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "apps/web/src/styles/adminTokens.css"
+      ],
+      "rules": {
+        "property-disallowed-list": null
+      }
+    }
+  ]
+}

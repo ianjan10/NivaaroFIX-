@@ -75,7 +75,9 @@ export async function findEligibleProviders(requestId, radiusMeters) {
     FROM agent_login a
     WHERE a.is_online = true
       AND a.availability_status = 'AVAILABLE'
-      AND a.kyc_status = 'Verified'
+      AND LOWER(a.kyc_status) = 'verified'
+      AND COALESCE(a.account_status, 'active') NOT IN ('suspended', 'banned')
+      AND (a.suspended_until IS NULL OR a.suspended_until <= CURRENT_TIMESTAMP)
       AND a.lat IS NOT NULL
       AND a.lng IS NOT NULL
       AND (a.trade = $3 OR a.trade = 'both')
@@ -104,7 +106,7 @@ export async function findEligibleProviders(requestId, radiusMeters) {
     email: row.email,
     phone: row.phone,
     trade: row.trade,
-    rating: parseFloat(row.rating || 5.0),
+    rating: (row.rating !== null && row.rating !== undefined) ? parseFloat(row.rating) : null,
     completedJobs: row.completed_jobs || 0,
     experienceYears: row.experience_years || 0,
     distanceMeters: parseFloat(row.distance_meters),

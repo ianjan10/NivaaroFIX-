@@ -3,7 +3,6 @@ import React, { useState, useRef } from 'react';
 import { useToastNotification } from '../context/ToastNotificationContext';
 import { useFormAutoScroll } from '../hooks/useFormAutoScroll';
 import IndianPhoneInput from '../components/IndianPhoneInput';
-import DateOfBirthSelector from '../components/DateOfBirthSelector';
 import UnifiedOtpInput from '../components/UnifiedOtpInput';
 import { PasswordStrengthMeter, ConfirmPasswordMatch, evaluatePasswordStrength } from '../components/PasswordStrengthValidator';
 
@@ -16,7 +15,6 @@ export default function CustomerForgotPasswordPage({ isAgent = false, onBackToSi
 
   // Step 1: Form
   const [email, setEmail] = useState('');
-  const [dob, setDob] = useState({ day: '', month: '', year: '' });
   const [phone, setPhone] = useState('');
 
   // Step 2: OTP
@@ -31,7 +29,6 @@ export default function CustomerForgotPasswordPage({ isAgent = false, onBackToSi
   const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   // Auto-scroll refs
-  const dobRef = useRef(null);
   const phoneRef = useRef(null);
   const step1SubmitRef = useRef(null);
   const newPwRef = useRef(null);
@@ -44,7 +41,7 @@ export default function CustomerForgotPasswordPage({ isAgent = false, onBackToSi
   // Step 1 Submit
   const handleStep1Submit = (e) => {
     e.preventDefault();
-    if (!email || !dob.day || !dob.month || !dob.year || !phone) return;
+    if (!email || !phone) return;
 
     if (phone.length !== 10) {
       showToast('Please enter a valid 10-digit Indian mobile number (+91).', 5000, 'error');
@@ -193,17 +190,6 @@ export default function CustomerForgotPasswordPage({ isAgent = false, onBackToSi
                     />
                   </div>
 
-                  {/* Date of Birth (DOB) */}
-                  <div className="input-group" ref={dobRef}>
-                    <label>{t.dobLabel || 'Date of Birth'}</label>
-                    <DateOfBirthSelector
-                      day={dob.day}
-                      month={dob.month}
-                      year={dob.year}
-                      onChange={setDob}
-                      onComplete={() => smoothScrollTo(phoneRef)}
-                    />
-                  </div>
 
                   {/* Registered Mobile Phone */}
                   <div className="input-group" ref={phoneRef}>
@@ -306,7 +292,7 @@ export default function CustomerForgotPasswordPage({ isAgent = false, onBackToSi
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         onFocus={handleNewPwFocus}
-                        placeholder="••••••••••••"
+                        placeholder="At least 8 characters"
                         autoComplete="new-password"
                         required
                       />
@@ -344,7 +330,7 @@ export default function CustomerForgotPasswordPage({ isAgent = false, onBackToSi
                         onFocus={handleConfirmPwFocus}
                         onKeyDown={handleConfirmPwKeyDown}
                         disabled={!newPassword.trim()}
-                        placeholder={!newPassword.trim() ? "Enter new password above first" : "••••••••••••"}
+                        placeholder={!newPassword.trim() ? "Enter new password above first" : "Re-enter your password"}
                         autoComplete="new-password"
                         required
                       />

@@ -1,429 +1,537 @@
-import React, { useState, useEffect } from 'react';
-import { useLanguage } from '../context/LanguageContext';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-const modalTranslations = {
-  "en": {
-    "customerTitle": "Account not found",
-    "agentTitle": "Professional account not found",
-    "descPrefix": "No registered account matching",
-    "descSuffix": "was found. Select how you'd like to proceed:",
-    "descGeneralCustomer": "No matching customer account credentials found in the database. Select how you would like to proceed:",
-    "descGeneralAgent": "No matching professional credentials found in the database. Select how you would like to proceed:",
-    "createAccountTitle": "Create a New Account",
-    "createAccountSub": "Fast registration with email, mobile & date of birth",
-    "registerPartnerTitle": "Register as Professional",
-    "registerPartnerSub": "Sign up with trade domain, experience & location in 1 min",
-    "tryAnotherTitle": "Try Another Mobile Number",
-    "tryAnotherSub": "Return to sign-in form to fix a typo or enter another number",
-    "autoDismissPrefix": "Auto-dismissing in",
-    "dismissBtn": "Dismiss"
-  },
-  "hi": {
-    "customerTitle": "खाता नहीं मिला",
-    "agentTitle": "प्रोफेशनल खाता नहीं मिला",
-    "descPrefix": "दर्ज विवरण",
-    "descSuffix": "से मेल खाने वाला कोई पंजीकृत खाता नहीं मिला। कृपया आगे बढ़ने के लिए विकल्प चुनें:",
-    "descGeneralCustomer": "डेटाबेस में कोई पंजीकृत ग्राहक खाता नहीं मिला। कृपया आगे बढ़ने का विकल्प चुनें:",
-    "descGeneralAgent": "डेटाबेस में कोई पंजीकृत प्रोफेशनल खाता नहीं मिला। कृपया आगे बढ़ने का विकल्प चुनें:",
-    "createAccountTitle": "नया खाता बनाएं",
-    "createAccountSub": "ईमेल, मोबाइल और जन्म तिथि के साथ त्वरित पंजीकरण",
-    "registerPartnerTitle": "प्रोफेशनल के रूप में पंजीकरण करें",
-    "registerPartnerSub": "1 मिनट में ट्रेड, अनुभव और लोकेशन के साथ साइन अप करें",
-    "tryAnotherTitle": "दूसरा मोबाइल नंबर आज़माएं",
-    "tryAnotherSub": "टाइपो सुधारने या दूसरा नंबर दर्ज करने के लिए वापस जाएं",
-    "autoDismissPrefix": "स्वतः बंद हो रहा है",
-    "dismissBtn": "बंद करें"
-  },
-  "mr": {
-    "customerTitle": "खाते आढळले नाही",
-    "agentTitle": "प्रोफेशनल खाते आढळले नाही",
-    "descPrefix": "नोंदणीकृत तपशील",
-    "descSuffix": "शी जुळणारे कोणतेही खाते आढळले नाही. कृपया पुढे जाण्यासाठी पर्याय निवडा:",
-    "descGeneralCustomer": "डेटाबेसमध्ये कोणतेही नोंदणीकृत खाते आढळले नाही. कृपया पुढे जाण्यासाठी पर्याय निवडा:",
-    "descGeneralAgent": "डेटाबेसमध्ये कोणतेही नोंदणीकृत प्रोफेशनल खाते आढळले नाही. कृपया पुढे जाण्यासाठी पर्याय निवडा:",
-    "createAccountTitle": "नवीन खाते तयार करा",
-    "createAccountSub": "ईमेल, मोबाईल आणि जन्मतारीखसह जलद नोंदणी",
-    "registerPartnerTitle": "प्रोफेशनल म्हणून नोंदणी करा",
-    "registerPartnerSub": "1 मिनिटात व्यवसाय, अनुभव आणि स्थानासह साइन अप करा",
-    "tryAnotherTitle": "दुसरा मोबाईल नंबर वापरा",
-    "tryAnotherSub": "टायपो सुधारण्यासाठी किंवा दुसरा नंबर प्रविष्ट करण्यासाठी परत जा",
-    "autoDismissPrefix": "आपोआप बंद होत आहे",
-    "dismissBtn": "रद्द करा"
-  },
-  "bn": {
-    "customerTitle": "অ্যাকাউন্ট পাওয়া যায়নি",
-    "agentTitle": "প্রফেশনাল অ্যাকাউন্ট পাওয়া যায়নি",
-    "descPrefix": "প্রদত্ত বিবরণ",
-    "descSuffix": "এর সাথে মিল থাকা কোনো নিবন্ধিত অ্যাকাউন্ট পাওয়া যায়নি। অনুগ্রহ করে একটি বিকল্প বেছে নিন:",
-    "descGeneralCustomer": "ডাটাবেসে কোনো নিবন্ধিত গ্রাহক অ্যাকাউন্ট পাওয়া যায়নি। অনুগ্রহ করে একটি বিকল্প বেছে নিন:",
-    "descGeneralAgent": "ডাটাবেসে কোনো নিবন্ধিত প্রফেশনাল অ্যাকাউন্ট পাওয়া যায়নি। অনুগ্রহ করে একটি বিকল্প বেছে নিন:",
-    "createAccountTitle": "নতুন অ্যাকাউন্ট তৈরি করুন",
-    "createAccountSub": "ইমেল, মোবাইল এবং জন্মতারিখ দিয়ে দ্রুত নিবন্ধন করুন",
-    "registerPartnerTitle": "প্রফেশনাল হিসেবে নিবন্ধন করুন",
-    "registerPartnerSub": "১ মিনিটে ট্রেড, অভিজ্ঞতা ও লোকেশন দিয়ে সাইন আপ করুন",
-    "tryAnotherTitle": "অন্য মোবাইল নম্বর ব্যবহার করুন",
-    "tryAnotherSub": "ভুল সংশোধন করতে বা অন্য নম্বর লিখতে ফিরে যান",
-    "autoDismissPrefix": "স্বয়ংক্রিয়ভাবে বন্ধ হচ্ছে",
-    "dismissBtn": "বাতিল করুন"
-  },
-  "ta": {
-    "customerTitle": "கணக்கு காணப்படவில்லை",
-    "agentTitle": "புரொபஷனல் கணக்கு காணப்படவில்லை",
-    "descPrefix": "உள்ளிடப்பட்ட விவரங்கள்",
-    "descSuffix": "உடன் பொருந்தும் கணக்கு எதுவும் காணப்படவில்லை. தொடர ஒரு விருப்பத்தைத் தேர்ந்தெடுக்கவும்:",
-    "descGeneralCustomer": "தரவுத்தளத்தில் பொருந்தும் வாடிக்கையாளர் கணக்கு எதுவும் காணப்படவில்லை. தொடர ஒரு விருப்பத்தைத் தேர்ந்தெடுக்கவும்:",
-    "descGeneralAgent": "தரவுத்தளத்தில் பொருந்தும் புரொபஷனல் கணக்கு எதுவும் காணப்படவில்லை. தொடர ஒரு விருப்பத்தைத் தேர்ந்தெடுக்கவும்:",
-    "createAccountTitle": "புதிய கணக்கை உருவாக்கவும்",
-    "createAccountSub": "மின்னஞ்சல், மொபைல் மற்றும் பிறந்த தேதியுடன் விரைவான பதிவு",
-    "registerPartnerTitle": "புரொபஷனலாக பதிவு செய்க",
-    "registerPartnerSub": "1 நிமிடத்தில் தொழில், அனுபவம் மற்றும் இருப்பிடத்துடன் பதிவு செய்யவும்",
-    "tryAnotherTitle": "மற்றொரு மொபைல் எண்ணை முயற்சிக்கவும்",
-    "tryAnotherSub": "எழுத்துப் பிழையைச் சரிசெய்ய அல்லது மற்றொரு எண்ணை உள்ளிட திரும்பிச் செல்லவும்",
-    "autoDismissPrefix": "தானாக மூடப்படுகிறது",
-    "dismissBtn": "ரத்து செய்"
-  },
-  "te": {
-    "customerTitle": "ఖాతా కనుగొనబడలేదు",
-    "agentTitle": "ప్రొఫెషనల్ ఖాతా కనుగొనబడలేదు",
-    "descPrefix": "నమోదు చేసిన వివరాలు",
-    "descSuffix": "తో సరిపోలే ఖాతా ఏదీ కనుగొనబడలేదు. కొనసాగడానికి ఒక ఎంపికను ఎంచుకోండి:",
-    "descGeneralCustomer": "డేటాబేస్‌లో సరిపోలే కస్టమర్ ఖాతా ఏదీ కనుగొనబడలేదు. కొనసాగడానికి ఒక ఎంపికను ఎంచుకోండి:",
-    "descGeneralAgent": "డేటాబేస్‌లో సరిపోలే ప్రొఫెషనల్ ఖాతా ఏదీ కనుగొనబడలేదు. కొనసాగడానికి ఒక ఎంపికను ఎంచుకోండి:",
-    "createAccountTitle": "కొత్త ఖాతాను సృష్టించండి",
-    "createAccountSub": "ఈమెయిల్, మొబైల్ మరియు పుట్టిన తేదీతో వేగవంతమైన నమోదు",
-    "registerPartnerTitle": "ప్రొఫెషనల్‌గా నమోదు చేసుకోండి",
-    "registerPartnerSub": "1 నిమిషంలో వృత్తి, అనుభవం మరియు ప్రదేశంతో సైన్ అప్ చేయండి",
-    "tryAnotherTitle": "మరొక మొబైల్ నంబర్‌ను ప్రయత్నించండి",
-    "tryAnotherSub": "తప్పును సరిదిద్దడానికి లేదా మరొక నంబర్‌ను నమోదు చేయడానికి తిరిగి వెళ్ళండి",
-    "autoDismissPrefix": "స్వయంచాలకంగా మూసివేయబడుతోంది",
-    "dismissBtn": "రద్దు చేయి"
-  },
-  "kn": {
-    "customerTitle": "ಖಾತೆ ಕಂಡುಬಂದಿಲ್ಲ",
-    "agentTitle": "ಪ್ರೊಫೆಷನಲ್ ಖಾತೆ ಕಂಡುಬಂದಿಲ್ಲ",
-    "descPrefix": "ನಮೂದಿಸಿದ ವಿವರಗಳು",
-    "descSuffix": "ಗೆ ಹೊಂದಿಕೆಯಾಗುವ ಯಾವುದೇ ಖಾತೆ ಕಂಡುಬಂದಿಲ್ಲ. ಮುಂದುವರಿಯಲು ಆಯ್ಕೆಯನ್ನು ಆರಿಸಿ:",
-    "descGeneralCustomer": "ಡೇಟಾಬೇಸ್‌ನಲ್ಲಿ ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಯಾಗುವ ಗ್ರಾಹಕ ಖಾತೆ ಕಂಡುಬಂದಿಲ್ಲ. ಮುಂದುವರಿಯಲು ಆಯ್ಕೆಯನ್ನು ಆರಿಸಿ:",
-    "descGeneralAgent": "ಡೇಟಾಬೇಸ್‌ನಲ್ಲಿ ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಯಾಗುವ ಪ್ರೊಫೆಷನಲ್ ಖಾತೆ ಕಂಡುಬಂದಿಲ್ಲ. ಮುಂದುವರಿಯಲು ಆಯ್ಕೆಯನ್ನು ಆರಿಸಿ:",
-    "createAccountTitle": "ಹೊಸ ಖಾತೆಯನ್ನು ರಚಿಸಿ",
-    "createAccountSub": "ಇಮೇಲ್, ಮೊಬೈಲ್ ಮತ್ತು ಹುಟ್ಟಿದ ದಿನಾಂಕದೊಂದಿಗೆ ತ್ವರಿತ ನೋಂದಣಿ",
-    "registerPartnerTitle": "ಪ್ರೊಫೆಷನಲ್ ಆಗಿ ನೋಂದಾಯಿಸಿ",
-    "registerPartnerSub": "1 ನಿಮಿಷದಲ್ಲಿ ವೃತ್ತಿ, ಅನುಭವ ಮತ್ತು ಸ್ಥಳದೊಂದಿಗೆ ಸೈನ್ ಅಪ್ ಮಾಡಿ",
-    "tryAnotherTitle": "ಮತ್ತೊಂದು ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು ಪ್ರಯತ್ನಿಸಿ",
-    "tryAnotherSub": "ತಪ್ಪನ್ನು ಸರಿಪಡಿಸಲು ಅಥವಾ ಇನ್ನೊಂದು ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಲು ಹಿಂತಿರುಗಿ",
-    "autoDismissPrefix": "ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಮುಚ್ಚಲಾಗುತ್ತಿದೆ",
-    "dismissBtn": "ರದ್ದುಮಾಡಿ"
-  },
-  "ur": {
-    "customerTitle": "اکاؤنٹ نہیں ملا",
-    "agentTitle": "پروفیشنل اکاؤنٹ نہیں ملا",
-    "descPrefix": "درج کردہ تفصیلات",
-    "descSuffix": "سے مماثل کوئی رجسٹرڈ اکاؤنٹ نہیں ملا۔ آگے بڑھنے کے لیے ایک آپشن منتخب کریں:",
-    "descGeneralCustomer": "ڈیٹا بیس میں کوئی مماثل کسٹمر اکاؤنٹ نہیں ملا۔ آگے بڑھنے کے لیے آپشن منتخب کریں:",
-    "descGeneralAgent": "ڈیٹا بیس میں کوئی مماثل پروفیشنل اکاؤنٹ نہیں ملا۔ آگے بڑھنے کے لیے آپشن منتخب کریں:",
-    "createAccountTitle": "نیا اکاؤنٹ بنائیں",
-    "createAccountSub": "ای میل، موبائل اور تاریخ پیدائش کے ساتھ فوری رجسٹریشن",
-    "registerPartnerTitle": "پروفیشنل کے طور پر رجسٹر کریں",
-    "registerPartnerSub": "1 منٹ میں ٹریڈ، تجربہ اور مقام کے ساتھ سائن اپ کریں",
-    "tryAnotherTitle": "دوسرا موبائل نمبر آزمائیں",
-    "tryAnotherSub": "غلطی درست کرنے یا دوسرا نمبر درج کرنے کے لیے واپس جائیں",
-    "autoDismissPrefix": "خودکار طریقے سے بند ہو رہا ہے",
-    "dismissBtn": "خارج کریں"
-  },
-  "gu": {
-    "customerTitle": "ખાતું મળ્યું નથી",
-    "agentTitle": "પ્રોફેશનલ ખાતું મળ્યું નથી",
-    "descPrefix": "દાખલ કરેલ વિગતો",
-    "descSuffix": "સાથે મેળ ખાતું કોઈ ખાતું મળ્યું નથી. આગળ વધવા માટે વિકલ્પ પસંદ કરો:",
-    "descGeneralCustomer": "ડેટાબેઝમાં કોઈ મેળ ખાતું ગ્રાહક ખાતું મળ્યું નથી. આગળ વધવા માટે વિકલ્પ પસંદ કરો:",
-    "descGeneralAgent": "ડેટાબેઝમાં કોઈ મેળ ખાતું પ્રોફેશનલ ખાતું મળ્યું નથી. આગળ વધવા માટે વિકલ્પ પસંદ કરો:",
-    "createAccountTitle": "નવું ખાતું બનાવો",
-    "createAccountSub": "ઇમેઇલ, મોબાઇલ અને જન્મ તારીખ સાથે ઝડપી નોંધણી",
-    "registerPartnerTitle": "પ્રોફેશનલ તરીકે નોંધણી કરો",
-    "registerPartnerSub": "1 મિનિટમાં વ્યવસાય, અનુભવ અને સ્થાન સાથે સાઇન અપ કરો",
-    "tryAnotherTitle": "બીજો મોબાઇલ નંબર અજમાવો",
-    "tryAnotherSub": "ભૂલ સુધારવા અથવા બીજો નંબર દાખલ કરવા પાછા જાઓ",
-    "autoDismissPrefix": "આપમેળે બંધ થઈ રહ્યું છે",
-    "dismissBtn": "રદ કરો"
-  },
-  "pa": {
-    "customerTitle": "ਖਾਤਾ ਨਹੀਂ ਮਿਲਿਆ",
-    "agentTitle": "ਪ੍ਰੋਫੈਸ਼ਨਲ ਖਾਤਾ ਨਹੀਂ ਮਿਲਿਆ",
-    "descPrefix": "ਦਰਜ ਕੀਤੇ ਵੇਰਵੇ",
-    "descSuffix": "ਨਾਲ ਮੇਲ ਖਾਂਦਾ ਕੋਈ ਖਾਤਾ ਨਹੀਂ ਮਿਲਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਅੱਗੇ ਵਧਣ ਲਈ ਵਿਕਲਪ ਚੁਣੋ:",
-    "descGeneralCustomer": "ਡੇਟਾਬੇਸ ਵਿੱਚ ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਗਾਹਕ ਖਾਤਾ ਨਹੀਂ ਮਿਲਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਅੱਗੇ ਵਧਣ ਲਈ ਵਿਕਲਪ ਚੁਣੋ:",
-    "descGeneralAgent": "ਡੇਟਾਬੇਸ ਵਿੱਚ ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਪ੍ਰੋਫੈਸ਼ਨਲ ਖਾਤਾ ਨਹੀਂ ਮਿਲਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਅੱਗੇ ਵਧਣ ਲਈ ਵਿਕਲਪ ਚੁਣੋ:",
-    "createAccountTitle": "ਨਵਾਂ ਖਾਤਾ ਬਣਾਓ",
-    "createAccountSub": "ਈਮੇਲ, ਮੋਬਾਈਲ ਅਤੇ ਜਨਮ ਮਿਤੀ ਨਾਲ ਤੇਜ਼ ਰਜਿਸਟ੍ਰੇਸ਼ਨ",
-    "registerPartnerTitle": "ਪ੍ਰੋਫੈਸ਼ਨਲ ਵਜੋਂ ਰਜਿਸਟਰ ਕਰੋ",
-    "registerPartnerSub": "1 ਮਿੰਟ ਵਿੱਚ ਵਪਾਰ, ਤਜਰਬਾ ਅਤੇ ਸਥਾਨ ਨਾਲ ਸਾਈਨ ਅੱਪ ਕਰੋ",
-    "tryAnotherTitle": "ਦੂਜਾ ਮੋਬਾਈਲ ਨੰਬਰ ਅਜ਼ਮਾਓ",
-    "tryAnotherSub": "ਗਲਤੀ ਠੀਕ ਕਰਨ ਜਾਂ ਦੂਜਾ ਨੰਬਰ ਦਰਜ ਕਰਨ ਲਈ ਵਾਪਸ ਜਾਓ",
-    "autoDismissPrefix": "ਆਪਣੇ ਆਪ ਬੰਦ ਹੋ ਰਿਹਾ ਹੈ",
-    "dismissBtn": "ਰੱਦ ਕਰੋ"
-  }
-};
-
+/**
+ * AccountNotFoundModal
+ *
+ * Refined glass dialog / mobile bottom-sheet shown when a user enters non-existent credentials.
+ * Features:
+ * - App font inherited at 16px, weight 600 for buttons
+ * - Close (X) button in card's top-right corner (36px circle, 16px inset, ghost hover fill)
+ * - Padding 28px desktop / 24px mobile; title to text 8px; text to buttons 24px; buttons 12px apart
+ * - Identifier in medium weight with overflow-wrap: anywhere and text-wrap: balance
+ * - Glass surface: rgba(255, 255, 255, 0.82), blur(24px) saturate(140%), 1px border, 24px radius
+ * - Scrim backdrop: rgba(10, 20, 16, 0.32), blur(6px)
+ * - Primary button focused on open; focus trapped; returns to opener on dismiss
+ * - Enter: 200ms scale (.96 to 1) + rise; Exit: 150ms reverse; reduced-motion: fade only
+ * - Mobile <= 480px: Bottom sheet with drag handle, swipe-down dismiss, safe-area padding
+ */
 export default function AccountNotFoundModal({
   isOpen,
-  role = 'customer', // 'customer' | 'agent'
+  role = 'customer',
   identifier = '',
   onRedirectToSignUp,
-  onNavigateForgot,
-  onClose,
-  duration = 10
+  onClose
 }) {
-  const [secondsLeft, setSecondsLeft] = useState(duration);
-  const { activeLanguage } = useLanguage();
+  const modalRef = useRef(null);
+  const openerRef = useRef(null);
+  const primaryBtnRef = useRef(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [dragY, setDragY] = useState(0);
+  const touchStartY = useRef(0);
+  const touchCurrentY = useRef(0);
 
-  const langKey = modalTranslations[activeLanguage] ? activeLanguage : 'en';
-  const loc = modalTranslations[langKey];
+  const cleanIdentifier = String(identifier || '').trim();
+  const isPhone = !cleanIdentifier.includes('@') && /^\+?[0-9\s-]{5,15}$/.test(cleanIdentifier);
+  const secondaryLabel = isPhone ? 'Use a different number' : 'Use a different email';
 
+  // Smooth closing with 150ms exit animation
+  const handleDismiss = useCallback(() => {
+    if (isClosing) return;
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+      setIsClosing(false);
+      setDragY(0);
+    }, 150);
+  }, [isClosing, onClose]);
+
+  // Focus management: save opener, focus primary button on open, restore on close
   useEffect(() => {
-    let interval = null;
     if (isOpen) {
-      setSecondsLeft(duration);
-      interval = setInterval(() => {
-        setSecondsLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            onClose();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      setIsClosing(false);
+      setDragY(0);
+      openerRef.current = document.activeElement;
+      const timer = setTimeout(() => {
+        if (primaryBtnRef.current) {
+          primaryBtnRef.current.focus();
+        } else if (modalRef.current) {
+          modalRef.current.focus();
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    } else if (openerRef.current) {
+      try {
+        openerRef.current.focus();
+      } catch (_) {}
     }
+  }, [isOpen]);
 
-    return () => {
-      if (interval) clearInterval(interval);
+  // Focus trap & Escape key
+  useEffect(() => {
+    if (!isOpen || isClosing) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleDismiss();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        if (!modalRef.current) return;
+        const focusable = modalRef.current.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusable || focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
     };
-  }, [isOpen, duration, onClose]);
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isClosing, handleDismiss]);
+
+  // Swipe-down gesture for mobile bottom sheet
+  const handleTouchStart = (e) => {
+    if (window.innerWidth > 480) return;
+    touchStartY.current = e.touches[0].clientY;
+    touchCurrentY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e) => {
+    if (window.innerWidth > 480) return;
+    touchCurrentY.current = e.touches[0].clientY;
+    const delta = touchCurrentY.current - touchStartY.current;
+    if (delta > 0) {
+      setDragY(delta);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (window.innerWidth > 480) return;
+    const delta = touchCurrentY.current - touchStartY.current;
+    if (delta > 70) {
+      handleDismiss();
+    }
+    setDragY(0);
+  };
 
   if (!isOpen) return null;
 
-  const isAgent = role === 'agent';
-  const progressPercent = ((duration - secondsLeft) / duration) * 100;
+  const handleCreateAccount = () => {
+    try {
+      if (cleanIdentifier) {
+        sessionStorage.setItem('nivaarofix_signup_prefill', JSON.stringify({
+          value: cleanIdentifier,
+          type: isPhone ? 'phone' : 'email'
+        }));
+      }
+    } catch (_) {}
+
+    if (onRedirectToSignUp) {
+      onRedirectToSignUp(cleanIdentifier, isPhone ? 'phone' : 'email');
+    }
+    handleDismiss();
+  };
 
   return (
-    <div className="uber-lang-modal-backdrop open" onClick={onClose}>
+    <div
+      className={`anf-modal-backdrop ${isClosing ? 'anf-backdrop-exit' : ''}`}
+      onClick={handleDismiss}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: 'rgba(10, 20, 16, 0.32)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch'
+      }}
+    >
       <div
-        className="uber-lang-modal-card"
-        onClick={(e) => e.stopPropagation()}
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Account Not Found"
+        aria-labelledby="account-not-found-title"
+        className={`anf-modal-card ${isClosing ? 'anf-card-exit' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        tabIndex={-1}
         style={{
           position: 'relative',
-          maxWidth: '560px'
+          width: '100%',
+          maxWidth: '440px',
+          maxHeight: 'min(92vh, 92dvh)',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          margin: 'auto',
+          boxSizing: 'border-box',
+          outline: 'none',
+          transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
+          transition: dragY > 0 ? 'none' : undefined
         }}
       >
-        {/* Linear Countdown Progress Bar at the very top */}
-        <div
+        <style>{`
+          /* Keyframe Animations */
+          @keyframes anfFadeRise {
+            0% {
+              opacity: 0;
+              transform: translateY(8px) scale(0.96);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          @keyframes anfFadeExit {
+            0% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+            100% {
+              opacity: 0;
+              transform: translateY(8px) scale(0.96);
+            }
+          }
+          @keyframes anfBackdropFadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+          }
+          @keyframes anfBackdropFadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+          }
+          @keyframes anfSheetSlideUp {
+            0% {
+              opacity: 0;
+              transform: translateY(100%);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          @keyframes anfSheetSlideDown {
+            0% {
+              opacity: 1;
+              transform: translateY(0);
+            }
+            100% {
+              opacity: 0;
+              transform: translateY(100%);
+            }
+          }
+
+          .anf-modal-backdrop {
+            animation: anfBackdropFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+          .anf-modal-backdrop.anf-backdrop-exit {
+            animation: anfBackdropFadeOut 150ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+          }
+
+          .anf-modal-card {
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(24px) saturate(140%);
+            -webkit-backdrop-filter: blur(24px) saturate(140%);
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            border-radius: 24px;
+            box-shadow: 0 8px 32px rgba(16, 32, 26, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.60);
+            padding: 28px;
+            color: var(--text-primary, #101820);
+            animation: anfFadeRise 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+          .anf-modal-card.anf-card-exit {
+            animation: anfFadeExit 150ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+          }
+
+          /* Fallbacks */
+          @supports not (backdrop-filter: blur(24px)) {
+            .anf-modal-card {
+              background: #f4f6f5;
+            }
+          }
+          @media (prefers-reduced-transparency: reduce) {
+            .anf-modal-card {
+              background: #ffffff !important;
+              backdrop-filter: none !important;
+              -webkit-backdrop-filter: none !important;
+            }
+          }
+          @media (prefers-contrast: more) {
+            .anf-modal-card {
+              background: #ffffff !important;
+              border: 2px solid #000000 !important;
+              backdrop-filter: none !important;
+              -webkit-backdrop-filter: none !important;
+            }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .anf-modal-card,
+            .anf-modal-card.anf-card-exit,
+            .anf-modal-backdrop,
+            .anf-modal-backdrop.anf-backdrop-exit {
+              animation: none !important;
+              transform: none !important;
+              transition: opacity 150ms ease !important;
+            }
+          }
+
+          /* Close Button (Ghost Style with Hover Fill) */
+          .anf-btn-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--text-muted, #6B7280);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 2;
+          }
+          .anf-btn-close:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+            color: var(--text-primary, #101820);
+          }
+          .anf-btn-close:active {
+            background-color: rgba(0, 0, 0, 0.08);
+            transform: scale(0.95);
+          }
+          .anf-btn-close:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #047857;
+          }
+
+          /* Drag handle for mobile */
+          .anf-drag-handle {
+            display: none;
+            width: 36px;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.20);
+            border-radius: 9999px;
+            margin: 0 auto 12px;
+            cursor: grab;
+          }
+
+          /* Buttons System */
+          .anf-primary-btn,
+          .anf-secondary-btn {
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            width: 100%;
+            height: 48px;
+            min-height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+          }
+
+          .anf-primary-btn {
+            background: var(--brand-primary, #047857);
+            color: #FFFFFF;
+            border: none;
+          }
+          .anf-primary-btn:hover {
+            background-color: #065F46;
+          }
+          .anf-primary-btn:active {
+            background-color: #064E3B;
+            transform: scale(0.99);
+          }
+          .anf-primary-btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #047857;
+          }
+
+          .anf-secondary-btn {
+            background: transparent !important;
+            background-color: transparent !important;
+            color: var(--text-primary, #101820);
+            border: 1px solid var(--border-color, rgba(16, 24, 32, 0.18));
+          }
+          .anf-secondary-btn:hover {
+            background-color: rgba(0, 0, 0, 0.04) !important;
+          }
+          .anf-secondary-btn:active {
+            background-color: rgba(0, 0, 0, 0.08) !important;
+            transform: scale(0.99);
+          }
+          .anf-secondary-btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #047857;
+          }
+
+          /* Mobile Bottom-Sheet (<= 480px) */
+          @media (max-width: 480px) {
+            .anf-modal-backdrop {
+              align-items: flex-end !important;
+              padding: 0 !important;
+            }
+            .anf-modal-card {
+              border-radius: 24px 24px 0 0 !important;
+              max-width: 100% !important;
+              width: 100% !important;
+              max-height: 90dvh !important;
+              overflow-y: auto !important;
+              -webkit-overflow-scrolling: touch !important;
+              margin: 0 !important;
+              border-left: none !important;
+              border-right: none !important;
+              border-bottom: none !important;
+              padding: 16px 24px calc(24px + env(safe-area-inset-bottom, 0px)) 24px !important;
+              animation: anfSheetSlideUp 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+            }
+            .anf-modal-card.anf-card-exit {
+              animation: anfSheetSlideDown 150ms cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+            }
+            .anf-drag-handle {
+              display: block !important;
+            }
+          }
+
+          /* Dark Theme Support */
+          .dark-theme .anf-modal-card {
+            background: rgba(18, 27, 23, 0.62) !important;
+            border-color: rgba(255, 255, 255, 0.10) !important;
+            color: #f3f4f6 !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+          }
+          .dark-theme .anf-modal-card h2 {
+            color: #f9fafb !important;
+          }
+          .dark-theme .anf-modal-card p {
+            color: #d1d5db !important;
+          }
+          .dark-theme .anf-identifier {
+            color: #f9fafb !important;
+          }
+          .dark-theme .anf-drag-handle {
+            background: rgba(255, 255, 255, 0.25) !important;
+          }
+          .dark-theme .anf-btn-close {
+            color: #9ca3af !important;
+          }
+          .dark-theme .anf-btn-close:hover {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: #ffffff !important;
+          }
+          .dark-theme .anf-secondary-btn {
+            color: #f3f4f6 !important;
+            border-color: rgba(255, 255, 255, 0.22) !important;
+          }
+          .dark-theme .anf-secondary-btn:hover {
+            background-color: rgba(255, 255, 255, 0.06) !important;
+          }
+        `}</style>
+
+        {/* Mobile Drag Handle */}
+        <div className="anf-drag-handle" aria-hidden="true" />
+
+        {/* Top-Right Corner Close (X) button */}
+        <button
+          type="button"
+          onClick={handleDismiss}
+          aria-label="Close dialog"
+          className="anf-btn-close"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+
+        {/* Title starts at top padding, with right padding so it never collides with close button */}
+        <h2
+          id="account-not-found-title"
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '3px',
-            background: '#e7e2d8'
+            fontFamily: 'var(--font-serif, "Fraunces", Georgia, serif)',
+            fontSize: '1.5rem',
+            fontWeight: 500,
+            margin: '0 0 8px 0',
+            paddingRight: '44px',
+            lineHeight: 1.25,
+            color: 'var(--text-primary, #101820)'
           }}
         >
-          <div
-            style={{
-              height: '100%',
-              width: `${100 - progressPercent}%`,
-              background: 'var(--brand-primary, #047857)',
-              transition: 'width 1s linear'
-            }}
-          />
-        </div>
+          Account not found
+        </h2>
 
-        {/* Modal Header */}
-        <div className="uber-lang-modal-header">
-          <div className="uber-lang-modal-title">
-            {isAgent ? loc.agentTitle : loc.customerTitle}
-          </div>
-          <button
-            type="button"
-            className="uber-lang-close-btn"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-
-        {/* Informative Subtitle Notice */}
-        <div style={{ padding: '1.15rem 1.75rem 0.5rem', color: 'var(--text-secondary, #5a5648)', fontSize: '0.92rem', lineHeight: 1.5 }}>
-          {identifier ? (
+        {/* Message: 8px from title, 24px to buttons, balanced wrap, overflow-wrap anywhere */}
+        <p
+          style={{
+            fontSize: '14px',
+            lineHeight: 1.5,
+            color: 'var(--text-secondary, #4B5563)',
+            margin: '0 0 24px 0',
+            textWrap: 'balance',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word'
+          }}
+        >
+          {cleanIdentifier ? (
             <>
-              {loc.descPrefix} <strong style={{ color: 'var(--text-primary, #14181f)' }}>{identifier}</strong> {loc.descSuffix}
+              We couldn't find an account for{' '}
+              <span className="anf-identifier" style={{ fontWeight: 500, color: 'var(--text-primary, #101820)' }}>
+                {cleanIdentifier}
+              </span>
+              .
             </>
           ) : (
-            isAgent ? loc.descGeneralAgent : loc.descGeneralCustomer
+            <>We couldn't find an account matching the provided details.</>
           )}
-        </div>
+        </p>
 
-        {/* Option Cards Grid matching the Reference Design */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem',
-            padding: '1rem 1.75rem 1.25rem'
-          }}
-        >
-          {/* Option 1: Create Account / Register (Highlighted Primary Card) */}
+        {/* Two Stacked Buttons (12px apart, 48px tall, 12px radius, app font 16px 600) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+          {/* Primary: Create a new account */}
           <button
+            ref={primaryBtnRef}
             type="button"
-            className="uber-lang-item active"
-            onClick={onRedirectToSignUp}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '1rem 1.25rem',
-              width: '100%',
-              border: '2px solid var(--brand-primary, #047857)',
-              background: 'var(--brand-tint, #ECFDF5)',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'all 0.18s ease'
-            }}
+            className="anf-primary-btn"
+            onClick={handleCreateAccount}
           >
-            <div className="uber-lang-names">
-              <span className="uber-lang-native" style={{ fontSize: '1.05rem', color: 'var(--text-primary, #14181f)' }}>
-                {isAgent ? loc.registerPartnerTitle : loc.createAccountTitle}
-              </span>
-              <span className="uber-lang-english" style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #5a5648)', marginTop: '0.2rem' }}>
-                {isAgent ? loc.registerPartnerSub : loc.createAccountSub}
-              </span>
-            </div>
-
-            <div className="uber-lang-checkmark" style={{ color: 'var(--brand-primary, #047857)', display: 'flex', alignItems: 'center' }}>
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-            </div>
+            Create a new account
           </button>
 
-          {/* Option 2: Try Another Credential / Dismiss */}
+          {/* Secondary Outline: Use a different email / Use a different number */}
           <button
             type="button"
-            className="uber-lang-item"
-            onClick={onClose}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0.95rem 1.25rem',
-              width: '100%',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
+            className="anf-secondary-btn"
+            onClick={handleDismiss}
           >
-            <div className="uber-lang-names">
-              <span className="uber-lang-native" style={{ fontSize: '1rem', color: 'var(--text-primary, #14181f)' }}>
-                {loc.tryAnotherTitle}
-              </span>
-              <span className="uber-lang-english" style={{ fontSize: '0.82rem', color: 'var(--text-secondary, #5a5648)' }}>
-                {loc.tryAnotherSub}
-              </span>
-            </div>
-
-            <div style={{ color: 'var(--text-secondary, #7a7568)' }}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="1 4 1 10 7 10"></polyline>
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-              </svg>
-            </div>
-          </button>
-
-          {/* Option 3: Forgot Password Recovery */}
-          {onNavigateForgot && (
-            <button
-              type="button"
-              className="uber-lang-item"
-              onClick={() => {
-                onClose();
-                onNavigateForgot();
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0.95rem 1.25rem',
-                width: '100%',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              <div className="uber-lang-names">
-                <span className="uber-lang-native" style={{ fontSize: '1rem', color: 'var(--text-primary, #14181f)' }}>
-                  {loc.forgotPasswordTitle}
-                </span>
-                <span className="uber-lang-english" style={{ fontSize: '0.82rem', color: 'var(--text-secondary, #5a5648)' }}>
-                  {loc.forgotPasswordSub}
-                </span>
-              </div>
-
-              <div style={{ color: 'var(--text-secondary, #7a7568)' }}>
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg>
-              </div>
-            </button>
-          )}
-        </div>
-
-        {/* Modal Footer with Auto-Dismiss Timer */}
-        <div
-          style={{
-            padding: '0.75rem 1.75rem 1.25rem',
-            borderTop: '1px solid rgba(16, 24, 32, 0.06)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '0.82rem',
-            color: 'var(--text-muted, #9a9484)'
-          }}
-        >
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-            <span
-              style={{
-                width: '7px',
-                height: '7px',
-                borderRadius: '50%',
-                background: 'var(--brand-primary, #047857)',
-                display: 'inline-block'
-              }}
-            />
-            <span>{loc.autoDismissPrefix} <strong>{secondsLeft}s</strong></span>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-secondary, #5a5648)',
-              fontWeight: 600,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              textDecoration: 'underline'
-            }}
-          >
-            {loc.dismissBtn}
+            {secondaryLabel}
           </button>
         </div>
       </div>

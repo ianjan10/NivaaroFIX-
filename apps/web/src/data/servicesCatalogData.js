@@ -283,30 +283,126 @@ export const heroSearchConfig = {
 };
 
 export const servicesSearchConfig = {
-  defaultPlaceholder: "What's wrong at home?",
+  defaultPlaceholder: 'Try “MCB keeps tripping” or “tap leaking”',
   cyclingExamples: [
-    "MCB keeps tripping",
+    'MCB keeps tripping',
     "Switchboard isn't working",
-    "Tap is leaking",
-    "Sink is blocked",
-    "Pipe is leaking"
+    'Tap is leaking',
+    'Sink is blocked',
+    'Pipe is leaking'
   ],
   emptyState: {
     message: "Tell us a little more about what's wrong.",
     actionText: "Describe your issue →"
   },
+  popularServices: [
+    { id: 'pop-mcb', category: 'Electrical', label: 'MCB & Fuse', serviceSlug: 'electrician' },
+    { id: 'pop-tap', category: 'Plumbing', label: 'Tap & Mixer Dripping', serviceSlug: 'plumber' },
+    { id: 'pop-switchboard', category: 'Electrical', label: 'Switchboard & Socket', serviceSlug: 'electrician' },
+    { id: 'pop-drain', category: 'Plumbing', label: 'Blocked Drain & Sink', serviceSlug: 'plumber' },
+    { id: 'pop-fan', category: 'Electrical', label: 'Ceiling Fan & Exhaust', serviceSlug: 'electrician' },
+    { id: 'pop-pipe', category: 'Plumbing', label: 'Concealed Pipe Leakage', serviceSlug: 'plumber' }
+  ],
   suggestions: [
-    { query: 'mcb', category: 'Electrical', label: 'MCB & Fuse', serviceSlug: 'electrician', icon: '⚡' },
-    { query: 'switchboard', category: 'Electrical', label: 'Switchboard & Socket', serviceSlug: 'electrician', icon: '⚡' },
-    { query: 'wiring', category: 'Electrical', label: 'House Wiring & Earthing', serviceSlug: 'electrician', icon: '⚡' },
-    { query: 'fan', category: 'Electrical', label: 'Ceiling Fan & Exhaust', serviceSlug: 'electrician', icon: '⚡' },
-    { query: 'inverter', category: 'Electrical', label: 'Inverter & Battery Wiring', serviceSlug: 'electrician', icon: '⚡' },
-    { query: 'tap', category: 'Plumbing', label: 'Tap & Mixer Dripping', serviceSlug: 'plumber', icon: '💧' },
-    { query: 'drain', category: 'Plumbing', label: 'Blocked Drain & Sink', serviceSlug: 'plumber', icon: '💧' },
-    { query: 'sink', category: 'Plumbing', label: 'Kitchen Sink Clog', serviceSlug: 'plumber', icon: '💧' },
-    { query: 'pipe', category: 'Plumbing', label: 'Concealed Pipe Leakage', serviceSlug: 'plumber', icon: '💧' },
-    { query: 'toilet', category: 'Plumbing', label: 'Commode & Flush Tank', serviceSlug: 'plumber', icon: '💧' },
-    { query: 'pump', category: 'Plumbing', label: 'Water Motor & Pump', serviceSlug: 'plumber', icon: '💧' }
+    {
+      id: 'sug-mcb',
+      query: 'mcb',
+      category: 'Electrical',
+      label: 'MCB & Fuse',
+      serviceSlug: 'electrician',
+      icon: '⚡',
+      keywords: ['breaker', 'circuit breaker', 'fuse', 'short circuit', 'trip', 'tripping', 'power cut', 'spark', 'sparking', 'rccb', 'elcb', 'mcb', 'distribution board']
+    },
+    {
+      id: 'sug-switchboard',
+      query: 'switchboard',
+      category: 'Electrical',
+      label: 'Switchboard & Socket',
+      serviceSlug: 'electrician',
+      icon: '⚡',
+      keywords: ['switch', 'socket', 'plug', 'board', 'power point', 'modular switch', 'burnt switch', 'regulator', 'light point']
+    },
+    {
+      id: 'sug-wiring',
+      query: 'wiring',
+      category: 'Electrical',
+      label: 'House Wiring & Earthing',
+      serviceSlug: 'electrician',
+      icon: '⚡',
+      keywords: ['wiring', 'wire', 'earthing', 'grounding', 'cable', 'concealed wire', 'neutral', 'rewiring']
+    },
+    {
+      id: 'sug-fan',
+      query: 'fan',
+      category: 'Electrical',
+      label: 'Ceiling Fan & Exhaust',
+      serviceSlug: 'electrician',
+      icon: '⚡',
+      keywords: ['fan', 'ceiling fan', 'exhaust', 'exhaust fan', 'ventilation', 'regulator', 'wobble', 'blade', 'fan repair']
+    },
+    {
+      id: 'sug-inverter',
+      query: 'inverter',
+      category: 'Electrical',
+      label: 'Inverter & Battery Wiring',
+      serviceSlug: 'electrician',
+      icon: '⚡',
+      keywords: ['inverter', 'battery', 'backup', 'ups', 'power backup', 'acid', 'charging', 'battery topup']
+    },
+    {
+      id: 'sug-tap',
+      query: 'tap',
+      category: 'Plumbing',
+      label: 'Tap & Mixer Dripping',
+      serviceSlug: 'plumber',
+      icon: '💧',
+      keywords: ['tap', 'mixer', 'faucet', 'dripping', 'spout', 'leak', 'leaking tap', 'washbasin tap', 'shower tap', 'water tap']
+    },
+    {
+      id: 'sug-drain',
+      query: 'drain',
+      category: 'Plumbing',
+      label: 'Blocked Drain & Sink',
+      serviceSlug: 'plumber',
+      icon: '💧',
+      keywords: ['drain', 'blocked drain', 'clog', 'clogged', 'choked', 'choke', 'drainage', 'trap', 'gully', 'standing water']
+    },
+    {
+      id: 'sug-sink',
+      query: 'sink',
+      category: 'Plumbing',
+      label: 'Kitchen Sink Clog',
+      serviceSlug: 'plumber',
+      icon: '💧',
+      keywords: ['sink', 'kitchen sink', 'sink blockage', 'basin choke', 'food waste', 'drainpipe', 'washbasin']
+    },
+    {
+      id: 'sug-pipe',
+      query: 'pipe',
+      category: 'Plumbing',
+      label: 'Concealed Pipe Leakage',
+      serviceSlug: 'plumber',
+      icon: '💧',
+      keywords: ['pipe', 'pipeline', 'pipe burst', 'wall seepage', 'water leak', 'concealed pipe', 'pipe joint', 'pvc pipe', 'plumbing leak']
+    },
+    {
+      id: 'sug-toilet',
+      query: 'toilet',
+      category: 'Plumbing',
+      label: 'Commode & Flush Tank',
+      serviceSlug: 'plumber',
+      icon: '💧',
+      keywords: ['commode', 'toilet', 'flush', 'flush tank', 'cistern', 'western toilet', 'indian toilet', 'jet spray', 'seat cover']
+    },
+    {
+      id: 'sug-pump',
+      query: 'pump',
+      category: 'Plumbing',
+      label: 'Water Motor & Pump',
+      serviceSlug: 'plumber',
+      icon: '💧',
+      keywords: ['pump', 'water pump', 'motor', 'submersible', 'booster pump', 'sump motor', 'tank overflow', 'monoblock']
+    }
   ]
 };
 

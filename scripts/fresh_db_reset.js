@@ -1,8 +1,23 @@
 import { pool } from '../apps/api/src/config/db.js';
 
 async function freshDbReset() {
+  // STRICT PRODUCTION SAFETY GUARDS
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ CRITICAL ERROR: fresh_db_reset.js is strictly forbidden in production environments (NODE_ENV=production).');
+    process.exit(1);
+  }
+
+  const hasConfirmFlag = process.argv.includes('--confirm-destructive');
+  if (!hasConfirmFlag) {
+    console.error('❌ SAFETY ABORT: Database reset refused.');
+    console.error('   This command destroys all transactional and user data.');
+    console.error('   To proceed on an explicitly disposable testing database, pass the flag:');
+    console.error('   node scripts/fresh_db_reset.js --confirm-destructive');
+    process.exit(1);
+  }
+
   console.log('================================================================');
-  console.log('🧹 NIVAAROFIX TOTAL DATABASE CLEAN & PURGE');
+  console.log('🧹 NIVAAROFIX TOTAL DATABASE CLEAN & PURGE (TEST DATABASE ONLY)');
   console.log('================================================================\n');
 
   const client = await pool.connect();

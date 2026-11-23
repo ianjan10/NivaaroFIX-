@@ -20,22 +20,6 @@ export function cleanPhone(raw) {
   return digits;
 }
 
-export function parseDob(raw) {
-  if (!raw) return null;
-  const str = typeof raw === 'object' ? `${raw.day}/${raw.month}/${raw.year}` : String(raw);
-  if (str.includes('1992') || str.includes('1988') || str.includes('2050') || str === '//' || str === '--') {
-    return null;
-  }
-  if (typeof raw === 'object' && raw.day && raw.month && raw.year) return raw;
-  if (typeof raw === 'string' && raw.includes('/')) {
-    const parts = raw.split('/');
-    if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
-      return { day: parts[0], month: parts[1], year: parts[2] };
-    }
-  }
-  return null;
-}
-
 /**
  * Customer Profile Checklist (100% completion required for booking)
  */
@@ -43,23 +27,19 @@ export function evaluateCustomerChecklist(user) {
   if (!user) {
     return {
       checklist: [
-        { id: 'name', label: 'Full Name', completed: false, weight: 15 },
-        { id: 'email', label: 'Email Address', completed: false, weight: 15 },
-        { id: 'phone', label: 'Mobile Number (10 digits)', completed: false, weight: 20 },
-        { id: 'dob', label: 'Date of Birth', completed: false, weight: 15 },
-        { id: 'stateCity', label: 'State & City', completed: false, weight: 15 },
-        { id: 'address', label: 'Detailed Address', completed: false, weight: 15 },
+        { id: 'name', label: 'Full Name', completed: false, weight: 20 },
+        { id: 'email', label: 'Email Address', completed: false, weight: 20 },
+        { id: 'phone', label: 'Mobile Number (10 digits)', completed: false, weight: 30 },
+        { id: 'address', label: 'Detailed Address', completed: false, weight: 25 },
         { id: 'avatar', label: 'Profile Photo', completed: false, weight: 5 }
       ],
       completionPercentage: 0,
       isFullyComplete: false,
-      missingCount: 7,
+      missingCount: 5,
       missingItems: [
         'Full Name',
         'Email Address',
         'Mobile Number (10 digits)',
-        'Date of Birth',
-        'State & City',
         'Detailed Address',
         'Profile Photo'
       ]
@@ -69,9 +49,6 @@ export function evaluateCustomerChecklist(user) {
   const name = (user.name || '').trim();
   const email = (user.email || '').trim().toLowerCase();
   const phoneDigits = cleanPhone(user.phone);
-  const dobObj = parseDob(user.dob);
-  const state = (user.state || '').trim();
-  const city = (user.city || '').trim();
   const address = (user.address || '').trim();
   const avatar = user.avatarUrl || user.avatar_url || '';
 
@@ -80,37 +57,25 @@ export function evaluateCustomerChecklist(user) {
       id: 'name',
       label: 'Full Name',
       completed: Boolean(name && name.length >= 2),
-      weight: 15
+      weight: 20
     },
     {
       id: 'email',
       label: 'Email Address',
       completed: Boolean(email && email.includes('@') && email.includes('.')),
-      weight: 15
+      weight: 20
     },
     {
       id: 'phone',
       label: 'Mobile Number (10 digits)',
       completed: Boolean(phoneDigits && phoneDigits.length === 10),
-      weight: 20
-    },
-    {
-      id: 'dob',
-      label: 'Date of Birth',
-      completed: Boolean(dobObj && dobObj.day && dobObj.month && dobObj.year),
-      weight: 15
-    },
-    {
-      id: 'stateCity',
-      label: 'State & City',
-      completed: Boolean(state && city),
-      weight: 15
+      weight: 30
     },
     {
       id: 'address',
       label: 'Detailed Address',
       completed: Boolean(address && address.length >= 8),
-      weight: 15
+      weight: 25
     },
     {
       id: 'avatar',
@@ -137,7 +102,8 @@ export function evaluateCustomerChecklist(user) {
 }
 
 /**
- * Agent / Partner Profile Checklist (100% completion required for giving service)
+ * Agent / Partner Profile Checklist (Recalculated without DOB, state, city)
+ * Real items: verified mobile, trade, operating base address, ID document, and name/email.
  */
 export function evaluateAgentChecklist(agent) {
   if (!agent) {
@@ -145,25 +111,21 @@ export function evaluateAgentChecklist(agent) {
       checklist: [
         { id: 'name', label: 'Full Name / Business Name', completed: false, weight: 15 },
         { id: 'email', label: 'Email Address', completed: false, weight: 15 },
-        { id: 'phone', label: 'Mobile Number (10 digits)', completed: false, weight: 20 },
-        { id: 'trade', label: 'Trade Specialization', completed: false, weight: 10 },
-        { id: 'experience', label: 'Experience Years', completed: false, weight: 10 },
-        { id: 'dob', label: 'Date of Birth', completed: false, weight: 10 },
-        { id: 'stateCity', label: 'State & City', completed: false, weight: 10 },
-        { id: 'address', label: 'Operating Base Address', completed: false, weight: 10 }
+        { id: 'phone', label: 'Verified Mobile', completed: false, weight: 20 },
+        { id: 'trade', label: 'Trade Specialization', completed: false, weight: 15 },
+        { id: 'address', label: 'Permanent address', completed: false, weight: 20 },
+        { id: 'idDocument', label: 'ID Document', completed: false, weight: 15 }
       ],
       completionPercentage: 0,
       isFullyComplete: false,
-      missingCount: 8,
+      missingCount: 6,
       missingItems: [
         'Full Name / Business Name',
         'Email Address',
-        'Mobile Number (10 digits)',
+        'Verified Mobile',
         'Trade Specialization',
-        'Experience Years',
-        'Date of Birth',
-        'State & City',
-        'Operating Base Address'
+        'Permanent address',
+        'ID Document'
       ]
     };
   }
@@ -171,14 +133,11 @@ export function evaluateAgentChecklist(agent) {
   const name = (agent.name || '').trim();
   const email = (agent.email || '').trim().toLowerCase();
   const phoneDigits = cleanPhone(agent.phone);
+  const isPhoneVerified = Boolean(agent.isPhoneVerified || agent.is_phone_verified || (phoneDigits && phoneDigits.length === 10));
   const trade = (agent.trade || '').trim();
-  const experience = agent.experienceYears !== undefined && agent.experienceYears !== null
-    ? Number(agent.experienceYears)
-    : (agent.experience_years !== undefined && agent.experience_years !== null ? Number(agent.experience_years) : -1);
-  const dobObj = parseDob(agent.dob);
-  const state = (agent.state || '').trim();
-  const city = (agent.city || '').trim();
-  const address = (agent.address || '').trim();
+  const address = (agent.permanent_address || agent.permanentAddress || agent.address || '').trim();
+  const kycStatus = (agent.kycStatus || agent.kyc_status || 'pending').toLowerCase();
+  const isIdVerified = kycStatus === 'verified' || Boolean(agent.hasUploadedId || agent.documentsCount > 0);
 
   const checklist = [
     {
@@ -195,48 +154,37 @@ export function evaluateAgentChecklist(agent) {
     },
     {
       id: 'phone',
-      label: 'Mobile Number (10 digits)',
-      completed: Boolean(phoneDigits && phoneDigits.length === 10),
+      label: 'Verified Mobile',
+      completed: Boolean(phoneDigits && phoneDigits.length === 10 && isPhoneVerified),
       weight: 20
     },
     {
       id: 'trade',
       label: 'Trade Specialization',
       completed: Boolean(trade && ['electrician', 'plumber'].includes(trade.toLowerCase())),
-      weight: 10
-    },
-    {
-      id: 'experience',
-      label: 'Experience Years',
-      completed: Boolean(experience >= 0 && !isNaN(experience)),
-      weight: 10
-    },
-    {
-      id: 'dob',
-      label: 'Date of Birth',
-      completed: Boolean(dobObj && dobObj.day && dobObj.month && dobObj.year),
-      weight: 10
-    },
-    {
-      id: 'stateCity',
-      label: 'State & City',
-      completed: Boolean(state && city),
-      weight: 10
+      weight: 15
     },
     {
       id: 'address',
-      label: 'Operating Base Address',
+      label: 'Permanent address',
       completed: Boolean(address && address.length >= 8),
-      weight: 10
+      weight: 20
+    },
+    {
+      id: 'idDocument',
+      label: 'ID Document',
+      completed: isIdVerified,
+      weight: 15
     }
   ];
 
-  const completionPercentage = checklist.reduce(
+  const rawPercentage = checklist.reduce(
     (acc, item) => (item.completed ? acc + item.weight : acc),
     0
   );
-  const isFullyComplete = completionPercentage === 100;
+  const completionPercentage = Math.min(100, rawPercentage);
   const missingItems = checklist.filter((item) => !item.completed).map((item) => item.label);
+  const isFullyComplete = missingItems.length === 0 && completionPercentage === 100;
 
   return {
     checklist,

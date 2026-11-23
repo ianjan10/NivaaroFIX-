@@ -47,7 +47,7 @@ const projectAssets = [
   {
     id: 8,
     src: '/project_image/4.png',
-    title: 'Live Dispatcher & Professional Console',
+    title: 'Live Dispatcher & Workspace',
     category: 'specs'
   }
 ];

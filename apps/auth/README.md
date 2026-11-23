@@ -18,13 +18,11 @@ WebLogin/
 |   |   |-- AppHeader.jsx             # Top navigation header
 |   |   |-- Logo.jsx                  # Official handcrafted vector logo component
 |   |   |-- BrandLogo.jsx             # Official high-resolution brand logo
-|   |   |-- DateOfBirthSelector.jsx   # Segmented DOB card (Day, Month, Year)
 |   |   |-- GoogleOAuthModal.jsx      # Google Identity Services dialog
 |   |   |-- IndianPhoneInput.jsx      # +91 Indian mobile input
 |   |   |-- InteractiveBackgroundShowcase.jsx # Animated editorial image carousel
 |   |   |-- LanguageSelectionModal.jsx# 10-language selector modal
 |   |   |-- LiveCameraCaptureModal.jsx# Real camera photo capture component
-|   |   |-- LocationCascadingSelect.jsx# 36 Indian states & 800+ districts selector
 |   |   |-- PasswordStrengthValidator.jsx# Real-time password strength meter
 |   |   |-- PhoneOtpModal.jsx         # 6-digit SMS OTP modal with bypass option
 |   |   `-- ToastNotification.jsx     # Floating notification toast

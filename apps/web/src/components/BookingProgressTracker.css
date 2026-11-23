@@ -1,0 +1,260 @@
+/* ========================================================================= */
+/* Booking Progress Tracker Component Styles */
+/* Minimalist, neutral 2px track, single brand green (#047857), no gradients */
+/* ========================================================================= */
+
+.booking-progress-tracker-container {
+  --bpt-brand: #047857;
+  --bpt-track: var(--bg-card-border, #e5e7eb);
+  --bpt-text-primary: var(--text-primary, #111827);
+  --bpt-text-secondary: var(--text-secondary, #4b5563);
+  --bpt-node-size: 16px;
+  --bpt-dot-size: 8px;
+
+  container-type: inline-size;
+  container-name: bpt-container;
+  width: 100%;
+  margin: 1.15rem 0 0.85rem;
+  padding: 0.25rem 0.25rem 0.15rem;
+  box-sizing: border-box;
+}
+
+/* Horizontal Track (Default / Container >= 520px) */
+.bpt-track-list {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bpt-line-track {
+  position: absolute;
+  top: calc(var(--bpt-node-size) / 2 - 1px);
+  left: calc(var(--bpt-node-size) / 2);
+  right: calc(var(--bpt-node-size) / 2);
+  height: 2px;
+  background-color: var(--bpt-track);
+  z-index: 1;
+}
+
+.bpt-line-fill {
+  height: 100%;
+  background-color: var(--bpt-brand);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bpt-step-item {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  text-align: center;
+  outline: none;
+  cursor: default;
+}
+
+.bpt-step-item:first-child {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.bpt-step-item:last-child {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.bpt-step-item:focus-visible {
+  outline: 2px solid var(--bpt-brand);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+/* Node indicators */
+.bpt-node-indicator {
+  width: var(--bpt-node-size);
+  height: var(--bpt-node-size);
+  border-radius: 50%;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.45rem;
+  transition: all 0.25s ease;
+}
+
+/* Completed Step: Solid Brand Green with Check */
+.bpt-step-completed .bpt-node-indicator {
+  background-color: var(--bpt-brand);
+  color: #ffffff;
+}
+
+.bpt-check-icon {
+  width: 10px;
+  height: 10px;
+  stroke: #ffffff;
+}
+
+/* Current Step: Brand green ring with active filled center */
+.bpt-step-current .bpt-node-indicator {
+  background-color: #ffffff;
+  border: 2px solid var(--bpt-brand);
+  box-shadow: 0 0 0 2px rgba(4, 120, 87, 0.2);
+}
+
+.bpt-current-dot {
+  width: var(--bpt-dot-size);
+  height: var(--bpt-dot-size);
+  border-radius: 50%;
+  background-color: var(--bpt-brand);
+  display: block;
+}
+
+/* Upcoming Step: Neutral gray ring & subtle dot */
+.bpt-step-upcoming .bpt-node-indicator {
+  background-color: #ffffff;
+  border: 2px solid var(--bpt-track);
+}
+
+.bpt-upcoming-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--bpt-track);
+  display: block;
+}
+
+/* Content (Label + Timestamp) */
+.bpt-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.bpt-step-label {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--bpt-text-secondary);
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.bpt-step-completed .bpt-step-label {
+  color: var(--bpt-text-primary);
+  font-weight: 600;
+}
+
+.bpt-step-current .bpt-step-label {
+  color: var(--bpt-brand);
+  font-weight: 700;
+}
+
+.bpt-step-time {
+  font-size: 0.67rem;
+  color: var(--bpt-text-secondary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.bpt-step-completed .bpt-step-time,
+.bpt-step-current .bpt-step-time {
+  color: #374151;
+  font-weight: 500;
+}
+
+.bpt-empty-time {
+  user-select: none;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ========================================================================= */
+/* Responsive Layout: Container Query < 520px (Vertical Layout) */
+/* ========================================================================= */
+@container bpt-container (max-width: 519px) {
+  .bpt-track-list {
+    flex-direction: column;
+    align-items: stretch;
+    position: relative;
+    padding-left: 1.75rem;
+  }
+
+  .bpt-line-track {
+    top: calc(var(--bpt-node-size) / 2);
+    bottom: calc(var(--bpt-node-size) / 2);
+    left: calc(1.75rem / 2 - 1px);
+    right: auto;
+    width: 2px;
+    height: auto;
+  }
+
+  .bpt-line-fill {
+    width: 100% !important;
+  }
+
+  .bpt-step-item,
+  .bpt-step-item:first-child,
+  .bpt-step-item:last-child {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left;
+    margin-bottom: 0.85rem;
+    position: relative;
+  }
+
+  .bpt-step-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .bpt-node-indicator {
+    position: absolute;
+    left: -1.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-bottom: 0;
+  }
+
+  .bpt-step-content {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .bpt-step-label {
+    font-size: 0.82rem;
+  }
+
+  .bpt-step-time {
+    font-size: 0.74rem;
+    margin-left: auto;
+  }
+}
+
+/* Accessibility: Prefers Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .bpt-line-fill,
+  .bpt-node-indicator,
+  .bpt-current-dot {
+    transition: none !important;
+    animation: none !important;
+  }
+}

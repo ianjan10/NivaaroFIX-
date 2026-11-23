@@ -29,8 +29,7 @@ export const UserRole = Object.freeze({
 
 export const TradeCategory = Object.freeze({
   ELECTRICIAN: 'electrician',
-  PLUMBER: 'plumber',
-  BOTH: 'both'
+  PLUMBER: 'plumber'
 });
 
 export const KycStatus = Object.freeze({

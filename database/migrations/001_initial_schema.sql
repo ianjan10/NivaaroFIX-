@@ -5,12 +5,15 @@
 -- Public entity codes: atomic sequence-driven (YYYY + 5 digits / 6 digits)
 -- ==============================================================================
 
--- Drop existing legacy views and tables
--- Recreate clean public schema
-DROP SCHEMA IF EXISTS public CASCADE;
-CREATE SCHEMA public;
+-- Non-destructive baseline schema initialization
+-- Recreate clean public schema permissions if needed
+CREATE SCHEMA IF NOT EXISTS public;
 GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO public;
+
+-- Extensions for spatial and distance calculations
+CREATE EXTENSION IF NOT EXISTS cube;
+CREATE EXTENSION IF NOT EXISTS earthdistance;
 
 -- 1. Code Sequences (Atomic generator for human-facing numeric codes)
 CREATE TABLE IF NOT EXISTS code_sequences (
@@ -130,8 +133,6 @@ CREATE TABLE IF NOT EXISTS professionals (
     trade               VARCHAR(64) NOT NULL DEFAULT 'electrician',
     experience_years    INT NOT NULL DEFAULT 0,
     address             TEXT,
-    city                VARCHAR(100) DEFAULT 'Bengaluru',
-    state               VARCHAR(100) DEFAULT 'Karnataka',
     kyc_status          VARCHAR(32) NOT NULL DEFAULT 'pending',
     rating              NUMERIC(3,2),
     completed_jobs      INT NOT NULL DEFAULT 0,
@@ -167,8 +168,6 @@ COMMENT ON COLUMN professionals.phone IS 'Verified professional mobile number.';
 COMMENT ON COLUMN professionals.trade IS 'Primary trade specialization (electrician, plumber, etc.).';
 COMMENT ON COLUMN professionals.experience_years IS 'Field experience in years.';
 COMMENT ON COLUMN professionals.address IS 'Professional base address.';
-COMMENT ON COLUMN professionals.city IS 'Operating city jurisdiction.';
-COMMENT ON COLUMN professionals.state IS 'Operating state jurisdiction.';
 COMMENT ON COLUMN professionals.kyc_status IS 'Background check status: pending, verified, rejected.';
 COMMENT ON COLUMN professionals.rating IS 'Aggregate customer rating (1.00 to 5.00).';
 COMMENT ON COLUMN professionals.completed_jobs IS 'Count of successfully finished jobs.';
@@ -302,6 +301,8 @@ CREATE TABLE IF NOT EXISTS service_requests (
     h3_cell                     TEXT,
     h3_index_res9               TEXT,
     h3_res_8                    TEXT,
+    location_accuracy_m         DOUBLE PRECISION DEFAULT 10,
+    expires_at                  TIMESTAMPTZ,
     status                      VARCHAR(32) NOT NULL DEFAULT 'open',
     accepted_quote_id           BIGINT,
     assigned_professional_id    BIGINT,
@@ -318,7 +319,8 @@ CREATE TABLE IF NOT EXISTS service_requests (
     CONSTRAINT fk_requests_pro FOREIGN KEY (assigned_professional_id) REFERENCES professionals(id) ON DELETE SET NULL,
     CONSTRAINT uq_service_requests_code UNIQUE (service_request_code),
     CONSTRAINT ck_service_requests_status CHECK (LOWER(REPLACE(status, ' ', '_')) IN (
-        'open', 'quoted', 'quoting', 'confirmed', 'accepted', 'en_route', 'on_the_way', 'arrived', 'in_progress', 'completed', 'cancelled'
+        'open', 'request_received', 'pending', 'quoted', 'quoting', 'confirmed', 'accepted',
+        'en_route', 'on_the_way', 'arrived', 'otp_verified', 'in_progress', 'completed', 'cancelled', 'reopened', 'expired'
     ))
 );
 
@@ -393,6 +395,7 @@ CREATE TABLE IF NOT EXISTS quotes (
     warranty_days               INT NOT NULL DEFAULT 30,
     message                     TEXT,
     status                      VARCHAR(32) NOT NULL DEFAULT 'pending',
+    expires_at                  TIMESTAMPTZ,
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_quotes PRIMARY KEY (id),
@@ -634,8 +637,10 @@ BEGIN
         NEW.customer_id := v_cust_id;
     END IF;
 
-    -- Normalize status to lowercase
-    NEW.status := LOWER(COALESCE(NEW.status, 'open'));
+    -- Default status if not provided
+    IF NEW.status IS NULL OR NEW.status = '' THEN
+        NEW.status := 'open';
+    END IF;
 
     RETURN NEW;
 END;
@@ -675,9 +680,6 @@ CREATE TABLE IF NOT EXISTS agent_login (
     phone               VARCHAR(32),
     trade               VARCHAR(64) NOT NULL DEFAULT 'electrician',
     experience_years    INT NOT NULL DEFAULT 0,
-    dob                 VARCHAR(32),
-    state               VARCHAR(100) DEFAULT 'Karnataka',
-    city                VARCHAR(100) DEFAULT 'Bengaluru',
     address             TEXT,
     password            VARCHAR(255),
     auth_provider       VARCHAR(32) DEFAULT 'partner_code',
@@ -717,11 +719,11 @@ BEGIN
 
     INSERT INTO professionals (
         user_id, professional_code, name, email, phone, trade, experience_years,
-        address, city, state, kyc_status, rating, completed_jobs, is_online,
+        address, kyc_status, rating, completed_jobs, is_online,
         availability_status, wallet_balance, lat, lng, h3_cell, updated_at
     ) VALUES (
         v_user_id, NEW.partner_id, NEW.name, NEW.email, NEW.phone, NEW.trade,
-        COALESCE(NEW.experience_years, 0), NEW.address, NEW.city, NEW.state,
+        COALESCE(NEW.experience_years, 0), NEW.address,
         LOWER(COALESCE(NEW.kyc_status, 'pending')), NEW.rating, COALESCE(NEW.completed_jobs, 0),
         COALESCE(NEW.is_online, false), LOWER(COALESCE(NEW.availability_status, 'available')),
         COALESCE(NEW.wallet_balance, 0.00), NEW.lat, NEW.lng, NEW.h3_index_res9, CURRENT_TIMESTAMP
@@ -732,8 +734,6 @@ BEGIN
         trade = EXCLUDED.trade,
         experience_years = EXCLUDED.experience_years,
         address = COALESCE(EXCLUDED.address, professionals.address),
-        city = COALESCE(EXCLUDED.city, professionals.city),
-        state = COALESCE(EXCLUDED.state, professionals.state),
         is_online = EXCLUDED.is_online,
         availability_status = EXCLUDED.availability_status,
         rating = COALESCE(EXCLUDED.rating, professionals.rating),
@@ -758,9 +758,6 @@ CREATE TABLE IF NOT EXISTS user_login (
     name                VARCHAR(150) NOT NULL,
     email               VARCHAR(255) NOT NULL UNIQUE,
     phone               VARCHAR(32),
-    dob                 VARCHAR(32),
-    state               VARCHAR(100),
-    city                VARCHAR(100),
     address             TEXT,
     password            VARCHAR(255),
     auth_provider       VARCHAR(32) DEFAULT 'email',
@@ -999,8 +996,13 @@ CREATE TABLE IF NOT EXISTS request_dispatches (
     id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     request_id          BIGINT,
     agent_id            BIGINT,
+    wave_number         INT DEFAULT 1,
+    radius_m            INT DEFAULT 50,
+    radius_meters       INT DEFAULT 50,
     status              VARCHAR(50) DEFAULT 'dispatched',
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    responded_at        TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_request_dispatches_req_agent UNIQUE (request_id, agent_id)
 );
 
 CREATE TABLE IF NOT EXISTS conversations (

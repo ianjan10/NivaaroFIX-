@@ -40,7 +40,7 @@ export default function GoogleOAuthModal({ isOpen, onClose, role = 'customer', o
   };
 
   return (
-    <div className="uber-lang-modal-backdrop open" onClick={onClose} style={{ zIndex: 9999 }}>
+    <div className="uber-lang-modal-backdrop open" onClick={onClose} style={{ zIndex: 9999, overflowY: 'auto' }}>
       <div
         className="google-oauth-config-card"
         onClick={(e) => e.stopPropagation()}
@@ -50,6 +50,10 @@ export default function GoogleOAuthModal({ isOpen, onClose, role = 'customer', o
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
           maxWidth: '480px',
           width: '92%',
+          maxHeight: 'min(92vh, 92dvh)',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          margin: 'auto',
           padding: '2.25rem 2rem',
           position: 'relative',
           animation: 'modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',

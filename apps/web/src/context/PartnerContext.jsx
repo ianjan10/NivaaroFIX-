@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { fastDeepEqual } from '../hooks/useSilentRealtime';
 
 const PartnerContext = createContext();
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 export function PartnerProvider({ children }) {
   // Provider online/offline status (from PostgreSQL)
@@ -114,9 +115,11 @@ export function PartnerProvider({ children }) {
   // -----------------------------------------------------------------------
   // 5. Fetch nearby open service requests (H3 dispatch)
   // -----------------------------------------------------------------------
-  const loadNearbyRequests = useCallback(async (email, lat, lng, radiusKm = 10) => {
+  const loadNearbyRequests = useCallback(async (email, lat, lng, radiusKm = 10, isSilent = false) => {
     if (!email) return;
-    setNearbyLoading(true);
+    if (!isSilent && nearbyRequests.length === 0) {
+      setNearbyLoading(true);
+    }
     try {
       const params = new URLSearchParams({ email: email.toLowerCase().trim() });
       if (lat !== undefined && lat !== null && lat !== '' && !isNaN(Number(lat))) {
@@ -130,17 +133,14 @@ export function PartnerProvider({ children }) {
       const res = await fetch(`${API_BASE}/dispatch/nearby-requests?${params.toString()}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.requests)) {
-        setNearbyRequests(data.requests);
-      } else {
-        setNearbyRequests([]);
+        setNearbyRequests((prev) => (fastDeepEqual(prev, data.requests) ? prev : data.requests));
       }
     } catch (err) {
       console.warn('Nearby requests fetch notice:', err.message);
-      setNearbyRequests([]);
     } finally {
       setNearbyLoading(false);
     }
-  }, []);
+  }, [nearbyRequests.length]);
 
   // -----------------------------------------------------------------------
   // 6. Automatically turn location on, fetch GPS, and connect nearby dispatch
@@ -228,7 +228,7 @@ export function PartnerProvider({ children }) {
       const res = await fetch(`${API_BASE}/dispatch/provider/active-job?email=${encodeURIComponent(email)}`);
       const data = await res.json();
       if (data.success && data.activeJob) {
-        setActivePartnerJob(data.activeJob);
+        setActivePartnerJob((prev) => (fastDeepEqual(prev, data.activeJob) ? prev : data.activeJob));
         // Derive stage from status
         const statusMap = {
           'Accepted': 'accepted',
@@ -236,7 +236,8 @@ export function PartnerProvider({ children }) {
           'OTP Verified': 'in_progress',
           'In Progress': 'in_progress'
         };
-        setJobStage(statusMap[data.activeJob.status] || 'accepted');
+        const nextStage = statusMap[data.activeJob.status] || 'accepted';
+        setJobStage((prev) => (prev === nextStage ? prev : nextStage));
       } else {
         setActivePartnerJob(null);
         setJobStage(null);
@@ -259,7 +260,7 @@ export function PartnerProvider({ children }) {
       const data = await res.json();
       if (data.success) {
         setJobStage('on_the_way');
-        setActivePartnerJob(prev => prev ? { ...prev, status: 'On the way' } : prev);
+        setActivePartnerJob(prev => prev ? { ...prev, status: 'On the way', ...(data.request || {}) } : prev);
       }
       return data;
     } catch (err) {
@@ -290,7 +291,7 @@ export function PartnerProvider({ children }) {
       const data = await res.json();
       if (data.success) {
         setJobStage('arrived');
-        setActivePartnerJob(prev => prev ? { ...prev, status: 'Arrived' } : prev);
+        setActivePartnerJob(prev => prev ? { ...prev, status: 'Arrived', ...(data.request || {}) } : prev);
       }
       return data;
     } catch (err) {
@@ -312,7 +313,7 @@ export function PartnerProvider({ children }) {
       const data = await res.json();
       if (data.success) {
         setJobStage('in_progress');
-        setActivePartnerJob(prev => prev ? { ...prev, status: 'In Progress' } : prev);
+        setActivePartnerJob(prev => prev ? { ...prev, status: 'In progress', ...(data.request || {}) } : prev);
       }
       return data;
     } catch (err) {
@@ -384,9 +385,10 @@ export function PartnerProvider({ children }) {
       const res = await fetch(`${API_BASE}/dispatch/wallet/${encodeURIComponent(email)}`);
       const data = await res.json();
       if (data.success && data.wallet) {
-        setWalletBalance(data.wallet.balance);
-        setCompletedJobsCount(data.wallet.completedJobs);
-        setWalletTransactions(data.wallet.transactions || []);
+        setWalletBalance((prev) => (prev === data.wallet.balance ? prev : data.wallet.balance));
+        setCompletedJobsCount((prev) => (prev === data.wallet.completedJobs ? prev : data.wallet.completedJobs));
+        const txs = data.wallet.transactions || [];
+        setWalletTransactions((prev) => (fastDeepEqual(prev, txs) ? prev : txs));
       }
     } catch (err) {
       console.warn('Wallet fetch notice:', err.message);

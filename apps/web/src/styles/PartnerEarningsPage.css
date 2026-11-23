@@ -1,0 +1,743 @@
+/* ==========================================================================
+   PartnerEarningsPage.css — Modern Minimalist Payouts & Settlements View
+   Auto-adjusting fluid layout matching the global top navigation padding.
+   ========================================================================== */
+
+.partner-settlements-page-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-height: calc(100vh - 72px);
+  padding: 1.5rem clamp(20px, 3.2vw, 48px) 3rem;
+  box-sizing: border-box;
+  background-color: var(--bg-canvas, #ffffff);
+  color: var(--text-primary, #101820);
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+}
+
+body.dark-theme .partner-settlements-page-wrapper {
+  background-color: var(--bg-dark, #0e131a);
+  color: var(--text-primary, #f7f5f1);
+}
+
+.partner-settlements-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ---------------- Page Header ---------------- */
+.settlements-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.25rem;
+  margin-top: 0;
+}
+
+.settlements-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.settlements-main-title {
+  font-size: clamp(1.6rem, 2.2vw, 2rem);
+  font-weight: 700;
+  color: var(--text-primary, #101820);
+  margin: 0;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+body.dark-theme .settlements-main-title {
+  color: #f7f5f1;
+}
+
+.settlements-subhead {
+  font-size: 0.88rem;
+  color: var(--text-secondary, #5a6472);
+  margin: 0;
+  line-height: 1.4;
+}
+
+body.dark-theme .settlements-subhead {
+  color: #9aa5b5;
+}
+
+.settlements-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.settlements-btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 1px solid rgba(16, 24, 40, 0.12);
+  color: var(--text-primary, #101820);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  transition: all 0.18s ease;
+}
+
+.settlements-btn-refresh:hover:not(:disabled) {
+  border-color: var(--brand-primary, #047857);
+  color: var(--brand-primary, #047857);
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.08);
+}
+
+.settlements-btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+body.dark-theme .settlements-btn-refresh {
+  background: #151c26;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f7f5f1;
+}
+
+.settlements-refresh-icon.spinning {
+  animation: settlementsSpin 0.9s linear infinite;
+}
+
+@keyframes settlementsSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ---------------- 4 Summary Cards Grid (Exact Screenshot 1 Typography) ---------------- */
+.settlements-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.settlements-stat-card {
+  background: #ffffff;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.03);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.settlements-stat-card:hover {
+  border-color: rgba(16, 24, 40, 0.16);
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.06);
+  transform: translateY(-1px);
+}
+
+body.dark-theme .settlements-stat-card {
+  background: #151c26;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+body.dark-theme .settlements-stat-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.settlements-stat-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #5a6472);
+  margin-bottom: 0.1rem;
+}
+
+body.dark-theme .settlements-stat-label {
+  color: #9aa5b5;
+}
+
+.settlements-stat-amount {
+  font-family: var(--font-mono, "Space Grotesk", monospace);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--pro-text-main, #101820);
+  margin: 0.2rem 0 0.15rem;
+}
+
+body.dark-theme .settlements-stat-amount {
+  color: #f7f5f1;
+}
+
+.settlements-stat-sub {
+  font-size: 0.76rem;
+  color: var(--text-muted, #8c96a5);
+  line-height: 1.35;
+}
+
+body.dark-theme .settlements-stat-sub {
+  color: #64748b;
+}
+
+/* ---------------- Bank Account / Route Banner ---------------- */
+.settlements-bank-banner {
+  background: #f8fafc;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+body.dark-theme .settlements-bank-banner {
+  background: #131922;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.settlements-bank-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex: 1;
+  min-width: 260px;
+}
+
+.settlements-bank-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid rgba(16, 24, 40, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+body.dark-theme .settlements-bank-icon-box {
+  background: #1e2838;
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.settlements-bank-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.settlements-bank-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.settlements-bank-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary, #101820);
+}
+
+body.dark-theme .settlements-bank-title {
+  color: #f7f5f1;
+}
+
+.settlements-bank-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #5a6472);
+  line-height: 1.4;
+  margin: 0;
+}
+
+body.dark-theme .settlements-bank-desc {
+  color: #9aa5b5;
+}
+
+.settlements-btn-bank-action {
+  padding: 0.6rem 1.25rem;
+  border-radius: 9999px;
+  background: var(--brand-primary, #047857);
+  color: #ffffff;
+  border: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(4, 120, 87, 0.25);
+  transition: all 0.18s ease;
+}
+
+.settlements-btn-bank-action:hover {
+  background: var(--brand-primary-hover, #065f46);
+  transform: translateY(-1px);
+}
+
+/* ---------------- Ledger Controls & Filter Bar ---------------- */
+.settlements-control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.settlements-filter-pills {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 9999px;
+  gap: 4px;
+}
+
+body.dark-theme .settlements-filter-pills {
+  background: #1a2330;
+}
+
+.settlements-filter-btn {
+  padding: 0.4rem 0.95rem;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #5a6472);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.settlements-filter-btn.active {
+  background: #ffffff;
+  color: var(--text-primary, #101820);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+body.dark-theme .settlements-filter-btn.active {
+  background: #243042;
+  color: #f7f5f1;
+}
+
+.settlements-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #ffffff;
+  border: 1px solid rgba(16, 24, 40, 0.12);
+  border-radius: 9999px;
+  padding: 0.45rem 1rem;
+  min-width: 280px;
+  flex: 1;
+  max-width: 420px;
+  box-sizing: border-box;
+}
+
+body.dark-theme .settlements-search-box {
+  background: #151c26;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.settlements-search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.85rem;
+  color: var(--text-primary, #101820);
+  width: 100%;
+}
+
+body.dark-theme .settlements-search-input {
+  color: #f7f5f1;
+}
+
+.settlements-search-input::placeholder {
+  color: var(--text-muted, #8c96a5);
+}
+
+/* ---------------- Table Container ---------------- */
+.settlements-table-card {
+  background: #ffffff;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
+}
+
+body.dark-theme .settlements-table-card {
+  background: #151c26;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.settlements-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settlements-table {
+  width: 100%;
+  min-width: 1080px;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  text-align: left;
+}
+
+.settlements-table th {
+  padding: 0.85rem 1.1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, #5a6472);
+  background: #f8fafc;
+  border-bottom: 1px solid rgba(16, 24, 40, 0.08);
+  white-space: nowrap;
+}
+
+body.dark-theme .settlements-table th {
+  background: #131922;
+  color: #9aa5b5;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.settlements-table td {
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid rgba(16, 24, 40, 0.06);
+  color: var(--text-primary, #101820);
+  vertical-align: middle;
+}
+
+body.dark-theme .settlements-table td {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+  color: #f7f5f1;
+}
+
+.settlements-table tr:last-child td {
+  border-bottom: none;
+}
+
+.settlements-table tr:hover td {
+  background: #f8fafc;
+}
+
+body.dark-theme .settlements-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Column Elements */
+.settlement-tx-datetime {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.settlement-date-main {
+  font-weight: 600;
+  font-size: 0.84rem;
+}
+
+.settlement-date-sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #5a6472);
+}
+
+body.dark-theme .settlement-date-sub {
+  color: #9aa5b5;
+}
+
+.settlement-booking-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono, 'Space Grotesk', monospace);
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text-primary, #101820);
+  background: #f1f5f9;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid rgba(16, 24, 40, 0.06);
+}
+
+body.dark-theme .settlement-booking-pill {
+  background: #1e2838;
+  color: #f7f5f1;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.settlement-service-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.settlement-service-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.settlement-customer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.settlement-customer-name {
+  font-weight: 600;
+}
+
+.settlement-customer-addr {
+  font-size: 0.76rem;
+  color: var(--text-secondary, #5a6472);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dark-theme .settlement-customer-addr {
+  color: #9aa5b5;
+}
+
+.settlement-method-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settlement-method-badge.cash {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid rgba(16, 24, 40, 0.06);
+}
+
+body.dark-theme .settlement-method-badge.cash {
+  background: #1e2838;
+  color: #cbd5e1;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.settlement-method-badge.online {
+  background: #f1f5f9;
+  color: #1e293b;
+  border: 1px solid rgba(16, 24, 40, 0.06);
+}
+
+body.dark-theme .settlement-method-badge.online {
+  background: #1e2838;
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.settlement-txid-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.settlement-txid-text {
+  font-family: var(--font-mono, 'Space Grotesk', monospace);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.settlement-copy-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  color: var(--text-secondary, #5a6472);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.settlement-copy-btn:hover {
+  color: var(--brand-primary, #047857);
+  background: rgba(4, 120, 87, 0.08);
+}
+
+.settlement-amount-val {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono, 'Space Grotesk', monospace);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.settlement-payout-val {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono, 'Space Grotesk', monospace);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary, #0f172a);
+}
+
+body.dark-theme .settlement-payout-val {
+  color: #f8fafc;
+}
+
+.settlement-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.settlement-badge.settled {
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+}
+
+body.dark-theme .settlement-badge.settled {
+  background: #1e2838;
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.settlement-badge.processing {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+}
+
+body.dark-theme .settlement-badge.processing {
+  background: #151c26;
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.settlement-btn-receipt {
+  background: transparent;
+  border: 1px solid rgba(16, 24, 40, 0.14);
+  color: var(--text-primary, #101820);
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.settlement-btn-receipt:hover {
+  border-color: var(--brand-primary, #047857);
+  color: var(--brand-primary, #047857);
+  background: #f8fafc;
+}
+
+body.dark-theme .settlement-btn-receipt {
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f7f5f1;
+}
+
+body.dark-theme .settlement-btn-receipt:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Empty State */
+.settlements-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3.5rem 1.5rem;
+  gap: 0.5rem;
+}
+
+.settlements-empty-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #5a6472);
+  margin-bottom: 0.5rem;
+}
+
+body.dark-theme .settlements-empty-icon {
+  background: #1a2330;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #9aa5b5;
+}
+
+.settlements-empty-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary, #101820);
+  margin: 0;
+}
+
+body.dark-theme .settlements-empty-title {
+  color: #f7f5f1;
+}
+
+.settlements-empty-desc {
+  font-size: 0.86rem;
+  color: var(--text-secondary, #5a6472);
+  max-width: 440px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+body.dark-theme .settlements-empty-desc {
+  color: #9aa5b5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .settlements-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settlements-search-box {
+    min-width: 100%;
+    max-width: 100%;
+  }
+
+  .settlements-bank-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settlements-btn-bank-action {
+    width: 100%;
+    text-align: center;
+  }
+}

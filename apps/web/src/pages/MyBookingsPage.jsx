@@ -7,7 +7,11 @@ import BookingCancelConfirmModal from '../components/BookingCancelConfirmModal';
 import BookingInvoiceModal from '../components/BookingInvoiceModal';
 import BookingRescheduleModal from '../components/BookingRescheduleModal';
 import BookingRateModal from '../components/BookingRateModal';
+import CustomerPaymentModal from '../components/CustomerPaymentModal';
+import PaymentReceiptModal from '../components/PaymentReceiptModal';
+import UnpaidCompletedJobModal from '../components/UnpaidCompletedJobModal';
 import BookingToast from '../components/BookingToast';
+import BookingProgressTracker from '../components/BookingProgressTracker';
 import Button from '../components/Button';
 
 /**
@@ -39,10 +43,7 @@ function formatDisplayAddress(rawAddress) {
 function formatJobSubtitle(category, createdAt) {
   const tradeMap = {
     electrician: 'Electrician',
-    plumber: 'Plumber',
-    carpenter: 'Carpenter',
-    appliance: 'Appliance Repair',
-    painter: 'Painter'
+    plumber: 'Plumber'
   };
   const trade = tradeMap[category?.toLowerCase()] || (category ? category.charAt(0).toUpperCase() + category.slice(1) : 'Technician');
   const d = createdAt ? new Date(createdAt) : new Date();
@@ -51,20 +52,67 @@ function formatJobSubtitle(category, createdAt) {
   return `${trade} · ${day}, ${time}`;
 }
 
+export function formatName(name) {
+  if (!name || typeof name !== 'string') return '';
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+export function isGenericPlaceholder(text) {
+  if (!text || typeof text !== 'string') return true;
+  const lower = text.trim().toLowerCase();
+  return [
+    'standard diagnosis and repair dispatch.',
+    'standard diagnosis & repair dispatch',
+    'general repair',
+    'repair',
+    'standard repair',
+    'photo inspection provided',
+    'not specified',
+    'service request',
+    'inspection & repair',
+    'home service repair'
+  ].includes(lower);
+}
+
+export function getJobDisplayTitle(job) {
+  const prob = (job?.problemDescription || '').trim();
+  const issue = (job?.issueType || '').trim();
+  const title = (job?.serviceTitle || '').trim();
+
+  // 1. If customer entered their specific problem, write that problem
+  if (prob && !isGenericPlaceholder(prob)) {
+    return prob.charAt(0).toUpperCase() + prob.slice(1);
+  }
+  // 2. Else if customer selected from some option, write that option
+  if (issue && !isGenericPlaceholder(issue) && issue.toLowerCase() !== 'inspection & repair') {
+    return issue.charAt(0).toUpperCase() + issue.slice(1);
+  }
+  // 3. Fallback to service title if genuine (not generic Taps, Mixers & Showers placeholder)
+  if (title && !isGenericPlaceholder(title) && !title.toLowerCase().includes('taps, mixers & showers')) {
+    return title.charAt(0).toUpperCase() + title.slice(1);
+  }
+  if (title && !isGenericPlaceholder(title)) {
+    return title;
+  }
+  // 4. Fallback to category default
+  return job?.category === 'plumber' ? 'Plumbing Repair' : 'Electrical Repair';
+}
+
 /**
- * Check if the user wrote a genuine custom problem description
- * (not empty, and not merely echoing the category or service title)
+ * Check if the user wrote a genuine custom problem description that differs from the card title
  */
-function hasCustomDetails(problemDescription, serviceTitle) {
+function hasCustomDetails(problemDescription, displayTitle) {
   if (!problemDescription) return false;
   const desc = problemDescription.trim();
-  if (desc.length === 0) return false;
-  const title = (serviceTitle || '').trim().toLowerCase();
+  if (desc.length === 0 || isGenericPlaceholder(desc)) return false;
+  const title = (displayTitle || '').trim().toLowerCase();
   const descLower = desc.toLowerCase();
+  // If the card heading already displays this problem text, don't duplicate "Details: ..."
   if (descLower === title) return false;
-  if (['standard diagnosis and repair dispatch.', 'standard diagnosis & repair dispatch', 'general repair', 'repair', 'standard repair'].includes(descLower)) {
-    return false;
-  }
   return true;
 }
 
@@ -120,6 +168,9 @@ export default function MyBookingsPage({
   const [invoiceModalBooking, setInvoiceModalBooking] = useState(null);
   const [rescheduleBooking, setRescheduleBooking] = useState(null);
   const [rateModalBooking, setRateModalBooking] = useState(null);
+  const [payModalBooking, setPayModalBooking] = useState(null);
+  const [receiptModalData, setReceiptModalData] = useState(null);
+  const [unpaidAlertJob, setUnpaidAlertJob] = useState(null);
   const [previewPhoto, setPreviewPhoto] = useState(null);
 
   useEffect(() => {
@@ -210,8 +261,8 @@ export default function MyBookingsPage({
     if (!currentUser?.isLoggedIn) return;
     const pollInterval = setInterval(async () => {
       try {
-        if (loadMyRequests) await loadMyRequests(currentUser);
-        if (loadUserBookings) await loadUserBookings(currentUser);
+        if (loadMyRequests) await loadMyRequests(currentUser, true);
+        if (loadUserBookings) await loadUserBookings(currentUser, true);
       } catch (err) {}
     }, 3000);
     return () => clearInterval(pollInterval);
@@ -233,13 +284,13 @@ export default function MyBookingsPage({
     if (!activeReqRef) return;
     let eventSource = null;
     try {
-      eventSource = new EventSource(`http://localhost:5000/api/realtime/request/${activeReqRef}`);
+      eventSource = new EventSource(`/api/realtime/request/${activeReqRef}`);
 
       eventSource.addEventListener('quote.received', (e) => {
         try {
           const data = JSON.parse(e.data);
           addToast(`Quotation Received: ${data.agentName || 'A technician'} offered ₹${data.amount}.`, 'brass');
-          if (currentUser && loadMyRequests) loadMyRequests(currentUser);
+          if (currentUser && loadMyRequests) loadMyRequests(currentUser, true);
         } catch (err) {}
       });
 
@@ -247,33 +298,33 @@ export default function MyBookingsPage({
         try {
           const data = JSON.parse(e.data);
           addToast(`Technician Assigned: ${data.agentName} has confirmed your booking.`, 'brass');
-          if (currentUser && loadMyRequests) loadMyRequests(currentUser);
+          if (currentUser && loadMyRequests) loadMyRequests(currentUser, true);
         } catch (err) {}
       });
 
       eventSource.addEventListener('status.en_route', () => {
         addToast('Your technician is now On the way to your address.', 'brass');
-        if (currentUser && loadMyRequests) loadMyRequests(currentUser);
+        if (currentUser && loadMyRequests) loadMyRequests(currentUser, true);
       });
 
       eventSource.addEventListener('status.arrived', () => {
         addToast("Technician has arrived at your doorstep! Share the 4-digit Door OTP to start work.", 'brass');
-        if (currentUser && loadMyRequests) loadMyRequests(currentUser);
+        if (currentUser && loadMyRequests) loadMyRequests(currentUser, true);
       });
 
       eventSource.addEventListener('status.otp_verified', () => {
         addToast('Door OTP verified. Service is now In Progress.', 'brass');
-        if (currentUser && loadMyRequests) loadMyRequests(currentUser);
+        if (currentUser && loadMyRequests) loadMyRequests(currentUser, true);
       });
 
       eventSource.addEventListener('status.completed', () => {
         addToast('Service Completed! Please rate your technician.', 'brass');
-        if (currentUser && loadMyRequests) loadMyRequests(currentUser);
+        if (currentUser && loadMyRequests) loadMyRequests(currentUser, true);
       });
 
       eventSource.addEventListener('status.cancelled', () => {
         addToast('The service request has been cancelled.', 'destructive');
-        if (currentUser && loadMyRequests) loadMyRequests(currentUser);
+        if (currentUser && loadMyRequests) loadMyRequests(currentUser, true);
       });
     } catch (err) {}
 
@@ -330,16 +381,26 @@ export default function MyBookingsPage({
           displayAddress: formatDisplayAddress(req.userAddress || req.address),
           subtitle: formatJobSubtitle(req.category, req.createdAt),
           problemDescription: req.problemDescription,
+          issueType: req.issueType || req.issue_type || null,
           status: normalizedStatus,
           otpCode: req.otpCode,
           quotes: Array.isArray(req.quotes) ? req.quotes : (quotesByRef[ref] || []),
           acceptedProvider: req.acceptedProvider || null,
-          totalAmount: req.totalAmount || req.acceptedProvider?.amount || 0,
+          totalAmount: req.paymentAmount || req.totalAmount || req.acceptedProvider?.amount || 0,
+          paymentStatus: req.paymentStatus || (normalizedStatus === 'Completed' ? 'due' : null),
+          paymentCode: req.paymentCode || null,
+          paymentAmount: req.paymentAmount || req.totalAmount || req.acceptedProvider?.amount || 0,
+          paymentCapturedAt: req.paymentCapturedAt || null,
           completionPhotos: req.completionPhotos || [],
           completionRemarks: req.completionRemarks || '',
           startedAt: req.startedAt,
           arrivedAt: req.arrivedAt,
           completedAt: req.completedAt,
+          confirmed_at: req.confirmed_at || req.confirmedAt || (['Confirmed', 'On the way', 'Arrived', 'In progress', 'Completed'].includes(normalizedStatus) ? (req.createdAt || req.created_at) : null),
+          on_the_way_at: req.on_the_way_at || req.onTheWayAt || null,
+          arrived_at: req.arrived_at || req.arrivedAt || null,
+          in_progress_at: req.in_progress_at || req.inProgressAt || req.started_at || req.startedAt || null,
+          completed_at: req.completed_at || req.completedAt || null,
           isDelayed: req.isDelayed || false,
           isServiceRequest: true
         });
@@ -375,6 +436,7 @@ export default function MyBookingsPage({
           displayAddress: formatDisplayAddress(b.address),
           subtitle: formatJobSubtitle(b.category, b.createdAt),
           problemDescription: b.problemDescription || b.issueType,
+          issueType: b.issueType || null,
           status: normalizedStatus,
           otpCode: b.otpCode,
           quotes: [],
@@ -388,6 +450,15 @@ export default function MyBookingsPage({
               }
             : null,
           totalAmount: b.totalAmount || 0,
+          paymentStatus: b.paymentStatus || (normalizedStatus === 'Completed' ? 'due' : null),
+          paymentCode: b.paymentCode || null,
+          paymentAmount: b.paymentAmount || b.totalAmount || 0,
+          paymentCapturedAt: b.paymentCapturedAt || null,
+          confirmed_at: b.confirmed_at || b.confirmedAt || (['Confirmed', 'On the way', 'Arrived', 'In progress', 'Completed'].includes(normalizedStatus) ? (b.createdAt || b.created_at) : null),
+          on_the_way_at: b.on_the_way_at || b.onTheWayAt || null,
+          arrived_at: b.arrived_at || b.arrivedAt || null,
+          in_progress_at: b.in_progress_at || b.inProgressAt || null,
+          completed_at: b.completed_at || b.completedAt || null,
           completionPhotos: [],
           completionRemarks: '',
           isServiceRequest: false
@@ -455,15 +526,24 @@ export default function MyBookingsPage({
     }
   }, [bookingsNavNonce, activeCount]);
 
-  // Automatically prompt full-screen rating if an active request just completed and is unrated
+  // Automatically prompt Pay Sheet if an active request just completed and is unpaid;
+  // If paid and unrated, prompt full-screen rating.
   useEffect(() => {
-    const unratedCompleted = unifiedJobs.find(
-      (j) => j.status === 'Completed' && j.isServiceRequest && !j.ratingGiven && !sessionStorage.getItem(`rated_dismissed_${j.id}`)
+    const unpaidCompleted = unifiedJobs.find(
+      (j) => j.status === 'Completed' && j.paymentStatus !== 'paid' && !sessionStorage.getItem(`pay_dismissed_${j.id}`)
     );
-    if (unratedCompleted && !rateModalBooking) {
+    if (unpaidCompleted && !payModalBooking) {
+      setPayModalBooking(unpaidCompleted);
+      return;
+    }
+
+    const unratedCompleted = unifiedJobs.find(
+      (j) => j.status === 'Completed' && j.paymentStatus === 'paid' && j.isServiceRequest && !j.ratingGiven && !sessionStorage.getItem(`rated_dismissed_${j.id}`)
+    );
+    if (unratedCompleted && !rateModalBooking && !payModalBooking) {
       setRateModalBooking(unratedCompleted);
     }
-  }, [unifiedJobs, rateModalBooking]);
+  }, [unifiedJobs, rateModalBooking, payModalBooking]);
 
   // Quotes sorting helper
   const getSortedQuotes = (quotes, reqRef) => {
@@ -579,61 +659,9 @@ export default function MyBookingsPage({
     setRateModalBooking(null);
   };
 
-  // Render slim tracker (5 small nodes, thin line, no thick bars)
-  const renderSlimTracker = (status) => {
-    const stages = ['Confirmed', 'On the way', 'Arrived', 'In progress', 'Completed'];
-    let stageIndex = 0;
-    if (status === 'Confirmed') stageIndex = 0;
-    else if (status === 'On the way') stageIndex = 1;
-    else if (status === 'Arrived') stageIndex = 2;
-    else if (status === 'In progress') stageIndex = 3;
-    else if (status === 'Completed') stageIndex = 4;
-
-    const fillPercent = (stageIndex / (stages.length - 1)) * 100;
-
-    return (
-      <div className="slim-tracker-container" aria-label={`Job status: ${status}`}>
-        <div className="slim-tracker-bar-wrap">
-          <div className="slim-tracker-bar-fill" style={{ width: `${fillPercent}%` }} />
-        </div>
-        <div className="slim-tracker-nodes-row">
-          {stages.map((stage, idx) => {
-            const isReached = idx <= stageIndex;
-            const isCurrent = idx === stageIndex;
-            return (
-              <div
-                key={stage}
-                className={`slim-tracker-node-col ${isReached ? 'reached' : ''} ${isCurrent ? 'current' : ''}`}
-              >
-                <div className="slim-tracker-dot" />
-                <span className="slim-tracker-label">{stage}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="my-bookings-page-wrapper" role="main">
       <div className="bookings-layout-container">
-        {/* Top Breadcrumb Navigation */}
-        <nav className="bookings-breadcrumb-nav" aria-label="Breadcrumb">
-          <button
-            type="button"
-            className="bookings-breadcrumb-link"
-            onClick={onNavigateToHome}
-            aria-label="Back to dashboard"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
-            </svg>
-            <span>Back to dashboard</span>
-          </button>
-        </nav>
-
         {/* Page Header */}
         <header className="bookings-page-header">
           <div className="bookings-header-text">
@@ -738,7 +766,7 @@ export default function MyBookingsPage({
 
         {/* Unified Bookings Feed Section (No Section Headings) */}
         <section className="bookings-feed-section" aria-live="polite">
-          {isLoading ? (
+          {isLoading && (!activeRequests || activeRequests.length === 0) && (!liveDbBookings || liveDbBookings.length === 0) ? (
             <div className="bookings-card-grid" aria-label="Loading your bookings">
               {[1, 2].map((idx) => (
                 <div key={idx} className="booking-skeleton-card">
@@ -829,7 +857,8 @@ export default function MyBookingsPage({
 
                 const sortedQuotes = getSortedQuotes(job.quotes, job.id);
                 const currentSort = quotesSortMap[job.id] || 'lowest';
-                const hasDetails = hasCustomDetails(job.problemDescription, job.serviceTitle);
+                const displayTitle = getJobDisplayTitle(job);
+                const hasDetails = hasCustomDetails(job.problemDescription, displayTitle);
                 const isTrackerVisible = !isOpen && !isQuoted && !isCancelled;
                 const isExpanded = isCardExpanded(job);
 
@@ -849,7 +878,7 @@ export default function MyBookingsPage({
                       role="button"
                       tabIndex={0}
                       aria-expanded={isExpanded}
-                      aria-label={`${isExpanded ? 'Minimize' : 'Expand'} details for ${job.serviceTitle}`}
+                      aria-label={`${isExpanded ? 'Minimize' : 'Expand'} details for ${displayTitle}`}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
@@ -871,7 +900,7 @@ export default function MyBookingsPage({
                         </div>
 
                         <div className="service-title-col">
-                          <h2 className="service-main-heading">{job.serviceTitle}</h2>
+                          <h2 className="service-main-heading">{displayTitle}</h2>
                           <div className="service-sub-meta">
                             <span>{job.subtitle}</span>
                             <span className="meta-bullet">•</span>
@@ -883,12 +912,18 @@ export default function MyBookingsPage({
                       {/* Header right: Calm status or job price + chevron */}
                       <div className="card-status-container" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         {isCompleted && (
-                          <span className="live-status-pill forest-pill" style={{ background: '#ecfdf5', color: '#065f46' }}>
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.6">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            <span>Completed</span>
-                          </span>
+                          job.paymentStatus === 'paid' ? (
+                            <span className="live-status-pill forest-pill" style={{ background: '#ecfdf5', color: '#065f46' }}>
+                              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.6">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                              <span>Paid</span>
+                            </span>
+                          ) : (
+                            <span className="live-status-pill" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                              <span>Payment Due</span>
+                            </span>
+                          )
                         )}
                         {isCancelled && (
                           <span className="live-status-pill" style={{ background: '#f3f4f6', color: '#6b7280' }}>
@@ -1002,26 +1037,27 @@ export default function MyBookingsPage({
                               >
                                 {sortedQuotes.map((q) => {
                                   const ratingNum = parseFloat(q.agentRating || 0);
-                                  const completedJobs = q.agentCompletedJobs || 0;
-                                  const hasReviews = completedJobs > 0 && ratingNum > 0;
+                                  const rawTrade = q.agentTrade || job.trade || 'Plumber';
+                                  const formattedTrade = rawTrade.charAt(0).toUpperCase() + rawTrade.slice(1);
+                                  const hasRating = ratingNum > 0;
 
                                   return (
                                     <div key={q.quoteId} className="horizontal-quote-card">
                                       <div>
                                         <div className="quote-pro-header">
-                                          <div className="quote-pro-name">{q.agentName}</div>
+                                          <div className="quote-pro-name">{formatName(q.agentName)}</div>
                                           <div className="quote-pro-sub">
-                                            <span>{q.agentTrade || job.trade}</span>
-                                            <span>•</span>
-                                            {hasReviews ? (
-                                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                                <svg viewBox="0 0 24 24" width="12" height="12" fill="#d97706" stroke="#d97706" strokeWidth="1" aria-hidden="true">
-                                                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                                                </svg>
-                                                <span>{ratingNum.toFixed(1)} ({completedJobs} jobs)</span>
-                                              </span>
-                                            ) : (
-                                              <span className="pro-badge-new">New</span>
+                                            <span>{formattedTrade}</span>
+                                            {hasRating && (
+                                              <>
+                                                <span>•</span>
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                  <svg viewBox="0 0 24 24" width="12" height="12" fill="#d97706" stroke="#d97706" strokeWidth="1" aria-hidden="true">
+                                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                                  </svg>
+                                                  <span>{ratingNum.toFixed(1)}</span>
+                                                </span>
+                                              </>
                                             )}
                                           </div>
                                         </div>
@@ -1076,26 +1112,31 @@ export default function MyBookingsPage({
                       </div>
                     )}
 
-                    {/* 3. SLIM TRACKER (When Confirmed, On the way, Arrived, In progress, Completed) */}
-                    {isTrackerVisible && renderSlimTracker(job.status)}
+                    {/* 3. PROGRESS TRACKER (When Confirmed, On the way, Arrived, In progress, Completed) */}
+                    {isTrackerVisible && <BookingProgressTracker job={job} />}
 
                     {/* 4. PRO DETAILS CARD (After Acceptance) */}
                     {isTrackerVisible && job.acceptedProvider && (
                       <div className="assigned-pro-strip">
                         <div className="assigned-pro-left">
-                          <div className="assigned-pro-name">{job.acceptedProvider.agentName}</div>
+                          <div className="assigned-pro-name">{formatName(job.acceptedProvider.agentName)}</div>
                           <div className="assigned-pro-meta">
-                            <span>{job.acceptedProvider.agentTrade || job.trade}</span>
-                            <span> • </span>
-                            {job.acceptedProvider.agentCompletedJobs > 0 ? (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <svg viewBox="0 0 24 24" width="12" height="12" fill="#d97706" stroke="#d97706" strokeWidth="1" aria-hidden="true">
-                                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                                </svg>
-                                <span>{parseFloat(job.acceptedProvider.agentRating || 5).toFixed(1)} ({job.acceptedProvider.agentCompletedJobs} jobs)</span>
-                              </span>
-                            ) : (
-                              <span className="pro-badge-new">New</span>
+                            <span>
+                              {(() => {
+                                const t = job.acceptedProvider.agentTrade || job.trade || 'Plumber';
+                                return t.charAt(0).toUpperCase() + t.slice(1);
+                              })()}
+                            </span>
+                            {parseFloat(job.acceptedProvider.agentRating || 0) > 0 && (
+                              <>
+                                <span> • </span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <svg viewBox="0 0 24 24" width="12" height="12" fill="#d97706" stroke="#d97706" strokeWidth="1" aria-hidden="true">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                  </svg>
+                                  <span>{parseFloat(job.acceptedProvider.agentRating).toFixed(1)}</span>
+                                </span>
+                              </>
                             )}
                           </div>
                         </div>
@@ -1140,7 +1181,7 @@ export default function MyBookingsPage({
                         <div>
                           <div className="doorstep-otp-heading">Doorstep Verification Code</div>
                           <div className="doorstep-otp-desc">
-                            Share this 4-digit code with {job.acceptedProvider?.agentName || 'technician'} to begin service.
+                            Share this 4-digit code with {formatName(job.acceptedProvider?.agentName) || 'technician'} to begin service.
                           </div>
                         </div>
                         <div className="doorstep-otp-digits">{job.otpCode}</div>
@@ -1201,15 +1242,53 @@ export default function MyBookingsPage({
                           </div>
                         )}
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
-                          <button
-                            type="button"
-                            className="btn-book-certified-pro"
-                            style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem' }}
-                            onClick={() => setRateModalBooking(job)}
-                          >
-                            Rate this job
-                          </button>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                          {job.paymentStatus === 'paid' ? (
+                            <>
+                              <button
+                                type="button"
+                                className="receipt-btn-print"
+                                style={{ height: '34px', fontSize: '0.8rem', padding: '0 12px' }}
+                                onClick={() => setReceiptModalData({
+                                  ...job,
+                                  amount: job.paymentAmount || job.amount || (job.quotes?.[0]?.amount) || 150,
+                                  payment_code: job.paymentCode || `PAY-${job.id || '2026000001'}`,
+                                  paymentCode: job.paymentCode || `PAY-${job.id || '2026000001'}`,
+                                  captured_at: job.paymentCapturedAt || job.completedAt || new Date().toISOString(),
+                                  method: job.paymentMethod || 'UPI / Online',
+                                  partnerId: job.proPartnerId || job.partnerId || '202600001',
+                                  proPartnerId: job.proPartnerId || job.partnerId || '202600001',
+                                  proName: job.acceptedProvider?.agentName || job.assigned_pro_name || 'Rahul'
+                                })}
+                              >
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <polyline points="6 9 6 2 18 2 18 9" />
+                                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                  <rect x="6" y="14" width="12" height="8" />
+                                </svg>
+                                <span>Receipt</span>
+                              </button>
+                              {!job.ratingGiven && (
+                                <button
+                                  type="button"
+                                  className="btn-book-certified-pro"
+                                  style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem' }}
+                                  onClick={() => setRateModalBooking(job)}
+                                >
+                                  Rate this job
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-book-certified-pro"
+                              style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem', background: '#047857' }}
+                              onClick={() => setPayModalBooking(job)}
+                            >
+                              Pay ₹{Number(job.paymentAmount || job.totalAmount || 0).toLocaleString('en-IN')}
+                            </button>
+                          )}
                         </div>
                       </>
                     )}
@@ -1244,7 +1323,7 @@ export default function MyBookingsPage({
         <div className="uber-lang-modal-backdrop open" onClick={() => !isAcceptingQuote && setPendingAcceptQuote(null)}>
           <div className="booking-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 0.5rem', color: 'var(--text-primary, #111827)' }}>
-              Accept Quote from {pendingAcceptQuote.quote.agentName}?
+              Accept Quote from {formatName(pendingAcceptQuote.quote.agentName)}?
             </h3>
             <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary, #6b7280)', margin: '0 0 1.25rem', lineHeight: 1.45 }}>
               Agreed price: <strong style={{ color: '#059669' }}>₹{pendingAcceptQuote.quote.amount}</strong>. Other quotes will be withdrawn and technician will be notified.
@@ -1358,6 +1437,51 @@ export default function MyBookingsPage({
           </div>
         </div>
       )}
+      {/* Customer Glass Pay Sheet */}
+      <CustomerPaymentModal
+        isOpen={Boolean(payModalBooking)}
+        onClose={() => {
+          if (payModalBooking?.id) {
+            sessionStorage.setItem(`pay_dismissed_${payModalBooking.id}`, 'true');
+          }
+          setPayModalBooking(null);
+        }}
+        booking={payModalBooking}
+        onPaymentSuccess={(verifyResult) => {
+          const completedJob = payModalBooking;
+          setPayModalBooking(null);
+          // Auto-transition to rating prompt
+          if (completedJob) {
+            setRateModalBooking(completedJob);
+          }
+          addToast('Payment captured successfully. Technician payout initiated.', 'brass');
+          if (loadMyRequests && currentUser) {
+            loadMyRequests(currentUser);
+          }
+        }}
+        onOpenReceipt={(payment) => {
+          setReceiptModalData(payment);
+        }}
+      />
+
+      {/* Printable Receipt Modal */}
+      <PaymentReceiptModal
+        isOpen={Boolean(receiptModalData)}
+        onClose={() => setReceiptModalData(null)}
+        payment={receiptModalData}
+        booking={receiptModalData}
+      />
+
+      {/* Unpaid Completed Booking Alert */}
+      <UnpaidCompletedJobModal
+        isOpen={Boolean(unpaidAlertJob)}
+        onClose={() => setUnpaidAlertJob(null)}
+        unpaidJob={unpaidAlertJob}
+        onPayNow={(job) => {
+          setUnpaidAlertJob(null);
+          setPayModalBooking(job);
+        }}
+      />
     </div>
   );
 }

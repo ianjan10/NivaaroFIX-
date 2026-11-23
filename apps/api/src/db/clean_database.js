@@ -15,6 +15,20 @@ async function cleanDatabase() {
   console.log('🧹 NIVAAROFIX DATABASE PURGE: REMOVING ALL FAKE & AI TEST DATA');
   console.log('============================================================');
 
+  // STRICT SAFETY GUARD: Prevent accidental production/development data loss
+  const dbName = process.env.PGDATABASE || process.env.DB_NAME || '';
+  const isTestEnv = process.env.NODE_ENV === 'test';
+  const hasConfirmFlag = process.argv.includes('--confirm-destructive');
+  const isTestDb = dbName.toLowerCase().endsWith('_test');
+
+  if (!isTestEnv || !hasConfirmFlag || !isTestDb) {
+    console.error('❌ SAFETY ABORT: Database purge rejected.');
+    console.error(`- NODE_ENV must be 'test' (Current: '${process.env.NODE_ENV}')`);
+    console.error(`- Database name must end with '_test' (Current: '${dbName}')`);
+    console.error(`- Must pass '--confirm-destructive' CLI flag`);
+    throw new Error('DESTRUCTIVE_PURGE_FORBIDDEN: Database cleanup is only permitted in isolated test databases.');
+  }
+
   const client = await pool.connect();
   try {
     console.log('1. Purging all dummy / AI-generated data across all tables...');
@@ -36,7 +50,6 @@ async function cleanDatabase() {
         professional_wallets,
         quotes,
         request_dispatches,
-        bookings,
         service_requests,
         customer_saved_addresses,
         professional_gps_log,

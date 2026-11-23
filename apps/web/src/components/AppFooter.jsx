@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import BrandLogo from './BrandLogo';
+import FeedbackModal from './FeedbackModal';
 
 export default function AppFooter({
   currentPortal = 'customer',
@@ -10,9 +11,21 @@ export default function AppFooter({
   onNavigateAbout,
   onNavigateBookings,
   onOpenAuth,
-  onSwitchPortal
+  onOpenFeedback,
+  onSwitchPortal,
+  onLogoutUser,
+  onLogoutAgent
 }) {
   const currentYear = new Date().getFullYear();
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
+  const handleFeedbackClick = () => {
+    if (onOpenFeedback) {
+      onOpenFeedback();
+    } else {
+      setIsFeedbackOpen(true);
+    }
+  };
 
   const handleHomeClick = () => {
     if (onNavigateHome) {
@@ -52,21 +65,25 @@ export default function AppFooter({
     if (onOpenAuth) {
       onOpenAuth();
     } else {
-      window.location.href = 'http://localhost:5500?portal=customer&action=login';
+      const lang = localStorage.getItem('nivaarofix-lang') || 'en';
+      const hash = window.location.hash.replace(/^#\/?/, '') || '';
+      const returnTarget = hash ? `/${hash}` : '/';
+      window.location.href = `http://localhost:5500?portal=customer&lang=${lang}&returnTo=${encodeURIComponent(returnTarget)}`;
     }
   };
 
   const handleProfileClick = () => {
+    const lang = localStorage.getItem('nivaarofix-lang') || 'en';
     if (agent?.isLoggedIn) {
       const agentPayload = encodeURIComponent(JSON.stringify(agent));
-      window.location.href = `http://localhost:5500?portal=agent&action=profile&agent=${agentPayload}`;
+      window.location.href = `http://localhost:5500?portal=agent&action=profile&lang=${lang}&agent=${agentPayload}`;
     } else if (user?.isLoggedIn) {
       const userPayload = encodeURIComponent(JSON.stringify(user));
-      window.location.href = `http://localhost:5500?portal=customer&action=profile&user=${userPayload}`;
+      window.location.href = `http://localhost:5500?portal=customer&action=profile&lang=${lang}&user=${userPayload}`;
     } else if (onOpenAuth) {
       onOpenAuth();
     } else {
-      window.location.href = 'http://localhost:5500?portal=customer&action=profile';
+      window.location.href = `http://localhost:5500?portal=customer&action=profile&lang=${lang}`;
     }
   };
 
@@ -95,7 +112,69 @@ export default function AppFooter({
             />
           </div>
 
-          {/* Column 2: Services */}
+          {/* Column 2: Account */}
+          <div className="footer-nav-col">
+            <h4 className="footer-col-heading">ACCOUNT</h4>
+            <ul className="footer-links-list">
+              {user?.isLoggedIn ? (
+                <>
+                  <li>
+                    <button
+                      type="button"
+                      className="footer-nav-link"
+                      onClick={handleBookingsClick}
+                    >
+                      My Bookings
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      className="footer-nav-link"
+                      onClick={handleProfileClick}
+                    >
+                      Account Profile
+                    </button>
+                  </li>
+                </>
+              ) : agent?.isLoggedIn ? (
+                <>
+                  <li>
+                    <button
+                      type="button"
+                      className="footer-nav-link"
+                      onClick={handlePartnerClick}
+                    >
+                      Workspace
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      className="footer-nav-link"
+                      onClick={handleProfileClick}
+                    >
+                      My Profile
+                    </button>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <button
+                      type="button"
+                      className="footer-nav-link"
+                      onClick={handleAuthClick}
+                    >
+                      Log in
+                    </button>
+                  </li>
+                </>
+              )}
+            </ul>
+          </div>
+
+          {/* Column 3: Services */}
           <div className="footer-nav-col">
             <h4 className="footer-col-heading">SERVICES</h4>
             <ul className="footer-links-list">
@@ -130,7 +209,7 @@ export default function AppFooter({
             </ul>
           </div>
 
-          {/* Column 3: Company */}
+          {/* Column 4: Company */}
           <div className="footer-nav-col">
             <h4 className="footer-col-heading">COMPANY</h4>
             <ul className="footer-links-list">
@@ -147,82 +226,11 @@ export default function AppFooter({
                 <button
                   type="button"
                   className="footer-nav-link"
-                  onClick={handlePartnerClick}
+                  onClick={handleFeedbackClick}
                 >
-                  Professional
+                  Feedback
                 </button>
               </li>
-            </ul>
-          </div>
-
-          {/* Column 4: Account */}
-          <div className="footer-nav-col">
-            <h4 className="footer-col-heading">ACCOUNT</h4>
-            <ul className="footer-links-list">
-              {user?.isLoggedIn ? (
-                <>
-                  <li>
-                    <button
-                      type="button"
-                      className="footer-nav-link"
-                      onClick={handleBookingsClick}
-                    >
-                      My Bookings
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className="footer-nav-link"
-                      onClick={handleProfileClick}
-                    >
-                      Profile & Settings
-                    </button>
-                  </li>
-                </>
-              ) : agent?.isLoggedIn ? (
-                <>
-                  <li>
-                    <button
-                      type="button"
-                      className="footer-nav-link"
-                      onClick={handlePartnerClick}
-                    >
-                      Professional Console
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className="footer-nav-link"
-                      onClick={handleProfileClick}
-                    >
-                      Professional Profile
-                    </button>
-                  </li>
-                </>
-              ) : (
-                <>
-                  <li>
-                    <button
-                      type="button"
-                      className="footer-nav-link"
-                      onClick={handleAuthClick}
-                    >
-                      Log in
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className="footer-nav-link"
-                      onClick={handleBookingsClick}
-                    >
-                      My Bookings
-                    </button>
-                  </li>
-                </>
-              )}
             </ul>
           </div>
 
@@ -243,6 +251,14 @@ export default function AppFooter({
           </div>
         </div>
       </div>
+
+      {/* Minimalist Interactive Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        user={user}
+        agent={agent}
+      />
     </footer>
   );
 }

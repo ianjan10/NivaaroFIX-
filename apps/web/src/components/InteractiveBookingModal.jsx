@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useBooking } from '../context/BookingContext';
 import { useLocation } from '../context/LocationContext';
 import { useLanguage } from '../context/LanguageContext';
+import { fastDeepEqual } from '../hooks/useSilentRealtime';
 import DoorstepPinMap from './DoorstepPinMap';
 import UberProximityRadarMap from './UberProximityRadarMap';
+import UnpaidCompletedJobModal from './UnpaidCompletedJobModal';
+import CustomerPaymentModal from './CustomerPaymentModal';
 
 /**
  * NivaaroFix Simplified 3-Step Interactive Booking Request Modal
@@ -20,6 +23,11 @@ import UberProximityRadarMap from './UberProximityRadarMap';
  *  - Proximity Matching: Matches nearby verified pros via server-side expanding radius (1km -> 3km -> 5km -> 10km).
  *  - Design: Ivory #f7f5f1, Navy #1e3a5f, Brand Green #047857. No emojis. Calm ease-out motion.
  */
+
+function formatName(name) {
+  if (!name || typeof name !== 'string') return '';
+  return name.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
 
 /**
  * High-accuracy GPS convergence fetcher.
@@ -272,13 +280,16 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
     activeCustomerRequest,
     hasRunningBooking,
     runningBooking,
-    openRunningBookingBlockedModal
+    openRunningBookingBlockedModal,
+    saveBookingIntent
   } = useBooking();
   const { selectedCity } = useLocation();
   const { t, activeLanguage } = useLanguage();
 
   // Wizard Steps: 1: Describe & Photos, 2: Review & Address, 3: Confirm & Proximity Match
   const [step, setStep] = useState(1);
+  const [unpaidAlertJob, setUnpaidAlertJob] = useState(null);
+  const [paySheetBooking, setPaySheetBooking] = useState(null);
 
   // If a booking is running when the drawer opens, defer immediately to the classy policy note
   useEffect(() => {
@@ -345,7 +356,7 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.quotes)) {
-            setLiveQuotes(data.quotes);
+            setLiveQuotes((prev) => (fastDeepEqual(prev, data.quotes) ? prev : data.quotes));
           }
         }
       } catch (err) {
@@ -427,8 +438,8 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
       setProblemTiming('');
       setProblemFrequency('');
 
-      // Customer description remains clean/empty unless customer writes one
-      setProblemDescription('');
+      // Pre-fill issue description if provided (e.g. from search or intent)
+      setProblemDescription(initialIssueForBooking || '');
 
       // Pre-populate address from user profile or saved localStorage session
       let initialAddr = currentUser?.address || '';
@@ -564,7 +575,7 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
 
       try {
         const base64Data = await readFileAsBase64(file);
-        const res = await fetch('http://localhost:5000/api/bookings/upload-photo', {
+        const res = await fetch('/api/bookings/upload-photo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -676,7 +687,7 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
 
     try {
       setIsUploadingPhoto(true);
-      const res = await fetch('http://localhost:5000/api/bookings/upload-photo', {
+      const res = await fetch('/api/bookings/upload-photo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -830,7 +841,15 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
     if (e) e.preventDefault();
 
     if (!currentUser || !currentUser.isLoggedIn) {
-      if (onOpenAuth) onOpenAuth();
+      if (saveBookingIntent) {
+        saveBookingIntent(
+          activeServiceForBooking || 'electrician',
+          problemDescription || initialIssueForBooking || '',
+          problemDescription || ''
+        );
+      }
+      if (closeBookingModal) closeBookingModal();
+      if (onOpenAuth) onOpenAuth('/book');
       return;
     }
 
@@ -867,9 +886,11 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
         lat: coords.lat || (currentUser.lat ? parseFloat(currentUser.lat) : null),
         lng: coords.lng || (currentUser.lng ? parseFloat(currentUser.lng) : null),
         serviceId: activeServiceForBooking.id || 'service',
-        serviceTitle: activeServiceForBooking.title || (typeof initialIssueForBooking === 'string' && initialIssueForBooking.trim()) || serviceActionTitle,
+        serviceTitle: problemDescription.trim()
+          ? (problemDescription.trim().charAt(0).toUpperCase() + problemDescription.trim().slice(1))
+          : ((typeof initialIssueForBooking === 'string' && initialIssueForBooking.trim()) || activeServiceForBooking.title || serviceActionTitle || 'Service Request'),
         category: activeServiceForBooking.categoryId || (isPlumber ? 'plumber' : 'electrician'),
-        issueType: activeServiceForBooking.title || 'Inspection & Repair',
+        issueType: (typeof initialIssueForBooking === 'string' && initialIssueForBooking.trim()) || activeServiceForBooking.title || 'Inspection & Repair',
         problemDescription: problemDescription.trim(),
         problemTiming: problemTiming || 'Not specified',
         problemFrequency: problemFrequency || 'Not specified',
@@ -911,6 +932,10 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
       }
     } catch (err) {
       console.error('Booking submission error:', err);
+      if (err.code === 'UNPAID_COMPLETED_JOB' && err.unpaidJob) {
+        setUnpaidAlertJob(err.unpaidJob);
+        return;
+      }
       setStepError(err.message || 'Your service request could not be processed. Please try again.');
       setStep(2); // Return to review step on error so user can retry
     } finally {
@@ -921,7 +946,7 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
   const handleAcceptQuotation = async (quoteId) => {
     setIsAcceptingQuote(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/quotes/${quoteId}/accept`, {
+      const res = await fetch(`/api/quotes/${quoteId}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1572,7 +1597,7 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
                     <div>
                       <h3 className="confirmed-main-title" style={{ color: '#065f46' }}>YOUR PROFESSIONAL IS CONFIRMED</h3>
                       <p className="confirmed-sub-title" style={{ color: '#047857' }}>
-                        {acceptedQuote.name || 'Your professional'} is assigned. Agreed amount: ₹{acceptedQuote.agreedAmount || acceptedQuote.amount || 0}.
+                        {formatName(acceptedQuote.name) || 'Your professional'} is assigned. Agreed amount: ₹{acceptedQuote.agreedAmount || acceptedQuote.amount || 0}.
                       </p>
                     </div>
                   </div>
@@ -1664,21 +1689,26 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
                             >
                               <div style={{ flex: '1 1 200px' }}>
                                 <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#1e3a5f' }}>
-                                  {prov.name}
+                                  {formatName(prov.name)}
                                 </div>
                                 <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
-                                  <span style={{ color: prov.rating ? '#059669' : '#64748b', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                    {prov.rating ? (
-                                      <>
+                                  <span>
+                                    {(() => {
+                                      const t = q.trade || q.agentTrade || q.category || 'Plumber';
+                                      return t.charAt(0).toUpperCase() + t.slice(1);
+                                    })()}
+                                  </span>
+                                  {prov.rating && Number(prov.rating) > 0 && (
+                                    <>
+                                      <span>•</span>
+                                      <span style={{ color: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
                                         <svg viewBox="0 0 24 24" width="12" height="12" fill="#059669" stroke="#059669" aria-hidden="true">
                                           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                                         </svg>
                                         <span>{Number(prov.rating).toFixed(1)}</span>
-                                      </>
-                                    ) : 'New'}
-                                  </span>
-                                  <span>•</span>
-                                  <span>{prov.completedJobs || 0} jobs</span>
+                                      </span>
+                                    </>
+                                  )}
                                   {q.warrantyDays && (
                                     <>
                                       <span>•</span>
@@ -1788,6 +1818,30 @@ export default function InteractiveBookingModal({ currentUser, onOpenAuth }) {
           </div>
         )}
       </div>
+
+      {/* Unpaid Completed Booking Alert */}
+      <UnpaidCompletedJobModal
+        isOpen={Boolean(unpaidAlertJob)}
+        onClose={() => setUnpaidAlertJob(null)}
+        unpaidJob={unpaidAlertJob}
+        onPayNow={(job) => {
+          setUnpaidAlertJob(null);
+          setPaySheetBooking(job);
+        }}
+      />
+
+      {/* Customer Glass Pay Sheet */}
+      <CustomerPaymentModal
+        isOpen={Boolean(paySheetBooking)}
+        onClose={() => setPaySheetBooking(null)}
+        booking={paySheetBooking}
+        onPaymentSuccess={() => {
+          setPaySheetBooking(null);
+          if (currentUser && loadMyRequests) {
+            loadMyRequests(currentUser);
+          }
+        }}
+      />
     </div>
   );
 }

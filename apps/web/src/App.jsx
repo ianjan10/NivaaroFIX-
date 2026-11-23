@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { LocationProvider } from './context/LocationContext';
 import { BookingProvider, useBooking } from './context/BookingContext';
@@ -16,26 +16,53 @@ import UserAuthModal from './components/UserAuthModal';
 import CustomerProfileIncompleteModal from './components/CustomerProfileIncompleteModal';
 import ActiveBookingBlockedModal from './components/ActiveBookingBlockedModal';
 import PartnerConsolePage from './pages/PartnerConsolePage';
+import PartnerEarningsPage from './pages/PartnerEarningsPage';
 import MyBookingsPage from './pages/MyBookingsPage';
+import AdminLoginPage from './pages/AdminLoginPage';
+import AdminLandingPage from './pages/AdminLandingPage';
 
 // Extract active view from URL hash or pathname with bulletproof matching
+// ROOT CAUSE FIX: Never execute side-effect redirects or force 'home' from inside getViewFromHash.
+// Pure function only, preserving the actual user view.
 function getViewFromHash() {
   const hash = (window.location.hash || '').toLowerCase();
   const path = (window.location.pathname || '').toLowerCase();
-  if (hash.includes('home') || hash === '#/' || hash === '') return 'home';
-  if (hash.includes('about') || path.includes('about')) return 'about';
-  if (hash.includes('services') || path.includes('services')) return 'services';
-  if (hash.includes('partner') || path.includes('partner')) return 'partner';
+  if (path.startsWith('/admin/login') || hash.startsWith('#/admin/login')) return 'admin-login';
+  if (path.startsWith('/admin') || hash.startsWith('#/admin')) return 'admin';
+  if (hash.includes('partner/settlements') || hash.includes('partner-settlements') || hash.includes('partner/payouts') || path.includes('partner/settlements') || path.includes('partner-settlements')) return 'partner-settlements';
+  if (hash.includes('book') && !hash.includes('bookings') && !path.includes('bookings')) return 'book';
+  if (path === '/book') return 'book';
   if (hash.includes('bookings') || hash.includes('booking') || path.includes('bookings') || path.includes('booking')) return 'bookings';
+  if (hash.includes('partner') || path.includes('partner')) return 'partner';
+  if (hash.includes('services') || path.includes('services')) return 'services';
+  if (hash.includes('about') || path.includes('about')) return 'about';
+  if (hash.includes('home') || hash === '#/' || hash === '' || path === '/') return 'home';
   return 'home';
 }
 
 function DashboardAppContent() {
   const [currentView, setCurrentView] = useState(getViewFromHash);
+  const [isSessionValidating, setIsSessionValidating] = useState(true);
+  const [roleNoticeMessage, setRoleNoticeMessage] = useState('');
   const [bookingsNavNonce, setBookingsNavNonce] = useState(() => (getViewFromHash() === 'bookings' ? 1 : 0));
   const [partnerNavNonce, setPartnerNavNonce] = useState(() => (getViewFromHash() === 'partner' ? 1 : 0));
   const [selectedServiceCategory, setSelectedServiceCategory] = useState('all');
   const [isUserAuthOpen, setIsUserAuthOpen] = useState(false);
+  const [isRouteNavigating, setIsRouteNavigating] = useState(false);
+  const routeNavTimeoutRef = useRef(null);
+
+  // If visitor lands directly on legacy #/login, replace history entry into auth portal (no Back bounce)
+  useEffect(() => {
+    const hash = (window.location.hash || '').toLowerCase();
+    const path = (window.location.pathname || '').toLowerCase();
+    if ((hash.includes('login') || path.includes('login')) && !path.includes('/admin') && !hash.includes('/admin')) {
+      const lang = localStorage.getItem('nivaarofix-lang') || localStorage.getItem('nivaaro-fix-lang') || 'en';
+      const hashQuery = window.location.hash.split('?')[1] || window.location.search.replace(/^\?/, '') || '';
+      const params = new URLSearchParams(hashQuery);
+      const next = params.get('next') || params.get('returnTo') || '/';
+      window.location.replace(`http://localhost:5500?portal=customer&lang=${lang}&returnTo=${encodeURIComponent(next)}`);
+    }
+  }, []);
 
   const {
     resumeBookingIntentIfPresent,
@@ -53,9 +80,6 @@ function DashboardAppContent() {
       const saved = localStorage.getItem('nivaaro-user');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed?.dob && (JSON.stringify(parsed.dob).includes('1992') || JSON.stringify(parsed.dob).includes('2050'))) {
-          parsed.dob = null;
-        }
         const digits = (parsed?.phone || '').replace(/\D/g, '');
         if (digits === '9876543210' || digits === '9876543220' || digits === '9876543211' || digits === '9840123456') {
           parsed.phone = null;
@@ -75,9 +99,6 @@ function DashboardAppContent() {
       const saved = localStorage.getItem('nivaaro-agent');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed?.dob && (JSON.stringify(parsed.dob).includes('1988') || JSON.stringify(parsed.dob).includes('1992') || JSON.stringify(parsed.dob).includes('2050'))) {
-          parsed.dob = null;
-        }
         const digits = (parsed?.phone || '').replace(/\D/g, '');
         if (digits === '9876543210' || digits === '9876543220' || digits === '9876543211' || digits === '9840123456') {
           parsed.phone = null;
@@ -101,13 +122,47 @@ function DashboardAppContent() {
     }
   }, [user, loadUserBookings, loadMyRequests]);
 
-  // Validate Customer session with PostgreSQL (purges stale/AI-generated users if not in DB)
+  // Validate server-side session on mount with PostgreSQL session store
+  useEffect(() => {
+    fetch('/api/auth/session', { credentials: 'include' })
+      .then((res) => {
+        if (res.ok) return res.json();
+        throw new Error('Not authenticated');
+      })
+      .then((data) => {
+        if (data?.authenticated) {
+          if (data.role === 'customer' && data.user) {
+            setUser({ ...data.user, isLoggedIn: true });
+            setAgent(null);
+            localStorage.removeItem('nivaaro-agent');
+            localStorage.setItem('nivaaro-user', JSON.stringify({ ...data.user, isLoggedIn: true }));
+          } else if (data.role === 'agent' && data.agent) {
+            setAgent({ ...data.agent, isLoggedIn: true });
+            setUser(null);
+            localStorage.removeItem('nivaaro-user');
+            localStorage.setItem('nivaaro-agent', JSON.stringify({ ...data.agent, isLoggedIn: true }));
+          }
+        }
+      })
+      .catch(() => {
+        // If not authenticated on server, purge stale storage
+        setUser(null);
+        setAgent(null);
+        localStorage.removeItem('nivaaro-user');
+        localStorage.removeItem('nivaaro-agent');
+      })
+      .finally(() => {
+        setIsSessionValidating(false);
+      });
+  }, []);
+
+  // Validate Customer profile with PostgreSQL
   useEffect(() => {
     if (user?.email) {
-      fetch(`http://localhost:5000/api/auth/customer-profile?email=${encodeURIComponent(user.email)}`)
+      fetch(`/api/auth/customer-profile?email=${encodeURIComponent(user.email)}`, { credentials: 'include' })
         .then((res) => {
-          if (res.status === 404) {
-            console.warn('Session user not found in database. Purging stale local session.');
+          if (res.status === 404 || res.status === 401) {
+            console.warn('Session user not found or unauthenticated. Purging stale local session.');
             localStorage.removeItem('nivaaro-user');
             setUser(null);
           } else if (res.ok) {
@@ -123,13 +178,13 @@ function DashboardAppContent() {
     }
   }, [user?.email]);
 
-  // Validate Agent session with PostgreSQL (purges stale/AI-generated partners if not in DB)
+  // Validate Agent profile with PostgreSQL
   useEffect(() => {
     if (agent?.email) {
-      fetch(`http://localhost:5000/api/agents/profile/${encodeURIComponent(agent.email)}`)
+      fetch(`/api/agents/profile/${encodeURIComponent(agent.email)}`, { credentials: 'include' })
         .then((res) => {
-          if (res.status === 404) {
-            console.warn('Session agent not found in database. Purging stale local session.');
+          if (res.status === 404 || res.status === 401) {
+            console.warn('Session agent not found or unauthenticated. Purging stale local session.');
             localStorage.removeItem('nivaaro-agent');
             setAgent(null);
           } else if (res.ok) {
@@ -166,9 +221,6 @@ function DashboardAppContent() {
     if (userParam) {
       try {
         const parsedUser = JSON.parse(decodeURIComponent(userParam));
-        if (parsedUser?.dob && (JSON.stringify(parsedUser.dob).includes('1992') || JSON.stringify(parsedUser.dob).includes('2050'))) {
-          parsedUser.dob = null;
-        }
         const userDigits = (parsedUser?.phone || '').replace(/\D/g, '');
         if (userDigits === '9876543210' || userDigits === '9876543220' || userDigits === '9876543211' || userDigits === '9840123456') {
           parsedUser.phone = null;
@@ -178,14 +230,25 @@ function DashboardAppContent() {
         localStorage.removeItem('nivaaro-agent');
         localStorage.setItem('nivaaro-user', JSON.stringify(parsedUser));
         
+        let destHash = '#/';
         // If returnTo specified /services, switch to services view
         if (returnToParam && returnToParam.includes('services')) {
           setCurrentView('services');
-          window.location.hash = '#/services';
+          destHash = '#/services';
+        } else if (returnToParam && returnToParam.includes('book') && !returnToParam.includes('bookings')) {
+          setCurrentView('services');
+          destHash = '#/services';
+          setTimeout(() => {
+            resumeBookingIntentIfPresent(parsedUser);
+          }, 300);
+        } else if (returnToParam && (returnToParam.includes('bookings') || returnToParam.includes('my-bookings'))) {
+          setCurrentView('bookings');
+          destHash = '#/bookings';
         } else {
           setCurrentView('home');
-          window.location.hash = '#/';
+          destHash = '#/';
         }
+        window.history.replaceState({}, '', window.location.pathname + destHash);
       } catch (e) {
         console.error('Error parsing user payload', e);
       }
@@ -194,9 +257,6 @@ function DashboardAppContent() {
     if (agentParam) {
       try {
         const parsedAgent = JSON.parse(decodeURIComponent(agentParam));
-        if (parsedAgent?.dob && (JSON.stringify(parsedAgent.dob).includes('1988') || JSON.stringify(parsedAgent.dob).includes('1992') || JSON.stringify(parsedAgent.dob).includes('2050'))) {
-          parsedAgent.dob = null;
-        }
         const agentDigits = (parsedAgent?.phone || '').replace(/\D/g, '');
         if (agentDigits === '9876543210' || agentDigits === '9876543220' || agentDigits === '9876543211' || agentDigits === '9840123456') {
           parsedAgent.phone = null;
@@ -206,25 +266,18 @@ function DashboardAppContent() {
         localStorage.removeItem('nivaaro-user');
         localStorage.setItem('nivaaro-agent', JSON.stringify(parsedAgent));
 
+        let destHash = '#/partner';
         if (viewParam === 'home' || returnToParam === 'home' || targetHash.includes('home')) {
           setCurrentView('home');
-          window.location.hash = '#/';
+          destHash = '#/';
         } else {
           setCurrentView('partner');
-          window.location.hash = '#/partner';
+          destHash = '#/partner';
         }
+        window.history.replaceState({}, '', window.location.pathname + destHash);
       } catch (e) {
         console.error('Error parsing agent payload', e);
       }
-    }
-
-    // Clean up query parameters smoothly if returning with payload
-    if (userParam || agentParam) {
-      const cleanHash = (viewParam === 'home' || returnToParam === 'home' || targetHash.includes('home'))
-        ? '#/'
-        : (window.location.hash || '#/');
-      const cleanPath = window.location.pathname + cleanHash;
-      window.history.replaceState({}, '', cleanPath);
     }
   }, []);
 
@@ -246,18 +299,140 @@ function DashboardAppContent() {
     const prevUser = user;
     setUser(null);
     localStorage.removeItem('nivaaro-user');
-    if (prevUser?.email) {
-      try {
-        await fetch('http://localhost:5000/api/dispatch/customer-logout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: prevUser.email, userId: prevUser.id })
-        });
-      } catch (err) {
-        console.warn('Customer logout cleanup error:', err.message);
-      }
+    if (currentView === 'bookings' || currentView === 'book') {
+      navigateTo('home');
+      window.location.hash = '#/';
+    }
+    try {
+      await fetch('/api/auth/customer-logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: prevUser?.email, userId: prevUser?.id })
+      });
+    } catch (err) {
+      console.warn('Customer logout cleanup error:', err.message);
     }
   };
+
+  const handleLogoutAgent = async () => {
+    const prevAgent = agent;
+    setAgent(null);
+    localStorage.removeItem('nivaaro-agent');
+    if (currentView === 'partner') {
+      navigateTo('home');
+      window.location.hash = '#/';
+    }
+    try {
+      await fetch('/api/auth/agent-logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: prevAgent?.email, partnerId: prevAgent?.partnerId, id: prevAgent?.id })
+      });
+    } catch (err) {
+      console.warn('Agent logout cleanup error:', err.message);
+    }
+  };
+
+  // Route Guards Enforcement
+  useEffect(() => {
+    // If session validation is still in progress, wait for genuine server state
+    if (isSessionValidating) return;
+
+    // 1. Customer-only routes: My Bookings, Booking flow
+    if (currentView === 'bookings' || currentView === 'book') {
+      if (!user?.isLoggedIn) {
+        const currentPath = currentView === 'book' ? '/book' : '/my-bookings';
+        setRoleNoticeMessage('');
+        const lang = localStorage.getItem('nivaarofix-lang') || localStorage.getItem('nivaaro-fix-lang') || 'en';
+        // HISTORY RULE: Use replace for guard redirects so Back never lands on a protected URL that loops
+        window.location.replace(`http://localhost:5500?portal=customer&lang=${lang}&returnTo=${encodeURIComponent(currentPath)}`);
+        return;
+      }
+      if (agent?.isLoggedIn && !user?.isLoggedIn) {
+        setRoleNoticeMessage('This page is for customer accounts');
+        setCurrentView('partner');
+        window.history.replaceState({}, '', '#/partner');
+        return;
+      }
+    }
+
+    // 2. Professional-only routes: Professional Console & Settlements
+    if (currentView === 'partner' || currentView === 'partner-settlements') {
+      if (!agent?.isLoggedIn) {
+        setRoleNoticeMessage('');
+        const lang = localStorage.getItem('nivaarofix-lang') || localStorage.getItem('nivaaro-fix-lang') || 'en';
+        const returnPath = currentView === 'partner-settlements' ? '/partner/settlements' : '/partner';
+        // HISTORY RULE: Use replace for guard redirects so Back never lands on a protected URL that loops
+        window.location.replace(`http://localhost:5500?portal=agent&lang=${lang}&returnTo=${encodeURIComponent(returnPath)}`);
+        return;
+      }
+      if (user?.isLoggedIn && !agent?.isLoggedIn) {
+        setRoleNoticeMessage('This area is for professional accounts');
+        setCurrentView('home');
+        window.history.replaceState({}, '', '#/');
+        return;
+      }
+    }
+
+    // 3. Logged-in Customer on /book route -> resume intent immediately
+    if (currentView === 'book' && user?.isLoggedIn) {
+      setCurrentView('services');
+      setTimeout(() => {
+        resumeBookingIntentIfPresent(user);
+      }, 150);
+    }
+  }, [currentView, user, agent, resumeBookingIntentIfPresent]);
+
+  // Global 401 Session Expiry Interceptor & Credentials Decorator
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (input, init = {}) => {
+      // Ensure credentials: 'include' for API calls to ensure cookies are sent
+      const url = typeof input === 'string' ? input : (input?.url || '');
+      if (url.includes('localhost:5000') || url.startsWith('/api') || url.startsWith('/')) {
+        init = { ...init, credentials: init.credentials || 'include' };
+      }
+      const response = await originalFetch(input, init);
+      if (response.status === 401) {
+        try {
+          const clone = response.clone();
+          const data = await clone.json();
+          if (data?.code === 'SESSION_EXPIRED' || data?.code === 'UNAUTHORIZED') {
+            const activeInputs = document.querySelectorAll('input[type="text"], textarea');
+            const drafts = {};
+            activeInputs.forEach((inp) => {
+              if (inp.value && (inp.id || inp.name)) {
+                drafts[inp.id || inp.name] = inp.value;
+              }
+            });
+            if (Object.keys(drafts).length > 0) {
+              sessionStorage.setItem('nivaarofix_draft_text', JSON.stringify(drafts));
+            }
+            setUser(null);
+            setAgent(null);
+            localStorage.removeItem('nivaaro-user');
+            localStorage.removeItem('nivaaro-agent');
+            // Only redirect if visitor is currently on a protected route
+            const activeView = getViewFromHash();
+            if (activeView === 'bookings' || activeView === 'book' || activeView === 'partner' || activeView === 'partner-settlements') {
+              setRoleNoticeMessage('Your session has expired. Please sign in to continue.');
+              const currentHash = window.location.hash.replace(/^#\/?/, '/') || '/';
+              const nextPath = currentHash.startsWith('/') ? currentHash : `/${currentHash}`;
+              const lang = localStorage.getItem('nivaarofix-lang') || localStorage.getItem('nivaaro-fix-lang') || 'en';
+              // Use replace on session expiry so Back never loops on expired endpoints
+              window.location.replace(`http://localhost:5500?portal=customer&lang=${lang}&returnTo=${encodeURIComponent(nextPath)}`);
+            }
+          }
+        } catch (_) {}
+      }
+      return response;
+    };
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
 
   // Synchronize state with browser back/forward buttons and page returns
   useEffect(() => {
@@ -270,6 +445,11 @@ function DashboardAppContent() {
       if (targetView === 'partner') {
         setPartnerNavNonce((prev) => prev + 1);
       }
+      setIsRouteNavigating(true);
+      if (routeNavTimeoutRef.current) clearTimeout(routeNavTimeoutRef.current);
+      routeNavTimeoutRef.current = setTimeout(() => {
+        setIsRouteNavigating(false);
+      }, 250);
     };
 
     const handleStorageSync = () => {
@@ -278,31 +458,67 @@ function DashboardAppContent() {
         if (savedUser) {
           const parsed = JSON.parse(savedUser);
           setUser(parsed);
+        } else {
+          setUser(null);
         }
         const savedAgent = localStorage.getItem('nivaaro-agent');
         if (savedAgent) {
           const parsed = JSON.parse(savedAgent);
           setAgent(parsed);
+        } else {
+          setAgent(null);
         }
       } catch (e) {}
     };
 
+    // HISTORY RULE: On bfcache restore (pageshow), never force home.
+    // Re-evaluate current view from hash and re-verify session with API.
+    const handlePageShow = async () => {
+      handleUrlChange();
+      handleStorageSync();
+      try {
+        const res = await fetch('/api/auth/session', {
+          credentials: 'include',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.authenticated && data?.user) {
+            setUser({ ...data.user, isLoggedIn: true });
+          } else if (data?.authenticated && data?.agent) {
+            setAgent({ ...data.agent, isLoggedIn: true });
+          } else {
+            setUser(null);
+            setAgent(null);
+            localStorage.removeItem('nivaaro-user');
+            localStorage.removeItem('nivaaro-agent');
+          }
+        } else if (res.status === 401) {
+          setUser(null);
+          setAgent(null);
+          localStorage.removeItem('nivaaro-user');
+          localStorage.removeItem('nivaaro-agent');
+        }
+      } catch (_) {}
+    };
+
     window.addEventListener('hashchange', handleUrlChange);
     window.addEventListener('popstate', handleUrlChange);
-    window.addEventListener('pageshow', handleStorageSync);
+    window.addEventListener('pageshow', handlePageShow);
     window.addEventListener('focus', handleStorageSync);
 
     return () => {
       window.removeEventListener('hashchange', handleUrlChange);
       window.removeEventListener('popstate', handleUrlChange);
-      window.removeEventListener('pageshow', handleStorageSync);
+      window.removeEventListener('pageshow', handlePageShow);
       window.removeEventListener('focus', handleStorageSync);
+      if (routeNavTimeoutRef.current) clearTimeout(routeNavTimeoutRef.current);
     };
   }, []);
 
   // Update theme class and scroll to top on view change
   useEffect(() => {
-    if (currentView === 'partner') {
+    if (currentView === 'partner' || currentView === 'partner-settlements') {
       document.body.classList.add('agent-portal');
     } else {
       document.body.classList.remove('agent-portal');
@@ -319,32 +535,95 @@ function DashboardAppContent() {
     if (view === 'partner') {
       setPartnerNavNonce((prev) => prev + 1);
     }
-    const targetHash = view === 'home' ? '#/' : `#/${view}`;
+    const targetHash = view === 'home' ? '#/' : (view === 'partner-settlements' ? '#/partner/settlements' : `#/${view}`);
     if (window.location.hash !== targetHash) {
       window.location.hash = targetHash;
     }
+    // Route progress indicator: 2px tall in brand green, appears only during navigation, removed when loading ends
+    setIsRouteNavigating(true);
+    if (routeNavTimeoutRef.current) clearTimeout(routeNavTimeoutRef.current);
+    routeNavTimeoutRef.current = setTimeout(() => {
+      setIsRouteNavigating(false);
+    }, 250);
   };
 
-  const handleLogoutAgent = () => {
-    setAgent(null);
-    localStorage.removeItem('nivaaro-agent');
-    if (currentView === 'partner') {
-      navigateTo('home');
+  const openLogin = (next = '', role = 'customer') => {
+    const lang = localStorage.getItem('nivaarofix-lang') || localStorage.getItem('nivaaro-fix-lang') || 'en';
+    let sanitizedNext = '';
+    if (next && typeof next === 'string') {
+      const trimmed = next.trim();
+      // Relative path validation: must start with a single '/' and not '//', no host, scheme or backslashes
+      if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.includes('\\') && !trimmed.includes('://')) {
+        sanitizedNext = trimmed;
+      }
     }
+    // Default return destination to current view/hash if not explicitly provided
+    if (!sanitizedNext) {
+      const currentHash = window.location.hash.replace(/^#\/?/, '') || (currentView === 'home' ? '' : currentView);
+      sanitizedNext = currentHash ? `/${currentHash}` : '/';
+    }
+    const nextQuery = sanitizedNext ? `&returnTo=${encodeURIComponent(sanitizedNext)}` : '';
+    const portal = role === 'agent' || role === 'professional' ? 'agent' : 'customer';
+    // User-initiated action pushes onto history
+    window.location.href = `http://localhost:5500?portal=${portal}&lang=${lang}${nextQuery}`;
   };
 
   return (
     <div className="dashboard-app-wrapper">
-      {/* Top Navbar */}
-      <TopNavbar
-        currentView={currentView}
-        onNavigate={navigateTo}
-        user={user}
-        agent={agent}
-        onOpenUserAuth={() => setIsUserAuthOpen(true)}
-        onLogoutUser={handleLogout}
-        onLogoutAgent={handleLogoutAgent}
-      />
+      {/* Route-Loading Progress Bar (2px brand green, only visible during navigation) */}
+      {isRouteNavigating && <div className="route-nav-progress-bar" aria-hidden="true" />}
+
+      {/* Top Navbar (Hidden on Admin Operations Console) */}
+      {!currentView.startsWith('admin') && (
+        <TopNavbar
+          currentView={currentView}
+          onNavigate={navigateTo}
+          user={user}
+          agent={agent}
+          onOpenUserAuth={() => openLogin()}
+          onLogoutUser={handleLogout}
+          onLogoutAgent={handleLogoutAgent}
+        />
+      )}
+
+      {/* Role Mismatch or Session Notice Banner */}
+      {!currentView.startsWith('admin') && roleNoticeMessage && (
+        <div
+          className="global-role-notice-banner"
+          style={{
+            maxWidth: '1200px',
+            margin: '0.75rem auto',
+            padding: '0.75rem 1.25rem',
+            background: '#ecfdf5',
+            border: '1px solid #047857',
+            borderRadius: '8px',
+            color: '#047857',
+            fontSize: '0.9rem',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <span>{roleNoticeMessage}</span>
+          <button
+            type="button"
+            onClick={() => setRoleNoticeMessage('')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#047857',
+              fontSize: '1.25rem',
+              lineHeight: 1,
+              cursor: 'pointer',
+              padding: '0 0.5rem'
+            }}
+            aria-label="Dismiss message"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <main>
         {currentView === 'home' && (
@@ -354,9 +633,11 @@ function DashboardAppContent() {
             onNavigateToPartner={() => navigateTo('partner')}
             onNavigateToAbout={() => navigateTo('about')}
             onNavigateToBookings={() => navigateTo('bookings')}
-            onOpenAuth={() => setIsUserAuthOpen(true)}
+            onOpenAuth={(next = '/book') => openLogin(next)}
             user={user}
             agent={agent}
+            onLogoutUser={handleLogout}
+            onLogoutAgent={handleLogoutAgent}
           />
         )}
 
@@ -366,7 +647,7 @@ function DashboardAppContent() {
             defaultCategory={selectedServiceCategory}
             currentUser={user}
             currentAgent={currentView === 'partner' ? agent : null}
-            onOpenAuth={() => setIsUserAuthOpen(true)}
+            onOpenAuth={(next = '/book') => openLogin(next)}
             onAgentBlocked={() => openAgentNotice()}
             onNavigateToHome={() => navigateTo('home')}
             onNavigateToPartner={() => navigateTo('partner')}
@@ -385,7 +666,12 @@ function DashboardAppContent() {
 
         {currentView === 'partner' && (
           /* 4. Dedicated Service Partner / Agent Console Page */
-          <PartnerConsolePage agent={agent} partnerNavNonce={partnerNavNonce} />
+          <PartnerConsolePage agent={agent} partnerNavNonce={partnerNavNonce} onNavigate={navigateTo} />
+        )}
+
+        {currentView === 'partner-settlements' && (
+          /* Dedicated Professional Payouts & Settlements Page */
+          <PartnerEarningsPage agent={agent} onNavigate={navigateTo} />
         )}
 
         {currentView === 'bookings' && (
@@ -394,57 +680,69 @@ function DashboardAppContent() {
             currentUser={user}
             onNavigateToHome={() => navigateTo('home')}
             onNavigateToServices={(cat) => navigateTo('services', cat)}
-            onOpenAuth={() => setIsUserAuthOpen(true)}
+            onOpenAuth={() => openLogin('/my-bookings')}
             bookingsNavNonce={bookingsNavNonce}
           />
+        )}
+
+        {currentView === 'admin-login' && (
+          <AdminLoginPage />
+        )}
+
+        {currentView === 'admin' && (
+          <AdminLandingPage />
         )}
       </main>
 
       {/* User Login & Profile Modal */}
-      <UserAuthModal
-        isOpen={isUserAuthOpen}
-        onClose={() => setIsUserAuthOpen(false)}
-        user={user}
-        onLogin={handleLogin}
-        onLogout={handleLogout}
-      />
+      {!currentView.startsWith('admin') && (
+        <>
+          <UserAuthModal
+            isOpen={isUserAuthOpen}
+            onClose={() => setIsUserAuthOpen(false)}
+            user={user}
+            onLogin={handleLogin}
+            onLogout={handleLogout}
+          />
 
-      {/* Service Detail Exploration Modal (No login required) */}
-      <ServiceDetailModal
-        currentUser={user}
-        currentAgent={currentView === 'partner' ? agent : null}
-        onOpenAuth={() => setIsUserAuthOpen(true)}
-        onAgentBlocked={() => openAgentNotice()}
-      />
+          {/* Service Detail Exploration Modal (No login required) */}
+          <ServiceDetailModal
+            currentUser={user}
+            currentAgent={currentView === 'partner' ? agent : null}
+            onOpenAuth={(next = '/book') => openLogin(next)}
+            onAgentBlocked={() => openAgentNotice()}
+          />
 
-      {/* Agent Role Warning Notice Modal */}
-      <AgentRoleNoticeModal
-        onSwitchToCustomer={() => {
-          if (closeAgentNotice) closeAgentNotice();
-          setIsUserAuthOpen(true);
-        }}
-      />
+          {/* Agent Role Warning Notice Modal */}
+          <AgentRoleNoticeModal
+            onSwitchToCustomer={() => {
+              if (closeAgentNotice) closeAgentNotice();
+              openLogin('/book');
+            }}
+          />
 
-      {/* Customer Profile Incomplete Warning Modal (100% checklist required before booking) */}
-      <CustomerProfileIncompleteModal
-        isOpen={isProfileIncompleteModalOpen}
-        onClose={closeProfileIncompleteModal}
-        user={user}
-      />
+          {/* Customer Profile Incomplete Warning Modal (100% checklist required before booking) */}
+          <CustomerProfileIncompleteModal
+            isOpen={isProfileIncompleteModalOpen}
+            onClose={closeProfileIncompleteModal}
+            user={user}
+          />
 
-      {/* Active Service In Progress Blocked Modal (Dedicated Service Policy) */}
-      <ActiveBookingBlockedModal
-        onNavigateToBookings={() => navigateTo('bookings')}
-      />
+          {/* Active Service In Progress Blocked Modal (Dedicated Service Policy) */}
+          <ActiveBookingBlockedModal
+            onNavigateToBookings={() => navigateTo('bookings')}
+          />
 
-      {/* Interactive Booking Modal / Drawer */}
-      <InteractiveBookingModal
-        currentUser={user}
-        onOpenAuth={() => setIsUserAuthOpen(true)}
-      />
+          {/* Interactive Booking Modal / Drawer */}
+          <InteractiveBookingModal
+            currentUser={user}
+            onOpenAuth={(next = '/book') => openLogin(next)}
+          />
 
-      {/* Uber-Style Full Language Modal */}
-      <LanguageSelectorModal />
+          {/* Uber-Style Full Language Modal */}
+          <LanguageSelectorModal />
+        </>
+      )}
     </div>
   );
 }

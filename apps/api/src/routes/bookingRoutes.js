@@ -4,6 +4,8 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { pool } from '../config/db.js';
+import { requireCustomerAuth, requireAnyAuth } from '../middleware/authMiddleware.js';
+import { PaymentService } from '../modules/payments/paymentService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,7 +134,7 @@ router.get('/photos/:filename', (req, res) => {
 // =========================================================================
 // 3. Create Real Booking (Genuine Customer Action with Problem & Photos)
 // =========================================================================
-router.post('/', async (req, res) => {
+router.post('/', requireCustomerAuth, async (req, res) => {
   try {
     const {
       role,
@@ -185,6 +187,20 @@ router.post('/', async (req, res) => {
           error: `CUSTOMER_LOCKED: You currently have an active service job in progress (${activeReq.request_ref}: ${activeReq.service_title}). You cannot request another service until this job is completed.`,
           activeRequestRef: activeReq.request_ref,
           activeStatus: activeReq.status
+        });
+      }
+
+      // Unpaid Completed Job Gating
+      const customerIdentifier = userId || req.user?.id || req.userId;
+      const customerEmail = userEmail || req.userEmail || req.user?.email;
+      const unpaidCheck = await PaymentService.checkUnpaidCompletedJobs(customerIdentifier, customerEmail);
+      if (unpaidCheck.hasUnpaid) {
+        return res.status(403).json({
+          success: false,
+          code: 'UNPAID_COMPLETED_JOB',
+          error: 'Pay for your previous service first.',
+          message: 'Pay for your previous service first.',
+          unpaidBooking: unpaidCheck
         });
       }
     }
@@ -310,27 +326,21 @@ router.post('/', async (req, res) => {
 });
 
 // =========================================================================
-// 4. Genuine User Bookings List (Filter by actual authenticated user)
+// 4. Genuine User Bookings List (Filter strictly by authenticated user session)
 // =========================================================================
-router.get(['/my-bookings', '/me'], async (req, res) => {
+router.get(['/my-bookings', '/me'], requireCustomerAuth, async (req, res) => {
   try {
-    const { email, userId } = req.query;
-
-    if (!email && !userId) {
-      // Unauthenticated or empty query returns empty list (no fake global bookings)
-      return res.json({ success: true, bookings: [] });
-    }
-
-    const numericUserId = (userId && !isNaN(parseInt(userId, 10))) ? parseInt(userId, 10) : null;
+    const userId = req.userId;
+    const userEmail = req.userEmail;
 
     const query = `
       SELECT * FROM bookings
-      WHERE ($1::varchar IS NOT NULL AND user_email = $1)
-         OR ($2::int IS NOT NULL AND user_id = $2)
+      WHERE ($1::int IS NOT NULL AND user_id = $1)
+         OR ($2::varchar IS NOT NULL AND user_email = $2)
       ORDER BY created_at DESC;
     `;
 
-    const result = await pool.query(query, [email || null, numericUserId]);
+    const result = await pool.query(query, [userId || null, userEmail || null]);
 
     const formatted = result.rows.map(b => ({
       bookingId: b.booking_ref,
@@ -353,6 +363,11 @@ router.get(['/my-bookings', '/me'], async (req, res) => {
       userName: b.user_name,
       userEmail: b.user_email,
       userPhone: b.user_phone,
+      confirmed_at: b.confirmed_at,
+      on_the_way_at: b.on_the_way_at,
+      arrived_at: b.arrived_at,
+      in_progress_at: b.in_progress_at,
+      completed_at: b.completed_at,
       createdAt: b.created_at
     }));
 
@@ -364,9 +379,9 @@ router.get(['/my-bookings', '/me'], async (req, res) => {
 });
 
 // =========================================================================
-// 5. Get Booking by Reference
+// 5. Get Booking by Reference (Ownership & Door OTP Privacy Enforced)
 // =========================================================================
-router.get('/:ref', async (req, res) => {
+router.get('/:ref', requireAnyAuth, async (req, res) => {
   try {
     const { ref } = req.params;
     const result = await pool.query(
@@ -379,6 +394,24 @@ router.get('/:ref', async (req, res) => {
     }
 
     const b = result.rows[0];
+
+    // Ownership Authorization
+    const isOwnerCustomer = req.userRole === 'customer' && (
+      (req.userId && req.userId === b.user_id) ||
+      (req.userEmail && req.userEmail.toLowerCase() === (b.user_email || '').toLowerCase())
+    );
+    const isAssignedAgent = req.userRole === 'agent' && (
+      (req.agentId && req.agentId === b.assigned_agent_id)
+    );
+    const isAdmin = req.userRole === 'admin';
+
+    if (!isOwnerCustomer && !isAssignedAgent && !isAdmin) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'You are not authorized to view this booking.' });
+    }
+
+    // Door OTP is the customer's arrival confirmation secret — only the customer (or admin) can see it
+    const otpCode = (isOwnerCustomer || isAdmin) ? b.otp_code : null;
+
     return res.json({
       success: true,
       booking: {
@@ -396,12 +429,17 @@ router.get('/:ref', async (req, res) => {
         etaMinutes: b.eta_minutes,
         scheduledTime: b.time_slot,
         status: b.status,
-        otpCode: b.otp_code,
+        otpCode,
         totalAmount: b.total_amount,
         address: b.user_address,
         userName: b.user_name,
         userEmail: b.user_email,
         userPhone: b.user_phone,
+        confirmed_at: b.confirmed_at,
+        on_the_way_at: b.on_the_way_at,
+        arrived_at: b.arrived_at,
+        in_progress_at: b.in_progress_at,
+        completed_at: b.completed_at,
         cancelReason: b.cancel_reason,
         rating: b.rating,
         reviewFeedback: b.review_feedback,
@@ -417,7 +455,7 @@ router.get('/:ref', async (req, res) => {
 // =========================================================================
 // 6. Cancel Booking
 // =========================================================================
-router.patch('/:ref/cancel', async (req, res) => {
+router.patch('/:ref/cancel', requireAnyAuth, async (req, res) => {
   try {
     const { ref } = req.params;
     const { reason } = req.body;
@@ -454,7 +492,7 @@ router.patch('/:ref/cancel', async (req, res) => {
 // =========================================================================
 // 7. Reschedule Booking
 // =========================================================================
-router.patch('/:ref/reschedule', async (req, res) => {
+router.patch('/:ref/reschedule', requireCustomerAuth, async (req, res) => {
   try {
     const { ref } = req.params;
     const { scheduledTime } = req.body;
@@ -495,7 +533,7 @@ router.patch('/:ref/reschedule', async (req, res) => {
 // =========================================================================
 // 8. Rate & Review Booking Visit
 // =========================================================================
-router.post('/:ref/rate', async (req, res) => {
+router.post('/:ref/rate', requireCustomerAuth, async (req, res) => {
   try {
     const { ref } = req.params;
     const { rating, feedback, tags = [] } = req.body;

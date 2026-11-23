@@ -23,7 +23,7 @@ const visualPillars = [
     specDetails: 'Resolution: High-Res UI Spec • 306 KB • Multi-Language Ready',
     hotspots: [
       { top: '22%', left: '35%', title: 'Direct Google OAuth & Phone OTP', desc: 'Instant authentication with real database verification' },
-      { top: '55%', left: '40%', title: 'Segmented DOB Selector', desc: 'Ergonomic day/month/year selector for smooth profile completion' },
+      { top: '55%', left: '40%', title: 'Streamlined Account Setup', desc: 'Minimal required fields for rapid customer and partner sign-up' },
       { top: '80%', left: '50%', title: 'Account Mismatch Modal', desc: 'Intelligent fallback dialog localized in 10 Indian languages' }
     ]
   },

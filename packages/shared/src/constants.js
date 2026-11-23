@@ -3,6 +3,8 @@
  * Core domain configurations, thresholds, and business rules.
  */
 
+export const PLATFORM_COMMISSION_PERCENT = 15;
+
 export const TRACKER_STEPS = Object.freeze([
   { key: 'confirmed', label: 'Confirmed', stepIndex: 0 },
   { key: 'on_the_way', label: 'On the way', stepIndex: 1 },

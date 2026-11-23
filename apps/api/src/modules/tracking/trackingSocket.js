@@ -43,6 +43,7 @@ export async function getOrInitChannel(jobRef) {
 
   const channel = {
     jobRef,
+    requestId: row.id,
     assignedProId: row.assigned_professional_id,
     assignedProEmail: (row.pro_email || '').toLowerCase(),
     customerEmail: (row.user_email || '').toLowerCase(),
@@ -269,14 +270,43 @@ export async function processLocationUpdate(jobRef, rawLocation, proEmail) {
   // Also broadcast over SSE fallback channel
   notifyCustomer(jobRef, 'location.update', updatePayload);
 
+  // Persist live location telemetry into location_updates for zero data loss
+  if (channel.requestId && channel.assignedProId) {
+    pool.query(`
+      INSERT INTO location_updates (service_request_id, professional_id, lat, lng, accuracy, heading, speed)
+      VALUES ($1, $2, $3, $4, $5, $6, $7);
+    `, [
+      channel.requestId,
+      channel.assignedProId,
+      smoothedLat,
+      smoothedLng,
+      Math.round(accuracy),
+      finalHeading,
+      speed ? parseFloat(speed) : 0
+    ]).catch(() => {});
+  }
+
   return { success: true, payload: updatePayload };
+}
+
+let trackingWssInstance = null;
+
+export function handleTrackingUpgrade(req, socket, head) {
+  if (!trackingWssInstance) {
+    socket.destroy();
+    return;
+  }
+  trackingWssInstance.handleUpgrade(req, socket, head, (ws) => {
+    trackingWssInstance.emit('connection', ws, req);
+  });
 }
 
 /**
  * Initialize WebSocket Server for Realtime Location Pipeline.
  */
-export function initTrackingWebSocket(server) {
-  const wss = new WebSocketServer({ server, path: '/ws/tracking' });
+export function initTrackingWebSocket() {
+  const wss = new WebSocketServer({ noServer: true });
+  trackingWssInstance = wss;
 
   wss.on('connection', (ws) => {
     let currentJobRef = null;
@@ -353,4 +383,23 @@ export function initTrackingWebSocket(server) {
 
   console.log('🛰️ Real-time high-accuracy tracking WebSocket attached on /ws/tracking');
   return wss;
+}
+
+/**
+ * Broadcast arbitrary realtime payload (such as payment events) to all WebSocket subscribers of a job.
+ */
+export function broadcastToJobSockets(jobRef, payload) {
+  if (!jobRef || !activeJobChannels.has(jobRef)) return;
+  const channel = activeJobChannels.get(jobRef);
+  const jsonStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  channel.customerSockets.forEach((ws) => {
+    try {
+      if (ws.readyState === 1) ws.send(jsonStr);
+    } catch (_) {}
+  });
+  channel.proSockets.forEach((ws) => {
+    try {
+      if (ws.readyState === 1) ws.send(jsonStr);
+    } catch (_) {}
+  });
 }

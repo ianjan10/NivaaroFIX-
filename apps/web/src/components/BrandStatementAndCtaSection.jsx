@@ -1,11 +1,14 @@
 import React from 'react';
+import { useBooking } from '../context/BookingContext';
 
-export default function BrandStatementAndCtaSection({ onNavigateToServices }) {
+export default function BrandStatementAndCtaSection({ onNavigateToServices, currentUser = null, onOpenAuth = null }) {
+  const { openServiceDetail } = useBooking();
+
   const handleClick = () => {
     if (onNavigateToServices) {
       onNavigateToServices('all');
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (openServiceDetail) {
+      openServiceDetail('electrician');
     }
   };
 

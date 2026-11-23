@@ -46,7 +46,8 @@ export default function BookingTrackLiveModal({ isOpen, onClose, booking, onCont
 
   if (!isOpen || !booking) return null;
 
-  const proName = (booking.technicianName || booking.agentName || '').trim() || 'Professional';
+  const rawProName = (booking.technicianName || booking.agentName || '').trim() || 'Professional';
+  const proName = rawProName.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
   const proTrade = booking.trade || (booking.category === 'plumber' ? 'Plumber' : 'Electrician');
   const proRating = booking.technicianRating || booking.agentRating;
   const proJobs = booking.technicianJobs !== undefined ? booking.technicianJobs : (booking.agentCompletedJobs || 0);
@@ -215,7 +216,7 @@ export default function BookingTrackLiveModal({ isOpen, onClose, booking, onCont
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
                 <span>
-                  {proRating && Number(proRating) > 0 ? Number(proRating).toFixed(1) : 'New'} ({proJobs} jobs)
+                  {proRating && Number(proRating) > 0 ? Number(proRating).toFixed(1) : 'New'}
                 </span>
               </span>
             </div>

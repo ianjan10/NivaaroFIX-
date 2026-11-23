@@ -1,5 +1,6 @@
 import assert from 'assert';
-import WebSocket from '../apps/api/node_modules/ws/index.js';
+import WebSocket from 'ws';
+import { pool } from '../apps/api/src/config/db.js';
 
 const BASE_URL = 'http://localhost:5000';
 const WS_BASE_URL = 'ws://localhost:5000';
@@ -10,6 +11,14 @@ async function runE2ETest() {
   const timestamp = Date.now();
   const testCustomerEmail = `test.customer.${timestamp}@nivaarofix.test`;
   const testProEmail = `test.pro.${timestamp}@nivaarofix.test`;
+  const testProPhone = `+91 98${String(timestamp).slice(-8)}`;
+  const testCustomerPhone = `+91 97${String(timestamp).slice(-8)}`;
+
+  // Clean any stale test accounts from previous aborted runs
+  await pool.query("DELETE FROM agent_login WHERE phone = '+91 9888877771' OR email LIKE '%nivaarofix.test'");
+  await pool.query("DELETE FROM professionals WHERE phone = '+91 9888877771' OR email LIKE '%nivaarofix.test'");
+  await pool.query("DELETE FROM user_login WHERE email LIKE '%nivaarofix.test'");
+  await pool.query("DELETE FROM customers WHERE email LIKE '%nivaarofix.test'");
 
   // Customer location: Indiranagar, Bengaluru
   const customerLat = 12.9783;
@@ -30,19 +39,23 @@ async function runE2ETest() {
     body: JSON.stringify({
       email: testProEmail,
       name: 'Ramesh Electrician',
-      phone: '+91 9888877771',
+      phone: testProPhone,
       password: 'Password@123',
       trade: 'electrician'
     })
   });
   const regData = await regRes.json();
   assert.strictEqual(regRes.status, 201, `Failed to register agent: ${JSON.stringify(regData)}`);
+  const proToken = regData.sessionToken || regRes.headers.get('set-cookie')?.match(/nivaarofix_session=([^;]+)/)?.[1];
   console.log(`✅ Professional registered: ${testProEmail}`);
 
   // Set pro's initial coordinates
   const locUpdateRes = await fetch(`${BASE_URL}/api/agent/location`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({
       email: testProEmail,
       lat: proInitialLat,
@@ -53,10 +66,31 @@ async function runE2ETest() {
   assert.strictEqual(locUpdateRes.status, 200, 'Failed to update pro initial location');
   console.log(`✅ Professional location initialized at (${proInitialLat}, ${proInitialLng})`);
 
-  console.log('\n--- 2. CUSTOMER BOOKS WITH CONFIRMED PIN ---');
-  const bookRes = await fetch(`${BASE_URL}/api/dispatch/request`, {
+  // Activate payout details for quotation eligibility
+  await pool.query("UPDATE professionals SET payout_status = 'active' WHERE LOWER(email) = $1", [testProEmail.toLowerCase()]);
+  await pool.query("UPDATE agent_login SET payout_status = 'active' WHERE LOWER(email) = $1", [testProEmail.toLowerCase()]);
+
+  console.log('\n--- 2. REGISTER CUSTOMER & BOOK WITH CONFIRMED PIN ---');
+  const custRegRes = await fetch(`${BASE_URL}/api/auth/customer-register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: testCustomerEmail,
+      name: 'Anita Sharma',
+      phone: testCustomerPhone,
+      password: 'Password@123'
+    })
+  });
+  const custRegData = await custRegRes.json();
+  assert.strictEqual(custRegRes.status, 201, `Customer register failed: ${JSON.stringify(custRegData)}`);
+  const customerToken = custRegData.sessionToken || custRegRes.headers.get('set-cookie')?.match(/nivaarofix_session=([^;]+)/)?.[1];
+
+  const bookRes = await fetch(`${BASE_URL}/api/dispatch/request`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${customerToken}`
+    },
     body: JSON.stringify({
       userEmail: testCustomerEmail,
       userName: 'Anita Sharma',
@@ -95,7 +129,10 @@ async function runE2ETest() {
   // Attempt invalid quote <= 0
   const zeroQuoteRes = await fetch(`${BASE_URL}/api/dispatch/quote`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({
       requestRef,
       agentEmail: testProEmail,
@@ -112,7 +149,10 @@ async function runE2ETest() {
   const validQuoteAmount = 480;
   const quoteRes = await fetch(`${BASE_URL}/api/dispatch/quote`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({
       requestRef,
       agentEmail: testProEmail,
@@ -129,7 +169,10 @@ async function runE2ETest() {
   console.log('\n--- 5. CUSTOMER ACCEPTS QUOTE & VERIFIES AGREED PAYOUT ---');
   const acceptRes = await fetch(`${BASE_URL}/api/dispatch/quote/${quoteId}/accept`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${customerToken}`
+    }
   });
   const acceptData = await acceptRes.json();
   assert.strictEqual(acceptRes.status, 200, `Accept failed: ${JSON.stringify(acceptData)}`);
@@ -149,7 +192,10 @@ async function runE2ETest() {
   console.log('\n--- 6. MARK EN ROUTE / ON THE WAY ---');
   const enRouteRes = await fetch(`${BASE_URL}/api/dispatch/request/${requestRef}/en-route`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({ agentEmail: testProEmail })
   });
   const enRouteData = await enRouteRes.json();
@@ -221,7 +267,10 @@ async function runE2ETest() {
   // Also test HTTP fallback location endpoint
   const httpLocRes = await fetch(`${BASE_URL}/api/dispatch/job/${requestRef}/location`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({
       agentEmail: testProEmail,
       lat: 12.9720,
@@ -239,7 +288,10 @@ async function runE2ETest() {
   // Attempt 1: Far away arrival attempt (1.5 km away)
   const farArrivedRes = await fetch(`${BASE_URL}/api/dispatch/request/${requestRef}/arrived`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({
       agentEmail: testProEmail,
       lat: proInitialLat,
@@ -255,7 +307,10 @@ async function runE2ETest() {
   // Attempt 2: Doorstep arrival (<50 meters)
   const nearArrivedRes = await fetch(`${BASE_URL}/api/dispatch/request/${requestRef}/arrived`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({
       agentEmail: testProEmail,
       lat: proDoorstepLat,
@@ -273,7 +328,10 @@ async function runE2ETest() {
   // Attempt invalid OTP
   const wrongOtpRes = await fetch(`${BASE_URL}/api/dispatch/request/${requestRef}/verify-otp`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({ otp: '9999' })
   });
   assert.strictEqual(wrongOtpRes.status, 400);
@@ -282,7 +340,10 @@ async function runE2ETest() {
   // Correct OTP
   const correctOtpRes = await fetch(`${BASE_URL}/api/dispatch/request/${requestRef}/verify-otp`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({ otp: otpCode })
   });
   const correctOtpData = await correctOtpRes.json();
@@ -294,7 +355,10 @@ async function runE2ETest() {
   // Try complete without photo
   const noPhotoRes = await fetch(`${BASE_URL}/api/dispatch/request/${requestRef}/complete`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({
       agentEmail: testProEmail,
       photos: []
@@ -306,7 +370,10 @@ async function runE2ETest() {
   // Complete with photo
   const completeRes = await fetch(`${BASE_URL}/api/dispatch/request/${requestRef}/complete`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${proToken}`
+    },
     body: JSON.stringify({
       agentEmail: testProEmail,
       photos: ['https://storage.nivaarofix.test/completed_work_01.jpg'],
@@ -321,7 +388,10 @@ async function runE2ETest() {
   console.log('\n--- 11. CUSTOMER RATES PROFESSIONAL ---');
   const rateRes = await fetch(`${BASE_URL}/api/dispatch/request/${requestRef}/rate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${customerToken}`
+    },
     body: JSON.stringify({
       rating: 5,
       feedback: 'Arrived promptly on motorcycle, verified safety switch, and left area neat.',
@@ -334,7 +404,6 @@ async function runE2ETest() {
   console.log(`✅ 5-star customer rating submitted.`);
 
   console.log('\n--- 12. CLEANUP & VERIFY EMPTY STATES ---');
-  const { pool } = await import('../apps/api/src/config/db.js');
   await pool.query('DELETE FROM reviews WHERE request_id IN (SELECT id FROM service_requests WHERE user_email LIKE \'%nivaarofix.test\') OR customer_id IS NULL;');
   await pool.query('DELETE FROM wallet_transactions WHERE agent_id IN (SELECT id FROM agent_login WHERE email LIKE \'%nivaarofix.test\') OR request_ref IN (SELECT service_request_code FROM service_requests WHERE user_email LIKE \'%nivaarofix.test\');');
   await pool.query('DELETE FROM payouts WHERE professional_id IN (SELECT id FROM professionals WHERE email LIKE \'%nivaarofix.test\') OR service_request_id IN (SELECT id FROM service_requests WHERE user_email LIKE \'%nivaarofix.test\');');
@@ -356,6 +425,7 @@ async function runE2ETest() {
 
   console.log('✅ All test transactional records verified removed from database.');
   console.log('\n🎉 ALL 12 END-TO-END STEPS PASSED WITH 100% SUCCESS! 🚀');
+  process.exit(0);
 }
 
 runE2ETest().catch((err) => {

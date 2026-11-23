@@ -31,7 +31,7 @@ const HERO_PHOTO_INTERVAL = 5000;
 const ROTATING_WORD_INTERVAL = 3800;
 const rotatingWords = ['confidence', 'care', 'precision'];
 
-export default function HeroSearchSection({ onNavigateToServices }) {
+export default function HeroSearchSection({ onNavigateToServices, currentUser = null, onOpenAuth = null }) {
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [currentWordIdx, setCurrentWordIdx] = useState(0);
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -41,7 +41,7 @@ export default function HeroSearchSection({ onNavigateToServices }) {
   
   const searchInputRef = useRef(null);
   const searchFormRef = useRef(null);
-  const { openBookingFor } = useBooking();
+  const { openBookingFor, initiateProtectedBooking, openServiceDetail } = useBooking();
   const { getLocalizedService, t } = useLanguage();
 
   // 1. Subtle photo transition
@@ -89,15 +89,35 @@ export default function HeroSearchSection({ onNavigateToServices }) {
     : [];
 
   const handleSelectService = (service) => {
+    const text = searchTerm.trim();
     setSearchTerm('');
     setIsSearching(false);
-    openBookingFor(service);
+    const targetSlug = service?.categoryId || service?.id || (typeof service === 'string' ? service : 'electrician');
+    const targetIssue = text || service?.title || null;
+    if (openServiceDetail) {
+      openServiceDetail(targetSlug, targetIssue);
+    } else if (onNavigateToServices) {
+      onNavigateToServices(targetSlug);
+    }
   };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (filteredSuggestions.length > 0) {
       handleSelectService(filteredSuggestions[0]);
+    } else if (searchTerm.trim().length > 0) {
+      const q = searchTerm.trim().toLowerCase();
+      const trade = (q.includes('plumb') || q.includes('tap') || q.includes('pipe') || q.includes('leak') || q.includes('drain'))
+        ? 'plumber'
+        : 'electrician';
+      const text = searchTerm.trim();
+      setSearchTerm('');
+      setIsSearching(false);
+      if (openServiceDetail) {
+        openServiceDetail(trade, text);
+      } else if (onNavigateToServices) {
+        onNavigateToServices(trade);
+      }
     } else if (onNavigateToServices) {
       onNavigateToServices('all');
     }
@@ -109,10 +129,11 @@ export default function HeroSearchSection({ onNavigateToServices }) {
       s.shortDesc.toLowerCase().includes(item.query) ||
       (s.commonIssues && s.commonIssues.some(iss => iss.name.toLowerCase().includes(item.query)))
     );
-    if (matching) {
-      openBookingFor(matching);
+    const targetSlug = matching ? (matching.categoryId || matching.id) : (item.category || 'electrician');
+    if (openServiceDetail) {
+      openServiceDetail(targetSlug, item.label);
     } else if (onNavigateToServices) {
-      onNavigateToServices(item.category);
+      onNavigateToServices(targetSlug);
     }
   };
 

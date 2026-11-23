@@ -2,12 +2,15 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePartner } from '../context/PartnerContext';
 import { useLanguage } from '../context/LanguageContext';
 import { evaluateAgentChecklist } from '../utils/profileStrength';
+import { fastDeepEqual } from '../hooks/useSilentRealtime';
 import BookingToast from '../components/BookingToast';
 import UnifiedOtpInput from '../components/UnifiedOtpInput';
 import PartnerActiveNavigationMap from '../components/PartnerActiveNavigationMap';
+import BookingProgressTracker from '../components/BookingProgressTracker';
+import ProfessionalPayoutModal from '../components/ProfessionalPayoutModal';
 import '../styles/PartnerConsole.css';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 /**
  * Format distance cleanly:
@@ -96,7 +99,7 @@ function StarRatingIcons({ rating }) {
   );
 }
 
-export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce = 0 }) {
+export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce = 0, onNavigate }) {
   const {
     isOnline,
     toggleOnline,
@@ -141,6 +144,12 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     }
   });
 
+  useEffect(() => {
+    if (propAgent) {
+      setCurrentAgent(propAgent);
+    }
+  }, [propAgent]);
+
   const [withdrawSuccessMsg, setWithdrawSuccessMsg] = useState('');
   const [eligibilityNoticeMsg, setEligibilityNoticeMsg] = useState('');
   const [activeTab, setActiveTab] = useState(() => {
@@ -160,11 +169,60 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
   const [completionRemarks, setCompletionRemarks] = useState('');
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
 
+  // Live Working Location & Heartbeat state
+  const [showLocationPromptPopover, setShowLocationPromptPopover] = useState(false);
+  const [isAcquiringFix, setIsAcquiringFix] = useState(false);
+  const [currentLocality, setCurrentLocality] = useState(currentAgent?.currentLocality || currentAgent?.current_locality || '');
+  const [offlineExplanation, setOfflineExplanation] = useState(null);
+  const lastLocationSentRef = useRef({ lat: 0, lng: 0, time: 0 });
+
   // Real database-backed completed jobs & customer reviews
   const [pastJobs, setPastJobs] = useState([]);
   const [pastJobsLoading, setPastJobsLoading] = useState(false);
   const [customerReviews, setCustomerReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  // Professional Payout & Automated Route Earnings State
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [payoutStatusInfo, setPayoutStatusInfo] = useState({ payout_status: 'not_set', bank_name: '', bank_last4: '' });
+  const [earningsData, setEarningsData] = useState({ totalEarned: 0, pendingSettlement: 0, settled: 0, jobs: [] });
+  const [earningsLoading, setEarningsLoading] = useState(false);
+
+  const fetchPayoutAndEarnings = useCallback(async (isSilent = false) => {
+    if (!currentAgent?.email) return;
+    try {
+      if (!isSilent && (!earningsData.jobs || earningsData.jobs.length === 0)) {
+        setEarningsLoading(true);
+      }
+      const [statusRes, earnRes] = await Promise.all([
+        fetch(`${API_BASE}/agents/payout-status?email=${encodeURIComponent(currentAgent.email)}`, { credentials: 'include' }),
+        fetch(`${API_BASE}/agents/earnings?email=${encodeURIComponent(currentAgent.email)}`, { credentials: 'include' })
+      ]);
+      if (statusRes.ok) {
+        const sData = await statusRes.json();
+        if (sData.success) {
+          setPayoutStatusInfo(prev => (fastDeepEqual(prev, sData) ? prev : sData));
+        }
+      }
+      if (earnRes.ok) {
+        const eData = await earnRes.json();
+        if (eData.success) {
+          const sum = eData.summary || {};
+          const nextData = {
+            totalEarned: eData.totalEarned ?? sum.totalEarned ?? 0,
+            pendingSettlement: eData.pendingSettlement ?? sum.pendingSettlement ?? 0,
+            settled: eData.settled ?? sum.settled ?? 0,
+            jobs: eData.jobs || []
+          };
+          setEarningsData(prev => (fastDeepEqual(prev, nextData) ? prev : nextData));
+        }
+      }
+    } catch (err) {
+      console.warn('Earnings fetch notice:', err.message);
+    } finally {
+      setEarningsLoading(false);
+    }
+  }, [currentAgent?.email, earningsData.jobs]);
 
   // Completed Jobs Filter, Sort & Interactive Accordion State
   const [completedSort, setCompletedSort] = useState('recent'); // 'recent' | 'highest_rated' | 'lowest_rated'
@@ -183,41 +241,41 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     });
   };
 
-  const loadPastJobs = useCallback(async (email) => {
+  const loadPastJobs = useCallback(async (email, isSilent = false) => {
     if (!email) return;
-    setPastJobsLoading(true);
+    if (!isSilent && pastJobs.length === 0) {
+      setPastJobsLoading(true);
+    }
     try {
-      const res = await fetch(`${API_BASE}/agents/completed-jobs/${encodeURIComponent(email)}`);
+      const res = await fetch(`${API_BASE}/agents/completed-jobs/${encodeURIComponent(email)}`, { credentials: 'include' });
       const data = await res.json();
       if (data.success && Array.isArray(data.jobs)) {
-        setPastJobs(data.jobs);
-      } else {
-        setPastJobs([]);
+        setPastJobs(prev => (fastDeepEqual(prev, data.jobs) ? prev : data.jobs));
       }
     } catch {
-      setPastJobs([]);
+      // Keep existing data to prevent flicker
     } finally {
       setPastJobsLoading(false);
     }
-  }, []);
+  }, [pastJobs.length]);
 
-  const loadCustomerReviews = useCallback(async (email) => {
+  const loadCustomerReviews = useCallback(async (email, isSilent = false) => {
     if (!email) return;
-    setReviewsLoading(true);
+    if (!isSilent && customerReviews.length === 0) {
+      setReviewsLoading(true);
+    }
     try {
-      const res = await fetch(`${API_BASE}/agents/reviews/${encodeURIComponent(email)}`);
+      const res = await fetch(`${API_BASE}/agents/reviews/${encodeURIComponent(email)}`, { credentials: 'include' });
       const data = await res.json();
       if (data.success && Array.isArray(data.reviews)) {
-        setCustomerReviews(data.reviews);
-      } else {
-        setCustomerReviews([]);
+        setCustomerReviews(prev => (fastDeepEqual(prev, data.reviews) ? prev : data.reviews));
       }
     } catch {
-      setCustomerReviews([]);
+      // Keep existing data to prevent flicker
     } finally {
       setReviewsLoading(false);
     }
-  }, []);
+  }, [customerReviews.length]);
 
   // Initial tab resolution on console load / entry:
   // When there are no live requests and no active job in progress, automatically land on 'completed' jobs;
@@ -327,7 +385,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
   const formatPrecisePartnerLocation = (agent) => {
     if (!agent) return t.proLocationPending || 'Location Pending';
 
-    // 1. If explicit address exists (e.g. "Dilshad Garden, Delhi, Delhi 110095")
+    // 1. If explicit address exists, extract the locality
     if (agent.address) {
       const cleaned = agent.address
         .replace(/\b\d{6}\b/g, '') // remove postal code
@@ -353,35 +411,18 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     // 2. If locality exists
     if (agent.locality) {
       const loc = agent.locality.replace(/\b(Hub|hub)\b/gi, '').trim();
-      const ct = (agent.city || '').replace(/\b(Hub|hub)\b/gi, '').trim();
-      if (loc && ct && !ct.toLowerCase().includes(loc.toLowerCase())) {
-        return `${loc}, ${ct}`;
-      }
       if (loc) return loc;
-    }
-
-    // 3. If city exists
-    if (agent.city) {
-      const cleanCity = agent.city.replace(/\b(Hub|hub)\b/gi, '').trim();
-      if (cleanCity) return cleanCity;
-    }
-
-    // 4. If state exists
-    if (agent.state) {
-      const cleanState = agent.state.replace(/\b(Hub|hub)\b/gi, '').trim();
-      if (cleanState) return cleanState;
     }
 
     return t.proLocationPending || 'Location Pending';
   };
 
   const partnerLocation = formatPrecisePartnerLocation(currentAgent);
-  const partnerTrade = currentAgent?.trade === 'both'
-    ? 'Electrician & Plumber'
-    : currentAgent?.trade === 'plumber' 
-      ? (t.proTradePlumber || 'Plumber') 
-      : (currentAgent?.trade ? formatTitleCase(currentAgent.trade) : (t.proTradeElectrician || 'Electrician'));
+  const partnerTrade = currentAgent?.trade === 'plumber' 
+    ? (t.proTradePlumber || 'Plumber') 
+    : (t.proTradeElectrician || 'Electrician');
   const partnerInitials = (partnerName || 'P').trim().charAt(0).toUpperCase();
+  const proAvatarUrl = currentAgent?.avatarUrl || currentAgent?.avatar_url || (currentAgent?.isLoggedIn ? `/api/verification/photo/stream?id=${currentAgent?.id || currentAgent?.partner_id || currentAgent?.partnerId || 1}` : null);
 
   // Check if provider is busy on an ongoing job (mutual exclusivity requirement)
   const isBusyOnJob = Boolean(
@@ -413,6 +454,8 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     if (currentAgent?.email) {
       loadProviderProfile(currentAgent.email).then((profile) => {
         if (profile) {
+          if (profile.offlineExplanation && isOnline) setOfflineExplanation(profile.offlineExplanation);
+          if (profile.currentLocality) setCurrentLocality(profile.currentLocality);
           setCurrentAgent((prev) => {
             const merged = { ...prev, ...profile };
             try {
@@ -427,6 +470,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
       loadWallet(currentAgent.email);
       loadPastJobs(currentAgent.email);
       loadCustomerReviews(currentAgent.email);
+      fetchPayoutAndEarnings();
       if (autoFetchAndConnectLocation) {
         autoFetchAndConnectLocation(currentAgent.email, currentAgent.city || 'Bengaluru');
       } else {
@@ -435,7 +479,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     }
   }, [currentAgent?.email, loadProviderProfile, loadActiveJob, loadWallet, loadPastJobs, loadCustomerReviews, loadNearbyRequests, autoFetchAndConnectLocation]);
 
-  // Real-time automatic background polling (every 3 seconds - no manual refresh needed)
+  // Real-time automatic background polling (every 3 seconds - zero flicker, no manual refresh needed)
   useEffect(() => {
     if (!currentAgent?.email) return;
 
@@ -446,11 +490,11 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
         if (!isBusyOnJob) {
           const targetLat = providerLocation?.lat || currentAgent?.lat || null;
           const targetLng = providerLocation?.lng || currentAgent?.lng || null;
-          loadNearbyRequests(currentAgent.email, targetLat, targetLng);
+          loadNearbyRequests(currentAgent.email, targetLat, targetLng, 10, true);
         }
         if (activeTab === 'completed') {
-          loadPastJobs(currentAgent.email);
-          loadCustomerReviews(currentAgent.email);
+          loadPastJobs(currentAgent.email, true);
+          loadCustomerReviews(currentAgent.email, true);
         }
       } catch (err) {
         // Silent sync catch
@@ -460,41 +504,96 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     return () => clearInterval(pollInterval);
   }, [currentAgent, isBusyOnJob, activeTab, providerLocation, loadActiveJob, loadWallet, loadNearbyRequests, loadPastJobs, loadCustomerReviews]);
 
-  // Automatic background live GPS tracking without human intervention
+  // Continuous working GPS tracking & 60-second heartbeat while Available
   useEffect(() => {
     if (!isOnline || !currentAgent?.email) return;
 
-    // Immediate live location fetch upon going online
-    if (autoFetchAndConnectLocation) {
-      autoFetchAndConnectLocation(currentAgent.email, currentAgent.city || 'Bengaluru');
-    }
-
-    // Continuous browser geolocation tracking without human intervention
     let watchId = null;
+    let heartbeatTimer = null;
+
+    const sendWorkingLocationUpdate = async (coords) => {
+      try {
+        const res = await fetch(`${API_BASE}/providers/me/location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: currentAgent.email,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy_m: coords.accuracy || 10
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.currentLocality) {
+            setCurrentLocality(data.currentLocality);
+          }
+          lastLocationSentRef.current = {
+            lat: coords.latitude,
+            lng: coords.longitude,
+            time: Date.now()
+          };
+        }
+      } catch (err) {}
+    };
+
     if (typeof window !== 'undefined' && navigator.geolocation) {
       try {
         watchId = navigator.geolocation.watchPosition(
           (pos) => {
-            const lat = parseFloat(pos.coords.latitude.toFixed(6));
-            const lng = parseFloat(pos.coords.longitude.toFixed(6));
-            if (updateLocation && currentAgent?.email) {
-              updateLocation(currentAgent.email, lat, lng);
+            const { latitude, longitude, accuracy } = pos.coords;
+            const now = Date.now();
+            const last = lastLocationSentRef.current;
+            
+            // Distance calculation in meters
+            const R = 6371e3;
+            const phi1 = (last.lat * Math.PI) / 180;
+            const phi2 = (latitude * Math.PI) / 180;
+            const dPhi = ((latitude - last.lat) * Math.PI) / 180;
+            const dLam = ((longitude - last.lng) * Math.PI) / 180;
+            const a = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLam / 2) ** 2;
+            const distM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const timeDiffSec = (now - last.time) / 1000;
+
+            const isJobTracking = Boolean(activePartnerJob);
+            const minTimeSec = isJobTracking ? 3 : 10;
+            const minDistanceM = isJobTracking ? 5 : 25;
+
+            if (timeDiffSec >= minTimeSec && (distM >= minDistanceM || last.time === 0)) {
+              sendWorkingLocationUpdate({ latitude, longitude, accuracy });
+              if (updateLocation) {
+                updateLocation(currentAgent.email, latitude, longitude);
+              }
             }
           },
-          () => {
-            // Silent fallback to registered hub coordinates
-          },
-          { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
         );
       } catch (err) {}
     }
+
+    // 60-second heartbeat while Available
+    heartbeatTimer = setInterval(() => {
+      if (typeof window !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            sendWorkingLocationUpdate(pos.coords);
+          },
+          () => {},
+          { enableHighAccuracy: false, maximumAge: 30000, timeout: 8000 }
+        );
+      }
+    }, 60000);
 
     return () => {
       if (watchId !== null && typeof window !== 'undefined' && navigator.geolocation) {
         navigator.geolocation.clearWatch(watchId);
       }
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+      }
     };
-  }, [isOnline, currentAgent, autoFetchAndConnectLocation, updateLocation]);
+  }, [isOnline, currentAgent?.email, activePartnerJob, updateLocation]);
 
   // Real-time SSE streaming for provider
   useEffect(() => {
@@ -503,7 +602,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
     let eventSource = null;
     try {
       const emailEncoded = encodeURIComponent(currentAgent.email.toLowerCase().trim());
-      eventSource = new EventSource(`http://localhost:5000/api/realtime/provider/${emailEncoded}`);
+      eventSource = new EventSource(`/api/realtime/provider/${emailEncoded}`);
 
       eventSource.addEventListener('quote.dispatched', (e) => {
         try {
@@ -530,6 +629,13 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
       eventSource.addEventListener('status.en_route', (e) => {
         try {
           addToast('Status Updated: You are now marked En Route to the customer.', 'info');
+          loadActiveJob(currentAgent.email);
+        } catch (err) {}
+      });
+
+      eventSource.addEventListener('status.arrived', (e) => {
+        try {
+          addToast('Status Updated: You are marked Arrived at customer doorstep.', 'info');
           loadActiveJob(currentAgent.email);
         } catch (err) {}
       });
@@ -613,27 +719,99 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
   }, [currentAgent, loadActiveJob, loadWallet, loadNearbyRequests, providerLocation]);
 
   const handleWithdraw = async () => {
-    if (walletBalance <= 0) return;
-    const withdrawAmt = walletBalance;
-    try {
-      if (currentAgent?.email) {
-        const res = await fetch(`${API_BASE}/dispatch/withdraw`, {
+    addToast('Bank payouts will be available after payment settlement integration.', 'destructive');
+  };
+
+  const executeAcquireFixAndGoAvailable = async () => {
+    if (currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') {
+      addToast('Your account is permanently banned from NivaaroFix. You cannot go available.', 'destructive');
+      return;
+    }
+    if (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) {
+      addToast('Your account is suspended for 1 week. You cannot go available during suspension.', 'destructive');
+      return;
+    }
+
+    setIsAcquiringFix(true);
+    let bestFix = null;
+    let completed = false;
+
+    // Graceful fallback to registered / saved location
+    const fallbackLat = Number(currentAgent?.currentLatitude || currentAgent?.lat || providerLocation?.lat || 10.765787);
+    const fallbackLng = Number(currentAgent?.currentLongitude || currentAgent?.lng || providerLocation?.lng || 78.814009);
+    const fallbackFix = { latitude: fallbackLat, longitude: fallbackLng, accuracy: 20 };
+
+    const finalizeFix = async (fix) => {
+      if (completed) return;
+      completed = true;
+      setIsAcquiringFix(false);
+
+      const targetFix = fix || fallbackFix;
+
+      try {
+        const res = await fetch(`${API_BASE}/providers/me/location`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: currentAgent.email, amount: withdrawAmt })
+          body: JSON.stringify({
+            email: currentAgent.email,
+            latitude: targetFix.latitude,
+            longitude: targetFix.longitude,
+            accuracy_m: targetFix.accuracy || 20
+          })
         });
-        const data = await res.json();
-        if (data.success) {
-          loadWallet(currentAgent.email);
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.currentLocality) {
+            setCurrentLocality(data.currentLocality);
+          }
         }
+
+        await toggleOnline(currentAgent.email, true);
+        addToast('You are now Available and receiving nearby jobs.', 'brass');
+        loadNearbyRequests(currentAgent.email, targetFix.latitude, targetFix.longitude);
+      } catch (err) {
+        // Even if network fails to save location, toggle online directly
+        await toggleOnline(currentAgent.email, true);
+        addToast('You are now Available and receiving nearby jobs.', 'brass');
+        loadNearbyRequests(currentAgent.email, targetFix.latitude, targetFix.longitude);
       }
-    } catch (e) {
-      console.warn('Withdrawal API notice:', e.message);
+    };
+
+    const timeoutTimer = setTimeout(() => {
+      finalizeFix(bestFix || fallbackFix);
+    }, 3000);
+
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      let watchId = null;
+      try {
+        watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            const { latitude, longitude, accuracy } = pos.coords;
+            if (!bestFix || accuracy < bestFix.accuracy) {
+              bestFix = { latitude, longitude, accuracy };
+            }
+            if (accuracy <= 30) {
+              clearTimeout(timeoutTimer);
+              if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+              finalizeFix(bestFix);
+            }
+          },
+          (err) => {
+            clearTimeout(timeoutTimer);
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            finalizeFix(bestFix || fallbackFix);
+          },
+          { enableHighAccuracy: false, timeout: 3000, maximumAge: 30000 }
+        );
+      } catch {
+        clearTimeout(timeoutTimer);
+        finalizeFix(fallbackFix);
+      }
+    } else {
+      clearTimeout(timeoutTimer);
+      finalizeFix(fallbackFix);
     }
-    const msg = `₹${withdrawAmt.toLocaleString('en-IN')} transferred to primary bank account via Instant IMPS.`;
-    setWithdrawSuccessMsg(msg);
-    addToast(msg, 'brass');
-    setTimeout(() => setWithdrawSuccessMsg(''), 10000);
   };
 
   const handleToggleOnline = async () => {
@@ -651,18 +829,19 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
       setTimeout(() => setEligibilityNoticeMsg(''), 10000);
       return;
     }
-    if (currentAgent?.email) {
-      const nextStatus = !isOnline;
-      await toggleOnline(currentAgent.email, nextStatus);
-      addToast(nextStatus ? 'You are now ONLINE and discoverable for nearby service dispatches.' : 'You are now OFFLINE.', nextStatus ? 'brass' : 'info');
-      if (nextStatus) {
-        if (autoFetchAndConnectLocation) {
-          autoFetchAndConnectLocation(currentAgent.email, currentAgent.city || 'Bengaluru');
-        } else {
-          loadNearbyRequests(currentAgent.email, currentAgent.lat, currentAgent.lng);
-        }
-      }
+
+    if (!currentAgent?.email) return;
+
+    if (isOnline) {
+      // Switching to Offline clears working location
+      await toggleOnline(currentAgent.email, false);
+      setCurrentLocality('');
+      addToast('You are now Offline.', 'info');
+      return;
     }
+
+    // Seamlessly go Available without blocking popover or error
+    executeAcquireFixAndGoAvailable();
   };
 
   const handleManualFeedRefresh = async () => {
@@ -1019,9 +1198,9 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
       {/* ================= 1. MINIMAL HEADER BAR ================= */}
       <header className="pro-header-bar">
         <div className="pro-header-identity">
-          {currentAgent?.avatarUrl ? (
+          {proAvatarUrl ? (
             <img
-              src={currentAgent.avatarUrl}
+              src={proAvatarUrl}
               alt={partnerName}
               className="pro-avatar"
               style={{ objectFit: 'cover' }}
@@ -1037,7 +1216,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
           <div
             className="pro-avatar"
             style={{
-              display: currentAgent?.avatarUrl ? 'none' : 'flex',
+              display: proAvatarUrl ? 'none' : 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 700,
@@ -1062,9 +1241,35 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
                   <span className="pro-meta-divider" aria-hidden="true" />
                 </>
               )}
-              <span className="pro-meta-status pro-trade-verified">
-                {profileCheck.isFullyComplete ? (t.proVerifiedStatus || 'Verified') : (t.proVerificationPending || 'Verification Pending')}
-              </span>
+              {(() => {
+                const isProBanned = Boolean(currentAgent?.isBanned || currentAgent?.accountStatus === 'banned');
+                const isProSuspended = Boolean(currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended);
+                const isProVerified = !isProBanned && !isProSuspended && Boolean(
+                  currentAgent?.kycStatus === 'verified' ||
+                  currentAgent?.kyc_status === 'verified' ||
+                  (currentAgent?.photo_verified && currentAgent?.aadhaar_verified) ||
+                  profileCheck.isFullyComplete
+                );
+                if (isProBanned) {
+                  return (
+                    <span className="pro-meta-status" style={{ background: '#450a0a', color: '#fca5a5', border: '1px solid #991b1b', fontWeight: 600 }}>
+                      Banned
+                    </span>
+                  );
+                }
+                if (isProSuspended) {
+                  return (
+                    <span className="pro-meta-status" style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', fontWeight: 600 }}>
+                      Suspended (1 Week)
+                    </span>
+                  );
+                }
+                return (
+                  <span className={`pro-meta-status ${isProVerified ? 'pro-trade-verified' : 'pro-trade-pending'}`}>
+                    {isProVerified ? (t.proVerifiedStatus || 'Verified') : (t.proVerificationPending || 'Verification Pending')}
+                  </span>
+                );
+              })()}
               <span className="pro-meta-divider" aria-hidden="true" />
               <span
                 className="pro-meta-hub"
@@ -1077,33 +1282,106 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
         </div>
 
         {/* Header Controls (Tactile Online Toggle) */}
-        <div className="pro-header-controls">
-          <div className="pro-online-control">
+        <div className="pro-header-controls" style={{ position: 'relative' }}>
+          <div className="pro-online-control" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span className={`pro-online-label ${isOnline && profileCheck.isFullyComplete && !isBusyOnJob ? 'is-online' : ''} ${isBusyOnJob ? 'is-busy' : ''}`}>
               {isBusyOnJob
                 ? (t.proBusyStatus || 'Busy (On Job)')
-                : isOnline && profileCheck.isFullyComplete
-                  ? (availabilityStatus === 'PAUSED' ? (t.proPausedStatus || 'Paused') : (t.proAvailable || 'Available'))
-                  : (t.proOffline || 'Offline')}
+                : isAcquiringFix
+                  ? 'Locating...'
+                  : isOnline && profileCheck.isFullyComplete
+                    ? (availabilityStatus === 'PAUSED' ? (t.proPausedStatus || 'Paused') : (t.proAvailable || 'Available'))
+                    : (t.proOffline || 'Offline')}
             </span>
             <button
               type="button"
-              className={`pro-switch-toggle ${isOnline && profileCheck.isFullyComplete && !isBusyOnJob ? 'is-online' : ''} ${isBusyOnJob ? 'is-busy-locked' : ''}`}
+              className={`pro-switch-toggle ${isOnline && profileCheck.isFullyComplete && !isBusyOnJob ? 'is-online' : ''} ${isBusyOnJob ? 'is-busy-locked' : ''} ${isAcquiringFix ? 'is-locating' : ''}`}
               onClick={handleToggleOnline}
-              disabled={isBusyOnJob || !profileCheck.isFullyComplete}
+              disabled={isBusyOnJob || !profileCheck.isFullyComplete || isAcquiringFix}
               aria-label={isBusyOnJob ? 'Availability locked to Busy' : 'Toggle Online Status'}
               title={
                 isBusyOnJob
                   ? `Locked to active job: ${activePartnerJob?.serviceTitle || 'In Progress'}. Complete service to unlock dispatch availability.`
-                  : !profileCheck.isFullyComplete
-                    ? 'Complete profile checklist to go online'
-                    : 'Toggle online status'
+                  : isAcquiringFix
+                    ? 'Acquiring high-accuracy location...'
+                    : !profileCheck.isFullyComplete
+                      ? 'Complete profile checklist to go online'
+                      : 'Toggle online status'
               }
               style={isBusyOnJob ? { opacity: 0.65, cursor: 'not-allowed' } : {}}
             >
               <span className="pro-switch-thumb" />
             </button>
           </div>
+
+          {/* Location Permission Popover Anchored to Toggle */}
+          {showLocationPromptPopover && (
+            <div
+              className="pro-glass-popover"
+              role="dialog"
+              aria-modal="false"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                right: 0,
+                zIndex: 100,
+                width: '280px',
+                backgroundColor: 'rgba(255, 255, 255, 0.96)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(0, 0, 0, 0.12)',
+                borderRadius: '12px',
+                padding: '16px',
+                boxShadow: '0 12px 28px -4px rgba(16, 24, 40, 0.12), 0 4px 8px -2px rgba(16, 24, 40, 0.06)'
+              }}
+            >
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.9rem', fontWeight: 600, color: '#111827' }}>
+                Share your location to receive nearby jobs.
+              </h4>
+              <p style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: '#4b5563', lineHeight: 1.4 }}>
+                Used only while you're Available. Your permanent address doesn't change.
+              </p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLocationPromptPopover(false);
+                    executeAcquireFixAndGoAvailable();
+                  }}
+                  style={{
+                    flex: 1,
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: '#0d824d',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Allow
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLocationPromptPopover(false)}
+                  style={{
+                    flex: 1,
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: 'transparent',
+                    color: '#4b5563',
+                    border: '1px solid rgba(0, 0, 0, 0.12)',
+                    fontSize: '0.82rem',
+                    fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -1134,6 +1412,85 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
         </div>
       )}
 
+      {/* ================= REJECTION / SUSPENSION / RE-UPLOAD REQUIRED ALERT ================= */}
+      {(currentAgent?.isBanned || currentAgent?.accountStatus === 'banned' || currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended || currentAgent?.kycStatus === 'rejected' || currentAgent?.kycStatus === 'needs_attention' || currentAgent?.rejectionReason) && (
+        <div style={{
+          backgroundColor: (currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') ? '#450a0a' : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) ? '#FFF7ED' : '#FEF2F2',
+          border: `1px solid ${(currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') ? '#991B1B' : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) ? '#FED7AA' : '#FCA5A5'}`,
+          borderRadius: '12px',
+          padding: '16px 20px',
+          marginBottom: '16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              backgroundColor: (currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') ? '#991B1B' : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) ? '#FFEDD5' : '#FEE2E2',
+              color: (currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') ? '#FEE2E2' : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) ? '#C2410C' : '#DC2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <div>
+              <div style={{
+                fontWeight: 700,
+                color: (currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') ? '#FEE2E2' : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) ? '#9A3412' : '#991B1B',
+                fontSize: '0.94rem',
+                marginBottom: '2px'
+              }}>
+                {(currentAgent?.isBanned || currentAgent?.accountStatus === 'banned')
+                  ? 'Account Deactivated'
+                  : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended)
+                    ? 'Account Suspended (7 Days)'
+                    : currentAgent.kycStatus === 'rejected'
+                      ? 'Verification Rejected'
+                      : 'Action Required'}
+              </div>
+              <div style={{
+                fontSize: '0.84rem',
+                color: (currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') ? '#FECACA' : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) ? '#7C2D12' : '#7F1D1D',
+                lineHeight: 1.4
+              }}>
+                {(currentAgent?.isBanned || currentAgent?.accountStatus === 'banned')
+                  ? 'This account has exceeded the 3-suspension limit and has been closed.'
+                  : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended)
+                    ? `Suspended for 7 days (Strike ${Math.min(3, currentAgent.suspensionAttempts || currentAgent.suspensionCount || 1)} of 3). Re-submission unlocks after 7 days.`
+                    : (currentAgent.rejectionReason || 'Please re-upload your verification documents to continue.')}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="pro-btn-complete-profile"
+            style={{
+              backgroundColor: (currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') ? '#7F1D1D' : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) ? '#C2410C' : '#DC2626',
+              borderColor: (currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') ? '#991B1B' : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) ? '#C2410C' : '#DC2626',
+              color: '#ffffff',
+              flexShrink: 0,
+              padding: '0.55rem 1.1rem'
+            }}
+            onClick={() => {
+              window.location.href = `http://localhost:5500?portal=agent&action=profile`;
+            }}
+          >
+            {(currentAgent?.isBanned || currentAgent?.accountStatus === 'banned') ? 'View Account' : (currentAgent?.isSuspended || currentAgent?.accountStatus === 'suspended' || currentAgent?.isCurrentlySuspended) ? 'View Status' : 'Update Documents'}
+          </button>
+        </div>
+      )}
+
       {/* ================= 2. COMPACT PROFILE COMPLETION ROW ================= */}
       {!profileCheck.isFullyComplete && (
         <div className="pro-compact-completion-bar">
@@ -1143,7 +1500,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
             </span>
             <div className="pro-completion-text-block">
               <span className="pro-completion-title">
-                Professional Profile Incomplete — Ineligible for Live Service Jobs
+                Profile Incomplete — Ineligible for Live Service Jobs
               </span>
               <p className="pro-completion-desc">
                 Complete all {profileCheck.missingCount} missing item{profileCheck.missingCount > 1 ? 's' : ''} ({profileCheck.missingItems.join(', ')}) to unlock live dispatch.
@@ -1203,30 +1560,19 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
       {/* ================= 3. UNIFIED FLATTENED STATS BAR ================= */}
       <div className="pro-unified-stats-bar">
         {/* Metric 1: Available Balance */}
-        <div className="pro-stat-cell">
+        <div
+          className="pro-stat-cell"
+          style={{ cursor: onNavigate ? 'pointer' : 'default' }}
+          onClick={() => onNavigate && onNavigate('partner-settlements')}
+          title="Click to view Payouts & Settlements ledger"
+        >
           <div className="pro-stat-label-row">
             <span className="pro-stat-label">{t.proStatAvailableBalance || 'Available Balance'}</span>
           </div>
           <div className="pro-stat-value-row">
-            <span className="pro-stat-number accent">
-              ₹{walletBalance.toLocaleString('en-IN')}
+            <span className="pro-stat-number">
+              ₹{Number(walletBalance || 0).toLocaleString('en-IN')}
             </span>
-            {walletBalance > 0 && (
-              <button
-                type="button"
-                className="pro-stat-action-link"
-                onClick={handleWithdraw}
-                title="Instant Bank Settlement (IMPS)"
-              >
-                <span>{t.proWithdrawBtn || 'Withdraw'}</span>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
-            )}
-          </div>
-          <div className="pro-stat-caption">
-            <span>{completedJobsCount} {t.proJobsSettled || 'jobs settled'}</span>
           </div>
         </div>
 
@@ -1237,9 +1583,6 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
           </div>
           <div className="pro-stat-value-row">
             <span className="pro-stat-number">{nearbyRequests.length}</span>
-          </div>
-          <div className="pro-stat-caption">
-            <span>{t.proRadiusSub || 'Within 10 km service radius'}</span>
           </div>
         </div>
 
@@ -1260,13 +1603,6 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
               <span className="pro-stat-number muted-val">—</span>
             )}
           </div>
-          <div className="pro-stat-caption">
-            <span>
-              {currentAgent?.rating && Number(currentAgent.rating) > 0 && (completedJobsCount > 0 || pastJobs.length > 0)
-                ? (t.proRatingVerified || 'Customer verified score')
-                : (t.proNoReviewsYet || 'No customer reviews yet')}
-            </span>
-          </div>
         </div>
 
         {/* Metric 4: Partner / Job Status — Reserved single pill badge */}
@@ -1280,18 +1616,6 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
               <span>
                 {activePartnerJob ? (t.proActiveJob || 'Active Job') : (isOnline ? (t.proAvailable || 'Available') : (t.proOffline || 'Offline'))}
               </span>
-            </span>
-          </div>
-          <div className="pro-stat-caption">
-            <span>
-              {activePartnerJob ? (() => {
-                const s = (activePartnerJob.status || '').toLowerCase();
-                if (s === 'en route' || s === 'on the way') return 'On the way';
-                if (s === 'arrived') return 'Arrived';
-                if (s === 'in progress' || s === 'otp verified') return 'In progress';
-                if (s === 'accepted' || s === 'confirmed') return 'Confirmed';
-                return activePartnerJob.status || 'Active Job';
-              })() : (isOnline ? (t.proListeningRequests || 'Listening for requests') : (t.proGoOnlinePrompt || 'Go online to accept jobs'))}
             </span>
           </div>
         </div>
@@ -1350,6 +1674,11 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
                   <strong>Notes:</strong> {activePartnerJob.notes}
                 </div>
               )}
+            </div>
+
+            {/* Real-Time Booking Progress Tracker with Server Timestamps */}
+            <div style={{ margin: '0.85rem 0' }}>
+              <BookingProgressTracker job={activePartnerJob} />
             </div>
 
             {/* Live Uber/Ola-grade Turn-by-Turn Road Route & Navigation Telemetry */}
@@ -1514,16 +1843,6 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
           <span>{t.proTabCompletedJobs || 'Completed Jobs'}</span>
           <span className="pro-tab-count">{pastJobs.length}</span>
         </button>
-        <button
-          type="button"
-          className={`pro-tab-item ${activeTab === 'payouts' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('payouts');
-            if (currentAgent?.email) loadWallet(currentAgent.email);
-          }}
-        >
-          <span>{t.proTabSettlements || 'Earnings & Payouts'}</span>
-        </button>
       </nav>
 
       {/* ================= TAB 1: LIVE REQUESTS FEED ================= */}
@@ -1551,7 +1870,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
                 </div>
               </div>
             </div>
-          ) : nearbyLoading ? (
+          ) : nearbyLoading && nearbyRequests.length === 0 ? (
             <div className="pro-empty-feed-state">
               <div className="pro-empty-icon-radar">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1721,22 +2040,16 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
               <div className="pro-summary-stat-value">
                 {totalCompletedCount}
               </div>
-              <span className="pro-summary-stat-sub">Verified doorstep deliveries</span>
             </div>
 
             <div className="pro-summary-stat-cell">
               <span className="pro-summary-stat-label">Average Customer Rating</span>
               <div className="pro-summary-stat-value accented">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="var(--pro-accent)" stroke="var(--pro-accent)" strokeWidth="1" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="#f59e0b" stroke="#f59e0b" strokeWidth="1" aria-hidden="true">
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
                 <span>{avgRatingNum ? `${avgRatingNum} / 5.0` : '—'}</span>
               </div>
-              <span className="pro-summary-stat-sub">
-                {ratedJobs.length > 0
-                  ? `Based on ${ratedJobs.length} verified review${ratedJobs.length === 1 ? '' : 's'}`
-                  : 'Awaiting initial customer ratings'}
-              </span>
             </div>
 
             <div className="pro-summary-stat-cell">
@@ -1744,7 +2057,6 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
               <div className="pro-summary-stat-value">
                 {thisMonthCount}
               </div>
-              <span className="pro-summary-stat-sub">Current settlement period</span>
             </div>
           </div>
 
@@ -1793,7 +2105,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
           </div>
 
           {/* Job List / Loading / Empty States */}
-          {pastJobsLoading ? (
+          {pastJobsLoading && mergedJobs.length === 0 ? (
             <div className="pro-ledger-empty-state">
               <div className="pro-empty-icon-radar">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1909,7 +2221,11 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
                             maximumFractionDigits: 2
                           })}
                         </span>
-                        <span className="pro-job-payout-status">Settled</span>
+                        {job.paymentStatus === 'paid' ? (
+                          <span className="pro-job-payout-status paid">Paid</span>
+                        ) : (
+                          <span className="pro-job-payout-status pending">Awaiting Payment</span>
+                        )}
                       </div>
 
                       {/* 5. Chevron Toggle */}
@@ -1924,6 +2240,11 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
                     <div className={`pro-job-accordion-body ${isExpanded ? 'open' : ''}`}>
                       <div className="pro-job-accordion-inner">
                         <div className="pro-job-expanded-content">
+                          {/* Real-Time Booking Progress Tracker with Exact Server Timestamps */}
+                          <div style={{ margin: '0.5rem 0 1rem 0' }}>
+                            <BookingProgressTracker job={job} />
+                          </div>
+
                           {/* Written Feedback (Silently collapsed if none) */}
                           {hasWrittenFeedback && (
                             <div className="pro-job-feedback-box">
@@ -2006,19 +2327,38 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
                               </div>
                               <div className="pro-job-payout-breakdown">
                                 <div className="pro-payout-line">
-                                  <span>Gross Fare</span>
+                                  <span>Service Fare</span>
                                   <span>₹{parseFloat(job.amount || 0).toFixed(2)}</span>
                                 </div>
-                                <div className="pro-payout-line">
-                                  <span>Platform Fee</span>
-                                  <span className="pro-payout-free">₹0.00 (Zero Fee)</span>
-                                </div>
+                                {job.platformFee > 0 && (
+                                  <div className="pro-payout-line">
+                                    <span>Platform Fee</span>
+                                    <span style={{ color: '#dc2626' }}>-₹{parseFloat(job.platformFee).toFixed(2)}</span>
+                                  </div>
+                                )}
                                 <div className="pro-payout-line total">
-                                  <span>Net Credited</span>
-                                  <span className="pro-payout-credited">₹{parseFloat(job.amount || 0).toFixed(2)}</span>
+                                  <span>Partner Net Earnings</span>
+                                  <span className="pro-payout-credited">₹{parseFloat(job.professionalAmount || job.amount || 0).toFixed(2)}</span>
                                 </div>
-                                <div className="pro-payout-method-tag">
-                                  {job.paymentMethod || 'UPI / Cash on completion'}
+                                <div className="pro-payout-method-tag" style={{ fontSize: '0.75rem', marginTop: '6px' }}>
+                                  {job.paymentStatus === 'paid' ? (
+                                    <span style={{ color: '#059669', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                      {job.paymentMethod === 'cash'
+                                        ? 'Paid via Cash on Delivery (Doorstep)'
+                                        : 'Paid via Razorpay Online (UPI / QR / Apps)'}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                      </svg>
+                                      Awaiting customer payment (Razorpay UPI QR or Cash on Delivery)
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -2029,128 +2369,6 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
                   </div>
                 );
               })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ================= TAB 3: FINANCIAL EARNINGS & PAYOUTS ================= */}
-      {activeTab === 'payouts' && (
-        <div className="pro-ledger-panel">
-          <div className="pro-ledger-header">
-            <div>
-              <h3 className="pro-section-title">
-                {t.proEarningsTitle || 'Earnings & Payouts'}
-              </h3>
-              <p className="pro-section-subtitle">
-                {t.proEarningsSubtitle || 'Automated payout ledger for verified service jobs, door OTP releases, and bank transfers.'}
-              </p>
-            </div>
-
-            <div className="pro-ledger-header-actions">
-              <div className="pro-ledger-balance-display">
-                <span className="pro-ledger-balance-label">{t.proNetAvailable || 'Available for Withdrawal'}</span>
-                <span className="pro-ledger-balance-val">
-                  ₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="pro-btn-settlement"
-                onClick={handleWithdraw}
-                disabled={walletBalance <= 0}
-                title={walletBalance <= 0 ? 'No funds available to withdraw' : 'Withdraw to Bank via IMPS'}
-              >
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
-                  <rect x="9" y="9" width="12" height="10" rx="2" />
-                  <circle cx="15" cy="14" r="1" />
-                </svg>
-                <span>{t.proWithdrawBtn || 'Withdraw to Bank'}</span>
-              </button>
-            </div>
-          </div>
-
-          {walletTransactions.length === 0 ? (
-            <div className="pro-ledger-empty-state">
-              <div className="pro-ledger-empty-icon">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                  <polyline points="10 9 9 9 8 9" />
-                </svg>
-              </div>
-              <h4 className="pro-ledger-empty-title">{t.proNoTransactions || 'No Transactions Recorded'}</h4>
-              <p className="pro-ledger-empty-desc">
-                {t.proNoTransactionsDesc || 'Your completed jobs will appear here once settled.'}
-              </p>
-              <div className="pro-ledger-empty-meta">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                <span>{t.proPayoutProtection || 'Automated payouts with door-step payment protection'}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="pro-table-wrapper">
-              <table className="pro-ledger-table">
-                <thead>
-                  <tr>
-                    <th>{t.proColJobRef || 'Job Reference'}</th>
-                    <th>{t.proColDateTime || 'Date & Time'}</th>
-                    <th>{t.proColPayoutType || 'Payout Type'}</th>
-                    <th style={{ textAlign: 'right' }}>{t.proColAmount || 'Amount'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {walletTransactions.map((tx) => (
-                    <tr key={tx.id} className="pro-ledger-row">
-                      <td className="pro-tx-cell-ref">
-                        <div className="pro-tx-desc">
-                          {tx.description || (tx.requestRef ? `Service Payout: ${tx.requestRef}` : 'Service Payout')}
-                        </div>
-                      </td>
-                      <td className="pro-tx-cell-date">
-                        <div className="pro-tx-datetime">
-                          <span className="pro-tx-date">
-                            {tx.createdAt
-                              ? new Date(tx.createdAt).toLocaleDateString('en-IN', {
-                                  day: '2-digit',
-                                  month: 'short',
-                                  year: 'numeric'
-                                })
-                              : 'Recent'}
-                          </span>
-                          {tx.createdAt && (
-                            <span className="pro-tx-time">
-                              {new Date(tx.createdAt).toLocaleTimeString('en-IN', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="pro-tx-cell-type">
-                        <span className="pro-tx-type">
-                          {tx.type === 'credit' ? (t.proTypeServicePayout || 'Service Payout') : (t.proTypeBankPayout || 'Bank IMPS Payout')}
-                        </span>
-                      </td>
-                      <td className="pro-tx-cell-amount" style={{ textAlign: 'right' }}>
-                        <span className={`pro-tx-amount ${tx.type === 'credit' ? 'credit' : 'debit'}`}>
-                          <span className="pro-tx-prefix">{tx.type === 'credit' ? '+' : '-'}</span>
-                          ₹{parseFloat(tx.amount || 0).toLocaleString('en-IN', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
         </div>
@@ -2279,7 +2497,7 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
               {/* Photo Upload Section */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--pro-text-main)', marginBottom: '0.5rem' }}>
-                  Work Completion Photos (1–4 required) <span style={{ color: '#059669' }}>*</span>
+                  Work Completion Photos (1–4 required) <span style={{ color: '#64748b' }}>*</span>
                 </label>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -2412,6 +2630,18 @@ export default function PartnerConsolePage({ agent: propAgent, partnerNavNonce =
           </div>
         </div>
       )}
+
+      {/* Professional Payout Setup Modal */}
+      <ProfessionalPayoutModal
+        isOpen={payoutModalOpen}
+        onClose={() => setPayoutModalOpen(false)}
+        currentStatus={payoutStatusInfo}
+        onSetupSuccess={(data) => {
+          setPayoutStatusInfo(data);
+          fetchPayoutAndEarnings();
+          addToast('Bank payout account activated! Earnings will transfer automatically upon job payment.', 'brass');
+        }}
+      />
 
       {/* Floating 10-Second Toast Alerts Queue */}
       <BookingToast toasts={toasts} onDismiss={dismissToast} />

@@ -1,0 +1,357 @@
+/* ==============================================================================
+   NivaaroFix Payment Receipt Modal Styles
+   Clean monochrome styling; prints crisp on standard A4 paper without dark backgrounds.
+   ============================================================================== */
+
+.receipt-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background-color: rgba(10, 20, 16, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.receipt-paper-card {
+  width: 100%;
+  max-width: 580px;
+  max-height: min(92vh, 92dvh);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  color: #111827;
+  font-family: inherit;
+  margin: auto;
+}
+
+/* Toolbar */
+.receipt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 14px 20px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.receipt-status-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #047857;
+  background: #ecfdf5;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(4, 120, 87, 0.2);
+}
+
+.receipt-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.receipt-btn-print {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.receipt-btn-print:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.receipt-btn-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.receipt-btn-close:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+/* Document Body */
+.receipt-body {
+  padding: 32px 36px;
+  background: #ffffff;
+}
+
+.receipt-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.receipt-brand-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+.receipt-brand-sub {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.receipt-id-col {
+  text-align: right;
+}
+
+.receipt-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.receipt-val-bold {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+  margin-top: 2px;
+}
+
+.receipt-val-medium {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #111827;
+  margin-top: 3px;
+}
+
+.receipt-sub-text {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.receipt-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 20px 0;
+}
+
+.receipt-divider-light {
+  height: 1px;
+  background: #f3f4f6;
+  margin: 16px 0;
+}
+
+.receipt-grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+/* Proof Section */
+.receipt-proof-section {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #f3f4f6;
+}
+
+.receipt-proof-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.receipt-proof-img {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+}
+
+.receipt-proof-meta {
+  flex: 1;
+}
+
+.receipt-proof-text {
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+
+.receipt-proof-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #047857;
+  margin-top: 2px;
+}
+
+/* Table Section */
+.receipt-table-section {
+  margin-top: 20px;
+}
+
+.receipt-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.receipt-table th {
+  padding: 8px 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.receipt-table td {
+  padding: 12px 0;
+  font-size: 0.88rem;
+  color: #1f2937;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.receipt-total-row td {
+  padding-top: 16px;
+  font-size: 1.05rem;
+  border-bottom: none;
+  color: #111827;
+}
+
+/* Payment Method Box */
+.receipt-payment-method-box {
+  margin-top: 24px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.receipt-pm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.receipt-pm-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.receipt-pm-val {
+  font-weight: 600;
+  color: #111827;
+}
+
+.receipt-pm-val.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.84rem;
+}
+
+.text-paid {
+  color: #047857 !important;
+}
+
+/* Footer */
+.receipt-footer {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px dashed #d1d5db;
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.receipt-link,
+.receipt-support-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: inherit;
+  color: #047857;
+  text-decoration: underline;
+  cursor: pointer;
+  display: inline;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.receipt-link:hover,
+.receipt-support-link-btn:hover {
+  color: #065f46;
+  text-decoration: underline;
+}
+
+.receipt-support-link-btn:focus-visible {
+  outline: 2px solid #059669;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Print Overrides */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .receipt-modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    backdrop-filter: none !important;
+  }
+
+  .receipt-paper-card {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .receipt-body {
+    padding: 0 !important;
+  }
+}
+

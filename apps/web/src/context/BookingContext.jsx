@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { allServicesList, servicesDirectory } from '../data/servicesCatalogData';
 import { evaluateCustomerChecklist } from '../utils/profileStrength';
+import { fastDeepEqual } from '../hooks/useSilentRealtime';
 
 const BookingContext = createContext();
 
 const BOOKING_INTENT_KEY = 'nivaarofix_booking_intent';
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 export function BookingProvider({ children }) {
   // Booking Drawer State (Protected Booking Workflow)
@@ -159,7 +160,10 @@ export function BookingProvider({ children }) {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || data.message || 'Failed to create service request.');
+        const error = new Error(data.error || data.message || 'Failed to create service request.');
+        error.code = data.code;
+        error.unpaidJob = data.unpaidJob;
+        throw error;
       }
 
       const createdRequest = {
@@ -175,51 +179,49 @@ export function BookingProvider({ children }) {
   }, [activeServiceForBooking]);
 
   // Fetch customer's service requests from PostgreSQL
-  const loadMyRequests = useCallback(async (currentUser) => {
+  const loadMyRequests = useCallback(async (currentUser, isSilent = false) => {
     if (!currentUser || (!currentUser.email && !currentUser.id)) {
       setActiveRequests([]);
       return;
     }
-    setRequestsLoading(true);
+    if (!isSilent && activeRequests.length === 0) {
+      setRequestsLoading(true);
+    }
     try {
       const emailQuery = currentUser.email ? `email=${encodeURIComponent(currentUser.email)}` : '';
       const idQuery = currentUser.id ? `userId=${currentUser.id}` : '';
       const queryString = [emailQuery, idQuery].filter(Boolean).join('&');
 
-      const res = await fetch(`${API_BASE}/dispatch/my-requests?${queryString}`);
+      const res = await fetch(`${API_BASE}/dispatch/my-requests?${queryString}`, { credentials: 'include' });
       const data = await res.json();
       if (data.success && Array.isArray(data.requests)) {
-        setActiveRequests(data.requests);
-      } else {
-        setActiveRequests([]);
+        setActiveRequests((prev) => (fastDeepEqual(prev, data.requests) ? prev : data.requests));
       }
     } catch (err) {
       console.warn('Service requests fetch notice:', err.message);
-      setActiveRequests([]);
     } finally {
       setRequestsLoading(false);
     }
-  }, []);
+  }, [activeRequests.length]);
 
   // Fetch quotes for a specific service request
-  const loadQuotesForRequest = useCallback(async (requestRef) => {
+  const loadQuotesForRequest = useCallback(async (requestRef, isSilent = false) => {
     if (!requestRef) return;
-    setQuotesLoading(true);
+    if (!isSilent && selectedRequestQuotes.length === 0) {
+      setQuotesLoading(true);
+    }
     try {
       const res = await fetch(`${API_BASE}/dispatch/request/${requestRef}/quotes`);
       const data = await res.json();
       if (data.success && Array.isArray(data.quotes)) {
-        setSelectedRequestQuotes(data.quotes);
-      } else {
-        setSelectedRequestQuotes([]);
+        setSelectedRequestQuotes((prev) => (fastDeepEqual(prev, data.quotes) ? prev : data.quotes));
       }
     } catch (err) {
       console.warn('Quotes fetch notice:', err.message);
-      setSelectedRequestQuotes([]);
     } finally {
       setQuotesLoading(false);
     }
-  }, []);
+  }, [selectedRequestQuotes.length]);
 
   // Accept a quote (transitions request to Accepted state)
   const acceptQuote = useCallback(async (quoteId) => {
@@ -233,7 +235,7 @@ export function BookingProvider({ children }) {
         setActiveRequests(prev =>
           prev.map(r =>
             r.requestRef === data.request?.requestRef
-              ? { ...r, status: 'Accepted', acceptedProvider: data.request.acceptedProvider }
+              ? { ...r, ...data.request, status: 'Confirmed', acceptedProvider: data.request.acceptedProvider }
               : r
           )
         );
@@ -319,7 +321,7 @@ export function BookingProvider({ children }) {
   // Legacy Booking Operations (Preserved for backward compatibility)
   // -----------------------------------------------------------------------
 
-  const loadUserBookings = useCallback(async (currentUser) => {
+  const loadUserBookings = useCallback(async (currentUser, isSilent = false) => {
     if (!currentUser || (!currentUser.email && !currentUser.id)) {
       setActiveBookings([]);
       return;
@@ -329,12 +331,10 @@ export function BookingProvider({ children }) {
       const idQuery = currentUser.id ? `userId=${currentUser.id}` : '';
       const queryString = [emailQuery, idQuery].filter(Boolean).join('&');
       
-      const res = await fetch(`${API_BASE}/bookings/my-bookings?${queryString}`);
+      const res = await fetch(`${API_BASE}/bookings/my-bookings?${queryString}`, { credentials: 'include' });
       const data = await res.json();
       if (data.success && Array.isArray(data.bookings)) {
-        setActiveBookings(data.bookings);
-      } else {
-        setActiveBookings([]);
+        setActiveBookings((prev) => (fastDeepEqual(prev, data.bookings) ? prev : data.bookings));
       }
     } catch (err) {
       console.warn('PostgreSQL booking fetch notice:', err.message);
@@ -398,16 +398,26 @@ export function BookingProvider({ children }) {
   const closeProfileIncompleteModal = () => setIsProfileIncompleteModalOpen(false);
 
   // 5. Booking Intent Storage & Retrieval
-  const saveBookingIntent = useCallback((service, issue = null) => {
-    const slug = typeof service === 'string' ? service : (service?.slug || service?.categoryId || 'electrician');
-    const title = typeof service === 'string' ? (service === 'plumber' ? 'Plumber' : 'Electrician') : (service?.title || 'Service');
+  const saveBookingIntent = useCallback((service, issue = null, searchText = '') => {
+    let slug = 'electrician';
+    let title = 'Electrician';
+    if (typeof service === 'string') {
+      slug = service.toLowerCase().includes('plumb') ? 'plumber' : 'electrician';
+      title = slug === 'plumber' ? 'Plumber' : 'Electrician';
+    } else if (service && typeof service === 'object') {
+      slug = service.slug || service.categoryId || (service.title?.toLowerCase().includes('plumb') ? 'plumber' : 'electrician');
+      title = service.title || (slug === 'plumber' ? 'Plumber' : 'Electrician');
+    }
+    const finalSearchText = issue || searchText || (typeof service === 'string' && !['electrician', 'plumber'].includes(service) ? service : '');
     const intent = {
+      action: 'book',
+      trade: slug,
+      serviceId: slug,
+      searchText: finalSearchText,
       serviceSlug: slug,
       categoryId: slug,
       serviceTitle: title,
-      issue: issue || null,
-      origin: 'services',
-      returnPath: '/services',
+      issue: finalSearchText,
       timestamp: Date.now()
     };
     try {
@@ -447,6 +457,7 @@ export function BookingProvider({ children }) {
   const initiateProtectedBooking = useCallback(({
     service,
     issue = null,
+    searchText = '',
     currentUser = null,
     currentAgent = null,
     onOpenAuth = null,
@@ -472,6 +483,20 @@ export function BookingProvider({ children }) {
       return { status: 'RUNNING_BOOKING_BLOCKED', booking: runningBooking };
     }
 
+    // If logged out, save booking intent and redirect to login preserving current view in history
+    if (!isCustomer) {
+      saveBookingIntent(service, issue, searchText);
+      closeServiceDetail();
+      // Do not alter window.location.hash here so browser Back returns cleanly to this view (e.g. #/services)
+      if (onOpenAuth) {
+        onOpenAuth('/book');
+      } else {
+        const lang = localStorage.getItem('nivaarofix-lang') || localStorage.getItem('nivaaro-fix-lang') || 'en';
+        window.location.href = `http://localhost:5500?portal=customer&lang=${lang}&returnTo=%2Fbook`;
+      }
+      return { status: 'LOGIN_REQUIRED', redirect: '/login?next=/book' };
+    }
+
     let targetService = service;
     if (typeof service === 'string') {
       const baseService = allServicesList.find(s => s.categoryId === service || s.slug === service) || allServicesList[0];
@@ -479,14 +504,15 @@ export function BookingProvider({ children }) {
     } else if (service && typeof service === 'object') {
       targetService = { ...service };
     }
-    if (issue && typeof issue === 'string' && issue.trim()) {
-      targetService.title = issue.trim();
-      targetService.id = issue.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const finalIssue = issue || searchText;
+    if (finalIssue && typeof finalIssue === 'string' && finalIssue.trim()) {
+      targetService.title = finalIssue.trim();
+      targetService.id = finalIssue.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
     }
     closeServiceDetail();
-    openBookingFor(targetService, issue);
+    openBookingFor(targetService, finalIssue);
     return { status: 'ALLOWED' };
-  }, [runningBooking, openRunningBookingBlockedModal, closeServiceDetail, openBookingFor, openAgentNotice]);
+  }, [runningBooking, openRunningBookingBlockedModal, closeServiceDetail, openBookingFor, openAgentNotice, saveBookingIntent]);
 
   // 7. Resume pending booking intent after login
   const resumeBookingIntentIfPresent = useCallback((currentUser) => {
@@ -494,10 +520,17 @@ export function BookingProvider({ children }) {
     if (runningBooking) return false;
 
     const intent = getPendingBookingIntent();
-    if (intent && intent.serviceSlug) {
-      const targetService = allServicesList.find(s => s.categoryId === intent.serviceSlug) || allServicesList[0];
+    if (intent && (intent.trade || intent.serviceSlug || intent.serviceId)) {
+      const trade = intent.trade || intent.serviceSlug || intent.serviceId || 'electrician';
+      const searchOrIssue = intent.searchText || intent.issue || null;
+      const baseService = allServicesList.find(s => s.categoryId === trade || s.slug === trade) || allServicesList[0];
+      const targetService = { ...baseService };
+      if (searchOrIssue && typeof searchOrIssue === 'string' && searchOrIssue.trim()) {
+        targetService.title = searchOrIssue.trim();
+        targetService.id = searchOrIssue.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      }
       clearBookingIntent();
-      openBookingFor(targetService, intent.issue);
+      openBookingFor(targetService, searchOrIssue);
       return true;
     }
     return false;
@@ -532,7 +565,10 @@ export function BookingProvider({ children }) {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || data.message || 'Failed to create booking.');
+        const error = new Error(data.error || data.message || 'Failed to create booking.');
+        error.code = data.code;
+        error.unpaidJob = data.unpaidJob;
+        throw error;
       }
 
       const createdBooking = data.booking;

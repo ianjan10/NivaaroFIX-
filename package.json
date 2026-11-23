@@ -9,6 +9,8 @@
     "packages/*"
   ],
   "scripts": {
+    "start": "powershell -ExecutionPolicy Bypass -File scripts/start_services.ps1",
+    "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/start_services.ps1",
     "dev": "npm run dev:api",
     "dev:api": "npm --prefix apps/api run dev",
     "dev:web": "npm --prefix apps/web run dev",
@@ -22,17 +24,29 @@
     "test:web": "npm --prefix apps/web test",
     "test:auth": "npm --prefix apps/auth test",
     "test:e2e": "node tests/arrival_tracking_e2e.test.mjs",
-    "test:all": "node tests/system_health.test.mjs && npm --prefix apps/api test && npm --prefix apps/web test && npm --prefix apps/auth test && node tests/arrival_tracking_e2e.test.mjs",
+    "test:security": "node tests/phase1_2_security_suite.test.mjs",
+    "test:payments": "node tests/payments_unit_and_integration.test.mjs",
+    "test:admin": "node tests/run_all_admin_tests.mjs",
+    "test:all": "node tests/system_health.test.mjs && npm --prefix apps/web test && node tests/phase1_2_security_suite.test.mjs && node tests/payments_unit_and_integration.test.mjs && npm run test:e2e && npm run test:admin",
     "db:reset": "node scripts/migrate.js",
     "db:clean": "node scripts/fresh_db_reset.js",
+    "admin:seed": "node scripts/admin_seed.js",
+    "admin:create": "node scripts/admin_cli.js create",
+    "admin:passwd": "node scripts/admin_cli.js passwd",
     "bundle:llm": "node scripts/build_full_project_knowledge_bundle.mjs",
     "bundle:db": "node scripts/build_database_knowledge_bundle.mjs",
     "lint": "eslint . --ext .js,.jsx,.mjs",
     "lint:brand": "node scripts/lint_no_banned_brand_colors.mjs",
+    "lint:typography": "node scripts/lint_admin_typography.mjs",
     "format": "prettier --write ."
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
-    "opentype.js": "^2.0.0"
+    "opentype.js": "^2.0.0",
+    "puppeteer-core": "^25.16.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^18.0.9"
   }
 }

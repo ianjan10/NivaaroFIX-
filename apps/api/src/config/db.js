@@ -47,6 +47,25 @@ export async function initDatabase() {
         await client.query(fs.readFileSync(catalogFile, 'utf8'));
       }
     }
+    // Verify 002 progress timestamps migration
+    const checkTimestamps = await client.query("SELECT 1 FROM information_schema.columns WHERE table_name = 'service_requests' AND column_name = 'confirmed_at';");
+    if (checkTimestamps.rows.length === 0) {
+      const migration002 = path.resolve(__dirname, '../../../../database/migrations/002_booking_progress_timestamps.sql');
+      if (fs.existsSync(migration002)) {
+        console.log('🔗 Applying migration 002_booking_progress_timestamps.sql...');
+        await client.query(fs.readFileSync(migration002, 'utf8'));
+      }
+    }
+
+    // Verify 021 realtime persistence & referential integrity
+    const checkRealtime = await client.query("SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'realtime_events';");
+    if (checkRealtime.rows.length === 0) {
+      const migration021 = path.resolve(__dirname, '../../../../database/migrations/021_realtime_data_and_referential_integrity.sql');
+      if (fs.existsSync(migration021)) {
+        console.log('🔗 Applying migration 021_realtime_data_and_referential_integrity.sql...');
+        await client.query(fs.readFileSync(migration021, 'utf8'));
+      }
+    }
     console.log('✅ NivaaroFix Clean Numbered Database Schema verified & ready!');
   } catch (err) {
     console.error('❌ DB init error:', err.message);

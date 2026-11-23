@@ -8,10 +8,10 @@ This directory contains design references, flow mockups, and architectural visua
 
 | File | Resolution / Type | Description / Architectural Intent |
 | :--- | :--- | :--- |
-| [`1.png`](file:///d:/My%20Project/Project_Image/1.png) | PNG Image (306 KB) | **Customer / User Authentication & Onboarding Spec**<br>Visual wireframe of the customer sign-in portal, phone OTP modal, and segmented Date-of-Birth selector. |
-| [`2.png`](file:///d:/My%20Project/Project_Image/2.png) | PNG Image (599 KB) | **Service Partner / Agent Portal Spec**<br>Visual specification for technician registration, skill classification, and KYC state/city cascading dropdowns. |
-| [`3.png`](file:///d:/My%20Project/Project_Image/3.png) | PNG Image (939 KB) | **NivaaroFix Homepage & Service Catalog Wireframe**<br>High-fidelity blueprint for the editorial homepage layout: hero search, verified review carousels, and dual-audience tabs. |
-| [`4.png`](file:///d:/My%20Project/Project_Image/4.png) | PNG Image (782 KB) | **Partner Console & Live Dispatch Dispatcher Spec**<br>Visual layout for live job queue dispatch, geolocation ETA radius tracking, and earnings overview. |
+| [`1.png`](./1.png) | PNG Image (306 KB) | **Customer / User Authentication & Onboarding Spec**<br>Visual wireframe of the customer sign-in portal, phone OTP modal, and segmented Date-of-Birth selector. |
+| [`2.png`](./2.png) | PNG Image (599 KB) | **Service Partner / Agent Portal Spec**<br>Visual specification for technician registration, skill classification, and KYC state/city cascading dropdowns. |
+| [`3.png`](./3.png) | PNG Image (939 KB) | **NivaaroFix Homepage & Service Catalog Wireframe**<br>High-fidelity blueprint for the editorial homepage layout: hero search, verified review carousels, and dual-audience tabs. |
+| [`4.png`](./4.png) | PNG Image (782 KB) | **Partner Console & Live Dispatch Dispatcher Spec**<br>Visual layout for live job queue dispatch, geolocation ETA radius tracking, and earnings overview. |
 
 ---
 

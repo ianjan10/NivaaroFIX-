@@ -46,6 +46,69 @@ function AppLayout() {
     }
   }, [portal]);
 
+  // Check if user is already authenticated; if so, redirect with replace (no back-button loop)
+  useEffect(() => {
+    let isMounted = true;
+    const checkActiveSession = async () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('action') === 'profile') return;
+
+      try {
+        const res = await fetch('http://localhost:5000/api/auth/session', {
+          credentials: 'include',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isMounted) return;
+
+        if (data?.authenticated) {
+          const returnTo = params.get('returnTo') || params.get('next');
+          const lang = params.get('lang') || localStorage.getItem('nivaarofix-lang') || 'en';
+          let targetHash = '#/';
+          let queryParam = '';
+
+          if (returnTo) {
+            const trimmed = returnTo.trim();
+            if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.includes('\\') && !trimmed.includes('://')) {
+              if (trimmed.includes('bookings') || trimmed.includes('my-bookings')) {
+                targetHash = '#/bookings';
+              } else if (trimmed.includes('services')) {
+                targetHash = '#/services';
+              } else if (trimmed.includes('partner')) {
+                targetHash = '#/partner';
+              } else if (trimmed.includes('book')) {
+                targetHash = '#/services';
+                queryParam = '&returnTo=/book';
+              }
+            }
+          }
+
+          if (data.agent) {
+            window.location.replace(`http://localhost:5173?lang=${lang}#/partner`);
+          } else if (data.user) {
+            window.location.replace(`http://localhost:5173?lang=${lang}${queryParam}${targetHash}`);
+          }
+        }
+      } catch (_) {}
+    };
+    checkActiveSession();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Listen to popstate for sub-views like 'forgot'
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (e.state?.authView === 'forgot') {
+        setView('forgot');
+      } else if (view === 'forgot') {
+        setView('auth');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [view]);
+
   // Sync payload params to localStorage and handle action=profile
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -76,8 +139,13 @@ function AppLayout() {
           cleanVal = decodeURIComponent(agentParam);
         } catch (_) {}
         // Validate JSON
-        JSON.parse(cleanVal);
-        localStorage.setItem('nivaaro-agent', cleanVal);
+        const parsed = JSON.parse(cleanVal);
+        const pId = parsed.partner_id || parsed.partnerId || parsed.id;
+        if (pId && !parsed.avatarUrl && !parsed.avatar_url) {
+          parsed.avatar_url = `/api/verification/photo/stream?id=${pId}`;
+          parsed.avatarUrl = parsed.avatar_url;
+        }
+        localStorage.setItem('nivaaro-agent', JSON.stringify(parsed));
         localStorage.removeItem('nivaaro-user');
       } catch (e) {
         console.error('Error saving agent in WebLogin', e);
@@ -104,7 +172,8 @@ function AppLayout() {
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set('portal', selectedPortal);
     newUrl.searchParams.delete('action');
-    window.history.pushState({}, '', newUrl.toString());
+    // HISTORY RULE: Query-only changes use replaceState so they do not add history entries
+    window.history.replaceState({}, '', newUrl.toString());
   };
 
   const handleSwitchPortal = (newPortal) => {
@@ -117,32 +186,38 @@ function AppLayout() {
     } else {
       newUrl.searchParams.set('portal', newPortal);
     }
-    window.history.pushState({}, '', newUrl.toString());
+    // HISTORY RULE: Query-only changes use replaceState so they do not add history entries
+    window.history.replaceState({}, '', newUrl.toString());
   };
 
+  const isProfileView = view === 'profile';
+
   return (
-    <div className="auth-viewport-root">
-      {/* 1. Background: Plain Ivory Canvas with subtle dot-grid mesh on Profile view; Marketing Hero Photo on Auth view */}
-      {view === 'profile' ? (
-        <div className="auth-background-stage profile-canvas-bg" aria-hidden="true">
-          <div className="bg-mesh-texture" style={{ opacity: 0.6 }} />
-        </div>
-      ) : (
-        <div className="auth-background-stage" aria-hidden="true">
-          <img
-            src="/project_image/5.png"
-            alt="Professional Electrician Working on Residential Electrical Panel"
-            className="auth-bg-photo"
-            loading="eager"
-          />
-          <div className="auth-light-overlay" />
+    <div className={`auth-viewport-root ${isProfileView ? 'pro-profile-viewport' : ''}`}>
+      {/* 1. Background Stage: Marketing Hero Photo blurred and faded for auth screens; removed on profile pages */}
+      {!isProfileView && (
+        <div className={`auth-background-stage ${view === 'profile' ? 'profile-glass-bg-stage' : ''}`} aria-hidden="true">
+          <picture>
+            <source srcSet="/project_image/5.webp" type="image/webp" />
+            <img
+              src="/project_image/5.png"
+              alt="Professional Electrician Working on Residential Electrical Panel"
+              className={`auth-bg-photo ${view === 'profile' ? 'profile-bg-photo-faded' : ''}`}
+              loading="eager"
+              decoding="async"
+              width="1920"
+              height="1080"
+            />
+          </picture>
+          <div className={`auth-light-overlay ${view === 'profile' ? 'profile-light-overlay' : ''}`} />
         </div>
       )}
 
-      {/* 2. Floating Minimal Interface Container */}
-      <div className={`page-container ${view === 'profile' ? 'profile-view-mode' : ''}`}>
-        {view !== 'profile' && <AppHeader currentPortal={portal} />}
+      {/* 2. Full-Width Fixed Header */}
+      {view !== 'profile' && <AppHeader currentPortal={portal} />}
 
+      {/* 3. Floating Minimal Interface Container */}
+      <div className={`page-container ${view === 'profile' ? 'profile-view-mode' : ''}`}>
         <main className={`auth-main-area ${view === 'profile' ? 'profile-main-area-reset' : ''}`}>
           {/* 1. Initial Selection: Ask Login as User / Agent */}
           {portal === 'select' && (
@@ -152,7 +227,10 @@ function AppLayout() {
           {/* 2. Customer / User Portal Auth */}
           {portal === 'customer' && view === 'auth' && (
             <CustomerPortalPage
-              onNavigateForgot={() => setView('forgot')}
+              onNavigateForgot={() => {
+                window.history.pushState({ authView: 'forgot' }, '', window.location.href);
+                setView('forgot');
+              }}
               onSwitchPortal={handleSwitchPortal}
             />
           )}
@@ -165,7 +243,7 @@ function AppLayout() {
                 setView('auth');
                 const newUrl = new URL(window.location.href);
                 newUrl.searchParams.delete('action');
-                window.history.pushState({}, '', newUrl.toString());
+                window.history.replaceState({}, '', newUrl.toString());
               }}
             />
           )}
@@ -173,7 +251,10 @@ function AppLayout() {
           {/* 4. Agent / Technician Portal Auth */}
           {portal === 'agent' && view === 'auth' && (
             <AgentPortalPage
-              onNavigateForgot={() => setView('forgot')}
+              onNavigateForgot={() => {
+                window.history.pushState({ authView: 'forgot' }, '', window.location.href);
+                setView('forgot');
+              }}
               onSwitchPortal={handleSwitchPortal}
             />
           )}
@@ -186,7 +267,7 @@ function AppLayout() {
                 setView('auth');
                 const newUrl = new URL(window.location.href);
                 newUrl.searchParams.delete('action');
-                window.history.pushState({}, '', newUrl.toString());
+                window.history.replaceState({}, '', newUrl.toString());
               }}
             />
           )}
@@ -195,14 +276,26 @@ function AppLayout() {
           {portal === 'customer' && view === 'forgot' && (
             <CustomerForgotPasswordPage
               isAgent={false}
-              onBackToSignIn={() => setView('auth')}
+              onBackToSignIn={() => {
+                if (window.history.state?.authView === 'forgot') {
+                  window.history.back();
+                } else {
+                  setView('auth');
+                }
+              }}
             />
           )}
 
           {/* 7. Agent Forgot Password */}
           {portal === 'agent' && view === 'forgot' && (
             <AgentForgotPasswordPage
-              onBackToSignIn={() => setView('auth')}
+              onBackToSignIn={() => {
+                if (window.history.state?.authView === 'forgot') {
+                  window.history.back();
+                } else {
+                  setView('auth');
+                }
+              }}
             />
           )}
         </main>

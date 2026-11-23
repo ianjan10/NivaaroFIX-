@@ -179,6 +179,8 @@ export async function createServiceRequest(params) {
       hasCoordinates: !!(numLat && numLng),
       initialRadius: DISPATCH_CONFIG.INITIAL_RADIUS_METERS || 50
     })
+  ]);
+
   // Broadcast to online providers listening on SSE stream
   try {
     broadcastToProviders('request.broadcast', {
@@ -249,7 +251,7 @@ export async function getRequestWithQuotes(requestRef) {
     providerPhone: sr.status === 'Accepted' || sr.status === 'En Route' || sr.status === 'In Progress' || sr.status === 'Completed'
       ? q.agent_phone
       : null, // Keep masked before acceptance
-    rating: parseFloat(q.agent_rating || 5.0),
+    rating: (q.agent_rating !== null && q.agent_rating !== undefined) ? parseFloat(q.agent_rating) : null,
     completedJobs: q.agent_completed_jobs || 0,
     experienceYears: q.agent_experience || 0,
     trade: q.agent_trade,

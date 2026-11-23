@@ -117,9 +117,9 @@ async function runGpsDispatchQuotationE2ETest() {
     // Step 2: Customer creates service request with GPS
     // -----------------------------------------------------------------
     // Clean up any lingering active test requests for customer to ensure test isolation
-    await pool.query("DELETE FROM quotes WHERE request_id IN (SELECT id FROM service_requests WHERE user_email = 'customer_e2e@test.com' OR customer_email = 'customer_e2e@test.com');");
-    await pool.query("DELETE FROM bookings WHERE user_email = 'customer_e2e@test.com' OR customer_email = 'customer_e2e@test.com';");
-    await pool.query("DELETE FROM service_requests WHERE user_email = 'customer_e2e@test.com' OR customer_email = 'customer_e2e@test.com';");
+    await pool.query("DELETE FROM quotes WHERE request_id IN (SELECT id FROM service_requests WHERE user_email = 'customer_e2e@test.com');");
+    await pool.query("DELETE FROM bookings WHERE user_email = 'customer_e2e@test.com';");
+    await pool.query("DELETE FROM service_requests WHERE user_email = 'customer_e2e@test.com';");
 
     console.log('Test 2: Customer creates GPS-based Service Request');
     const reqResult = await createServiceRequest({

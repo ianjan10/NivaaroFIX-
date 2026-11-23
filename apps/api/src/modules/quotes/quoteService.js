@@ -150,7 +150,7 @@ export async function submitQuote({
     provider: {
       id: agent.id,
       name: agent.name,
-      rating: parseFloat(agent.rating || 5.0),
+      rating: (agent.rating !== null && agent.rating !== undefined) ? parseFloat(agent.rating) : null,
       completedJobs: agent.completed_jobs || 0,
       experienceYears: agent.experience_years || 0,
       trade: agent.trade
@@ -248,8 +248,8 @@ export async function acceptQuote(quoteId, customerIdentifier) {
 
     // 7. Update service request
     await client.query(
-      "UPDATE service_requests SET status = 'Accepted', accepted_quote_id = $1, assigned_professional_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3;",
-      [quote.id, quote.agent_id, sr.id]
+      "UPDATE service_requests SET status = 'Confirmed', accepted_quote_id = $1, assigned_professional_id = $2, confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $3;",
+      [quote.id, quote.professional_id || quote.agent_id, sr.id]
     );
 
     // Force-lock provider to BUSY and remove from live dispatch

@@ -6,11 +6,12 @@ import {
   findNearbyProviders,
   haversineDistance,
   findNearbyProvidersExpandingRadius,
-  RADIUS_EXPANSION_TIERS_KM,
-  getCityCoordinates
+  RADIUS_EXPANSION_TIERS_KM
 } from '../utils/geoDispatch.js';
 import { notifyCustomer, notifyProvider, broadcastToProviders, registerCustomerStream } from '../modules/realtime/realtimeService.js';
 import { cleanupJobTracking, processLocationUpdate, getOrInitChannel, fetchRoadRoute } from '../modules/tracking/trackingSocket.js';
+import { requireCustomerAuth, requireAgentAuth, requireAnyAuth } from '../middleware/authMiddleware.js';
+import { PaymentService } from '../modules/payments/paymentService.js';
 
 const router = Router();
 
@@ -80,7 +81,7 @@ export function formatDistance(distKm) {
 // =========================================================================
 // 1. Create Service Request (Customer submits a problem + Proximity Matching)
 // =========================================================================
-router.post('/request', async (req, res) => {
+router.post('/request', requireCustomerAuth, async (req, res) => {
   try {
     const {
       userId,
@@ -135,6 +136,20 @@ router.post('/request', async (req, res) => {
           activeStatus: activeReq.status
         });
       }
+
+      // 2. Unpaid Completed Job Gating: Customer cannot start a new booking while a completed job is unpaid
+      const customerIdentifier = userId || req.user?.id || req.userId;
+      const customerEmail = userEmail || req.userEmail || req.user?.email;
+      const unpaidCheck = await PaymentService.checkUnpaidCompletedJobs(customerIdentifier, customerEmail);
+      if (unpaidCheck.hasUnpaid) {
+        return res.status(403).json({
+          success: false,
+          code: 'UNPAID_COMPLETED_JOB',
+          error: 'Pay for your previous service first.',
+          message: 'Pay for your previous service first.',
+          unpaidBooking: unpaidCheck
+        });
+      }
     }
 
     // Customer problem description (only saved when customer actually wrote one)
@@ -168,7 +183,21 @@ router.post('/request', async (req, res) => {
     // Catalog service title and category is the single source of truth
     const classified = classifyServiceCategory(description, serviceTitle, category);
     const finalCategory = (category && category !== 'general-service') ? category : classified.category;
-    const finalServiceTitle = (serviceTitle && serviceTitle.trim()) || classified.serviceTitle;
+
+    // Title priority: Customer's custom problem description -> Selected option/issue type -> Service category title
+    const customProblem = (description || '').trim();
+    const selectedOption = (issueType || '').trim();
+    const genericPlaceholders = ['general repair', 'repair', 'standard repair', 'photo inspection provided', 'not specified', 'standard diagnosis and repair dispatch.'];
+    let finalServiceTitle = '';
+    if (customProblem && !genericPlaceholders.includes(customProblem.toLowerCase())) {
+      finalServiceTitle = customProblem.charAt(0).toUpperCase() + customProblem.slice(1);
+    } else if (selectedOption && !genericPlaceholders.includes(selectedOption.toLowerCase()) && selectedOption.toLowerCase() !== 'inspection & repair') {
+      finalServiceTitle = selectedOption.charAt(0).toUpperCase() + selectedOption.slice(1);
+    } else if (serviceTitle && serviceTitle.trim() && !genericPlaceholders.includes(serviceTitle.trim().toLowerCase())) {
+      finalServiceTitle = serviceTitle.trim().charAt(0).toUpperCase() + serviceTitle.trim().slice(1);
+    } else {
+      finalServiceTitle = classified.serviceTitle;
+    }
 
     let resolvedServiceId = null;
     if (typeof serviceId === 'number' || (typeof serviceId === 'string' && /^\d+$/.test(serviceId))) {
@@ -296,7 +325,11 @@ router.post('/request', async (req, res) => {
         lng: sr.lng,
         matchSummary,
         createdAt: sr.created_at,
-        expiresAt: sr.expires_at
+        expiresAt: sr.expires_at,
+        paymentStatus: sr.payment_status || (sr.status === 'Completed' ? 'due' : null),
+        paymentCode: sr.payment_code || null,
+        paymentAmount: sr.payment_amount ? parseFloat(sr.payment_amount) : null,
+        paymentCapturedAt: sr.payment_captured_at || null
       }
     });
   } catch (err) {
@@ -423,7 +456,9 @@ router.get('/request/:ref', async (req, res) => {
         const q = quoteRes.rows[0];
         acceptedProvider = {
           quoteId: q.id,
-          agentName: q.agent_name,
+          agentName: (q.agent_name || '').trim()
+        ? q.agent_name.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+        : 'Professional',
           agentPhone: q.agent_phone,
           agentEmail: q.agent_email,
           amount: q.amount,
@@ -453,9 +488,18 @@ router.get('/request/:ref', async (req, res) => {
         userPhone: sr.user_phone,
         lat: sr.lat,
         lng: sr.lng,
+        confirmed_at: sr.confirmed_at,
+        on_the_way_at: sr.on_the_way_at,
+        arrived_at: sr.arrived_at,
+        in_progress_at: sr.in_progress_at,
+        completed_at: sr.completed_at,
         acceptedProvider,
         createdAt: sr.created_at,
-        expiresAt: sr.expires_at
+        expiresAt: sr.expires_at,
+        paymentStatus: sr.payment_status || (sr.status === 'Completed' ? 'due' : null),
+        paymentCode: sr.payment_code || null,
+        paymentAmount: sr.payment_amount ? parseFloat(sr.payment_amount) : null,
+        paymentCapturedAt: sr.payment_captured_at || null
       }
     });
   } catch (err) {
@@ -501,7 +545,16 @@ router.get('/my-requests', async (req, res) => {
              (SELECT a.lng FROM agent_login a WHERE a.id = sr.assigned_professional_id) AS pro_lng,
              (SELECT a.trade FROM agent_login a WHERE a.id = sr.assigned_professional_id) AS pro_trade,
              (SELECT a.rating FROM agent_login a WHERE a.id = sr.assigned_professional_id) AS pro_rating,
-             (SELECT a.completed_jobs FROM agent_login a WHERE a.id = sr.assigned_professional_id) AS pro_completed_jobs
+             (SELECT a.completed_jobs FROM agent_login a WHERE a.id = sr.assigned_professional_id) AS pro_completed_jobs,
+             (SELECT p.status FROM payments p WHERE p.service_request_id = sr.id LIMIT 1) AS payment_status,
+             (SELECT p.payment_code FROM payments p WHERE p.service_request_id = sr.id LIMIT 1) AS payment_code,
+             (SELECT p.amount FROM payments p WHERE p.service_request_id = sr.id LIMIT 1) AS payment_amount,
+             (SELECT p.captured_at FROM payments p WHERE p.service_request_id = sr.id LIMIT 1) AS payment_captured_at,
+             (SELECT p.method FROM payments p WHERE p.service_request_id = sr.id LIMIT 1) AS payment_method,
+             (SELECT p.provider_order_id FROM payments p WHERE p.service_request_id = sr.id LIMIT 1) AS provider_order_id,
+             (SELECT p.provider_payment_id FROM payments p WHERE p.service_request_id = sr.id LIMIT 1) AS provider_payment_id,
+             (SELECT p2.name FROM professionals p2 WHERE p2.id = sr.assigned_professional_id) AS assigned_pro_name,
+             (SELECT COALESCE(p2.professional_code, a.partner_id, '202600001') FROM professionals p2 LEFT JOIN agent_login a ON LOWER(a.email) = LOWER(p2.email) WHERE p2.id = sr.assigned_professional_id LIMIT 1) AS pro_partner_id
       FROM service_requests sr
       WHERE ($1::varchar IS NOT NULL AND sr.user_email = $1)
          OR ($2::int IS NOT NULL AND sr.user_id = $2)
@@ -512,17 +565,29 @@ router.get('/my-requests', async (req, res) => {
       // Get accepted provider details if available
       let acceptedProvider = null;
       if (sr.accepted_quote_id && Array.isArray(sr.quotes)) {
-        const accepted = sr.quotes.find(q => q.quoteId === sr.accepted_quote_id);
+        const accepted = sr.quotes.find(q => String(q.quoteId) === String(sr.accepted_quote_id));
         if (accepted) {
           acceptedProvider = { ...accepted };
         }
       }
+      if (!acceptedProvider && sr.assigned_pro_name) {
+        acceptedProvider = {
+          agentName: (sr.assigned_pro_name || '').trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '),
+          agentTrade: sr.pro_trade || (sr.category === 'plumber' ? 'Plumber' : 'Electrician'),
+          amount: sr.payment_amount || null
+        };
+      }
       if (acceptedProvider) {
+        if (acceptedProvider.agentName) {
+          acceptedProvider.agentName = acceptedProvider.agentName.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        }
         if (sr.pro_lat !== undefined && sr.pro_lat !== null) acceptedProvider.lat = parseFloat(sr.pro_lat);
         if (sr.pro_lng !== undefined && sr.pro_lng !== null) acceptedProvider.lng = parseFloat(sr.pro_lng);
         if (sr.pro_trade) acceptedProvider.trade = sr.pro_trade;
         acceptedProvider.rating = sr.pro_rating !== null && sr.pro_rating !== undefined ? parseFloat(sr.pro_rating) : null;
         acceptedProvider.completedJobs = sr.pro_completed_jobs || 0;
+        acceptedProvider.partnerId = sr.pro_partner_id || '202600001';
+        acceptedProvider.proPartnerId = sr.pro_partner_id || '202600001';
       }
 
       // Timeout Safeguard (Accepted for >2 hours without door OTP)
@@ -567,10 +632,29 @@ router.get('/my-requests', async (req, res) => {
         startedAt: sr.started_at,
         arrivedAt: sr.arrived_at,
         completedAt: sr.completed_at,
+        confirmed_at: sr.confirmed_at,
+        confirmedAt: sr.confirmed_at,
+        on_the_way_at: sr.on_the_way_at,
+        onTheWayAt: sr.on_the_way_at,
+        arrived_at: sr.arrived_at,
+        in_progress_at: sr.in_progress_at || sr.otp_verified_at || sr.started_at,
+        inProgressAt: sr.in_progress_at || sr.otp_verified_at || sr.started_at,
+        completed_at: sr.completed_at,
         rating: sr.rating,
         ratingFeedback: sr.rating_feedback,
         createdAt: sr.created_at,
-        expiresAt: sr.expires_at
+        expiresAt: sr.expires_at,
+        paymentStatus: sr.payment_status || (sr.status === 'Completed' ? 'due' : null),
+        paymentCode: sr.payment_code || null,
+        amount: sr.payment_amount ? parseFloat(sr.payment_amount) : null,
+        paymentAmount: sr.payment_amount ? parseFloat(sr.payment_amount) : null,
+        paymentCapturedAt: sr.payment_captured_at || null,
+        paymentMethod: sr.payment_method || null,
+        providerOrderId: sr.provider_order_id || null,
+        providerPaymentId: sr.provider_payment_id || null,
+        transactionId: sr.provider_order_id || sr.provider_payment_id || sr.payment_code || null,
+        partnerId: sr.pro_partner_id || '202600001',
+        proPartnerId: sr.pro_partner_id || '202600001'
       };
     });
 
@@ -644,6 +728,10 @@ async function handleCancelRequest(req, res) {
         SET status = 'Open',
             accepted_quote_id = NULL,
             assigned_professional_id = NULL,
+            confirmed_at = NULL,
+            on_the_way_at = NULL,
+            arrived_at = NULL,
+            in_progress_at = NULL,
             otp_verified = false,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = $1
@@ -779,8 +867,8 @@ async function handleCancelRequest(req, res) {
   }
 }
 
-router.patch('/request/:ref/cancel', handleCancelRequest);
-router.post('/request/:ref/cancel', handleCancelRequest);
+router.patch('/request/:ref/cancel', requireAnyAuth, handleCancelRequest);
+router.post('/request/:ref/cancel', requireAnyAuth, handleCancelRequest);
 
 // =========================================================================
 // Customer Logout Cleanup: Automatically invalidates & deletes unassigned requests
@@ -901,7 +989,7 @@ router.post('/request/:ref/rebroadcast', async (req, res) => {
 
     // Reset request to Open
     await pool.query(
-      "UPDATE service_requests SET status = 'Open', accepted_quote_id = NULL, assigned_professional_id = NULL, otp_verified = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1;",
+      "UPDATE service_requests SET status = 'Open', accepted_quote_id = NULL, assigned_professional_id = NULL, confirmed_at = NULL, on_the_way_at = NULL, arrived_at = NULL, in_progress_at = NULL, otp_verified = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1;",
       [sr.id]
     );
 
@@ -960,9 +1048,9 @@ router.get('/nearby-requests', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Provider email is required.' });
     }
 
-    // Fetch the provider's profile for trade and location
+    // Fetch the provider's profile for trade, location, and verification status
     const agentRes = await pool.query(
-      'SELECT id, trade, lat, lng, h3_index_res9, is_online FROM agent_login WHERE email = $1 LIMIT 1;',
+      'SELECT id, trade, lat, lng, h3_index_res9, is_online, account_status, kyc_status, suspended_until FROM agent_login WHERE email = $1 LIMIT 1;',
       [email.toLowerCase()]
     );
 
@@ -971,6 +1059,22 @@ router.get('/nearby-requests', async (req, res) => {
     }
 
     const agent = agentRes.rows[0];
+
+    // Suspension & Verification Guard: Suspended, banned, or unverified providers cannot receive requests
+    const isBanned = agent.account_status === 'banned';
+    const isSuspended = agent.account_status === 'suspended';
+    const isCurrentlySuspended = Boolean(isSuspended && agent.suspended_until && new Date(agent.suspended_until) > new Date());
+
+    if (isBanned) {
+      return res.json({ success: true, requests: [], notice: 'Account is permanently deactivated.' });
+    }
+    if (isCurrentlySuspended) {
+      const suspDate = new Date(agent.suspended_until).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      return res.json({ success: true, requests: [], notice: `Account is suspended for 7 days until ${suspDate}. You cannot receive job requests during suspension.` });
+    }
+    if (isSuspended || agent.kyc_status !== 'verified') {
+      return res.json({ success: true, requests: [], notice: 'Account requires admin verification before you can receive job requests.' });
+    }
 
     // Mutual Exclusivity Guard: If provider currently has an active engaged job, do not assign or dispatch any new services
     const activeJobCheck = await pool.query(`
@@ -1052,6 +1156,10 @@ router.get('/nearby-requests', async (req, res) => {
           alreadyQuoted: parseInt(sr.my_quotes || '0', 10) > 0,
           createdAt: sr.created_at,
           expiresAt: sr.expires_at,
+        paymentStatus: sr.payment_status || (sr.status === 'Completed' ? 'due' : null),
+        paymentCode: sr.payment_code || null,
+        paymentAmount: sr.payment_amount ? parseFloat(sr.payment_amount) : null,
+        paymentCapturedAt: sr.payment_captured_at || null,
           distanceKm: parseFloat(rawDist.toFixed(4)),
           formattedDistance: formattedDist
         };
@@ -1069,7 +1177,7 @@ router.get('/nearby-requests', async (req, res) => {
 // =========================================================================
 // 6. Provider Submits a Quote
 // =========================================================================
-router.post('/quote', async (req, res) => {
+router.post('/quote', requireAgentAuth, async (req, res) => {
   try {
     const { requestRef, agentEmail, amount, estimatedDuration, message } = req.body;
 
@@ -1094,7 +1202,7 @@ router.post('/quote', async (req, res) => {
 
     // Lookup the provider
     const agentRes = await pool.query(
-      'SELECT id, name, email, phone, trade FROM agent_login WHERE email = $1 LIMIT 1;',
+      'SELECT id, name, email, phone, trade, payout_status FROM agent_login WHERE email = $1 LIMIT 1;',
       [agentEmail.toLowerCase()]
     );
     if (agentRes.rows.length === 0) {
@@ -1160,7 +1268,9 @@ router.post('/quote', async (req, res) => {
     notifyCustomer(sr.request_ref, 'quote.received', {
       quoteId: q.id,
       requestRef,
-      agentName: q.agent_name,
+      agentName: (q.agent_name || '').trim()
+        ? q.agent_name.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+        : 'Professional',
       amount: q.amount,
       estimatedDuration: q.estimated_duration_minutes,
       message: q.message,
@@ -1180,7 +1290,9 @@ router.post('/quote', async (req, res) => {
       quote: {
         quoteId: q.id,
         requestRef: requestRef,
-        agentName: q.agent_name,
+        agentName: (q.agent_name || '').trim()
+        ? q.agent_name.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+        : 'Professional',
         amount: q.amount,
         estimatedDuration: q.estimated_duration_minutes,
         message: q.message,
@@ -1221,10 +1333,12 @@ router.get('/request/:ref/quotes', async (req, res) => {
     const quotes = quotesRes.rows.map(q => ({
       quoteId: q.id,
       agentId: q.agent_id,
-      agentName: q.agent_name,
+      agentName: (q.agent_name || '').trim()
+        ? q.agent_name.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+        : 'Professional',
       agentPhone: q.agent_phone,
       agentEmail: q.agent_email,
-      agentRating: parseFloat(q.agent_rating || 5.0),
+      agentRating: (q.agent_rating !== null && q.agent_rating !== undefined && !isNaN(parseFloat(q.agent_rating))) ? parseFloat(q.agent_rating) : null,
       agentCompletedJobs: q.agent_completed_jobs || 0,
       agentExperience: q.agent_experience || 0,
       agentTrade: q.agent_trade,
@@ -1245,12 +1359,22 @@ router.get('/request/:ref/quotes', async (req, res) => {
 // =========================================================================
 // 8. Customer Accepts a Quote (Atomic PostgreSQL Transaction)
 // =========================================================================
-router.post('/quote/:quoteId/accept', async (req, res) => {
+router.post('/quote/:quoteId/accept', requireCustomerAuth, async (req, res) => {
   const client = await pool.connect();
   try {
     const quoteId = parseInt(req.params.quoteId, 10);
     if (!quoteId) {
       return res.status(400).json({ success: false, error: 'Valid quote ID is required.' });
+    }
+
+    const { role, userRole, actorRole } = req.body || {};
+    const effectiveRole = (actorRole || role || userRole || '').toLowerCase();
+    if (['agent', 'provider', 'partner'].includes(effectiveRole)) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Unauthorized: Only customers can accept quotes to confirm a booking.'
+      });
     }
 
     await client.query('BEGIN');
@@ -1299,16 +1423,24 @@ router.post('/quote/:quoteId/accept', async (req, res) => {
       [sr.id, quoteId]
     );
 
-    // 5. Update service_requests status to Accepted and record assigned professional
+    // 5. Update service_requests status to Confirmed and record confirmed_at timestamp & assigned professional
     let assignedProId = quote.professional_id || quote.agent_id;
     if (quote.agent_email) {
       const pRes = await client.query('SELECT id FROM professionals WHERE email = $1 LIMIT 1;', [quote.agent_email]);
       if (pRes.rows.length > 0) assignedProId = pRes.rows[0].id;
     }
-    await client.query(
-      "UPDATE service_requests SET status = 'Accepted', accepted_quote_id = $1, assigned_professional_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3;",
+    const srUpdate = await client.query(
+      `UPDATE service_requests 
+       SET status = 'Confirmed', 
+           accepted_quote_id = $1, 
+           assigned_professional_id = $2, 
+           confirmed_at = CURRENT_TIMESTAMP, 
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $3
+       RETURNING *;`,
       [quoteId, assignedProId, sr.id]
     );
+    const updatedSr = srUpdate.rows[0];
 
     // 6. Force-lock accepted professional to BUSY and remove from live dispatch pool
     await client.query(
@@ -1355,13 +1487,13 @@ router.post('/quote/:quoteId/accept', async (req, res) => {
           service_id, service_title, category, problem_description, photos,
           total_amount, otp_code, status,
           technician_name, technician_phone, eta_minutes,
-          request_id, accepted_quote_id, assigned_agent_id
+          request_id, accepted_quote_id, assigned_agent_id, confirmed_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6,
           $7, $8, $9, $10, $11::jsonb,
           $12, $13, 'Confirmed',
           $14, $15, $16,
-          $17, $18, $19
+          $17, $18, $19, CURRENT_TIMESTAMP
         ) RETURNING id, booking_ref;
       `, [
         sr.request_ref,
@@ -1407,6 +1539,18 @@ router.post('/quote/:quoteId/accept', async (req, res) => {
 
     await client.query('COMMIT');
 
+    const progressPayload = {
+      request_id: updatedSr.id,
+      requestRef: sr.request_ref,
+      bookingRef,
+      status: 'Confirmed',
+      confirmed_at: updatedSr.confirmed_at,
+      on_the_way_at: updatedSr.on_the_way_at,
+      arrived_at: updatedSr.arrived_at,
+      in_progress_at: updatedSr.in_progress_at,
+      completed_at: updatedSr.completed_at
+    };
+
     // Realtime Notifications on Quote Acceptance
     notifyProvider(quote.agent_email, 'quote.accepted', {
       quoteId: quote.id,
@@ -1417,6 +1561,7 @@ router.post('/quote/:quoteId/accept', async (req, res) => {
       serviceTitle: sr.service_title,
       amount: quote.amount,
       address: sr.user_address,
+      ...progressPayload,
       timestamp: new Date().toISOString()
     });
     notifyCustomer(sr.request_ref, 'quote.accepted', {
@@ -1426,8 +1571,10 @@ router.post('/quote/:quoteId/accept', async (req, res) => {
       agentPhone: quote.agent_phone,
       serviceTitle: sr.service_title,
       amount: quote.amount,
+      ...progressPayload,
       timestamp: new Date().toISOString()
     });
+    notifyCustomer(sr.request_ref, 'status.confirmed', progressPayload);
 
     return res.json({
       success: true,
@@ -1436,8 +1583,9 @@ router.post('/quote/:quoteId/accept', async (req, res) => {
         requestRef: sr.request_ref,
         bookingRef,
         bookingId,
-        status: 'Accepted',
+        status: 'Confirmed',
         otpCode: sr.otp_code,
+        ...progressPayload,
         acceptedProvider: {
           quoteId: quote.id,
           agentId: quote.agent_id,
@@ -1462,51 +1610,139 @@ router.post('/quote/:quoteId/accept', async (req, res) => {
 // =========================================================================
 // 9. Provider Marks On the way / En Route
 // =========================================================================
-router.post('/request/:ref/en-route', async (req, res) => {
+router.post('/request/:ref/en-route', requireAgentAuth, async (req, res) => {
   try {
     const { ref } = req.params;
-    const { agentEmail } = req.body;
+    const { agentEmail, role, userRole } = req.body || {};
 
-    const result = await pool.query(
-      `UPDATE service_requests
-       SET status = 'On the way', updated_at = CURRENT_TIMESTAMP
-       WHERE (request_ref = $1 OR service_request_code = $1) AND LOWER(REPLACE(status, ' ', '_')) IN ('accepted', 'confirmed', 'open', 'quoted', 'quoting')
-       RETURNING *;`,
-      [ref]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Request not found or not in Confirmed state.' });
+    // 1. Actor authorization check
+    const callerRole = (role || userRole || '').toLowerCase();
+    if (callerRole === 'customer' || callerRole === 'user') {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Unauthorized: Only the assigned professional can mark this job On the way.'
+      });
     }
 
-    const sr = result.rows[0];
+    if (!agentEmail) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Professional email is required for authorization.'
+      });
+    }
+
+    // 2. Fetch request and check assigned professional
+    const srRes = await pool.query(
+      `SELECT sr.*, a.id as caller_agent_id, p.id as caller_pro_id
+       FROM service_requests sr
+       LEFT JOIN agent_login a ON LOWER(a.email) = LOWER($2)
+       LEFT JOIN professionals p ON LOWER(p.email) = LOWER($2)
+       WHERE sr.request_ref = $1 OR sr.service_request_code = $1
+       LIMIT 1;`,
+      [ref, agentEmail.toLowerCase().trim()]
+    );
+
+    if (srRes.rows.length === 0) {
+      return res.status(404).json({ success: false, code: 'NOT_FOUND', error: 'Service request not found.' });
+    }
+    const sr = srRes.rows[0];
+
+    // Check caller is recognized professional
+    if (!sr.caller_agent_id && !sr.caller_pro_id) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Professional account not recognized.'
+      });
+    }
+
+    const assignedId = String(sr.assigned_professional_id || '');
+    const isAssigned = (assignedId === String(sr.caller_pro_id) || assignedId === String(sr.caller_agent_id));
+    if (sr.assigned_professional_id && !isAssigned) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Unauthorized: Only the assigned professional can mark this job On the way.'
+      });
+    }
+
+    // 3. Strict sequential step validation: Previous step must be Confirmed (confirmed_at IS NOT NULL)
+    const normStatus = (sr.status || '').toLowerCase().replace(/_/g, ' ');
+    if (normStatus === 'on the way' || normStatus === 'en route') {
+      // Idempotent
+      return res.json({
+        success: true,
+        message: 'Status is already On the way.',
+        request: {
+          request_id: sr.id,
+          requestRef: ref,
+          status: 'On the way',
+          confirmed_at: sr.confirmed_at,
+          on_the_way_at: sr.on_the_way_at,
+          arrived_at: sr.arrived_at,
+          in_progress_at: sr.in_progress_at,
+          completed_at: sr.completed_at
+        }
+      });
+    }
+
+    if (!['confirmed', 'accepted'].includes(normStatus) || !sr.confirmed_at) {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_TRANSITION',
+        error: `Cannot transition to 'On the way'. Current status is '${sr.status}' (requires sequential transition from 'Confirmed').`
+      });
+    }
+
+    // 4. Update status and on_the_way_at timestamp
+    const result = await pool.query(
+      `UPDATE service_requests
+       SET status = 'On the way',
+           on_the_way_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING *;`,
+      [sr.id]
+    );
+    const updatedSr = result.rows[0];
 
     await pool.query(
       `UPDATE bookings
-       SET status = 'On the way', updated_at = CURRENT_TIMESTAMP
+       SET status = 'On the way',
+           on_the_way_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
        WHERE request_id = $1 OR booking_ref = $2;`,
       [sr.id, ref]
     );
 
-    notifyCustomer(ref, 'status.en_route', {
+    const progressPayload = {
+      request_id: updatedSr.id,
       requestRef: ref,
       status: 'On the way',
+      confirmed_at: updatedSr.confirmed_at,
+      on_the_way_at: updatedSr.on_the_way_at,
+      arrived_at: updatedSr.arrived_at,
+      in_progress_at: updatedSr.in_progress_at,
+      completed_at: updatedSr.completed_at
+    };
+
+    notifyCustomer(ref, 'status.en_route', {
+      ...progressPayload,
       message: 'Professional is on the way to your location.',
       timestamp: new Date().toISOString()
     });
-    if (agentEmail) {
-      notifyProvider(agentEmail, 'status.en_route', {
-        requestRef: ref,
-        status: 'On the way',
-        message: 'Status updated to On the way.',
-        timestamp: new Date().toISOString()
-      });
-    }
+    notifyProvider(agentEmail, 'status.en_route', {
+      ...progressPayload,
+      message: 'Status updated to On the way.',
+      timestamp: new Date().toISOString()
+    });
 
     return res.json({
       success: true,
       message: 'Status updated to On the way. Customer has been notified.',
-      request: { requestRef: ref, status: 'On the way' }
+      request: progressPayload
     });
   } catch (err) {
     console.error('En route error:', err);
@@ -1517,7 +1753,7 @@ router.post('/request/:ref/en-route', async (req, res) => {
 // =========================================================================
 // 9.5. Provider Marks Arrived (Doorstep Geofence or Tap)
 // =========================================================================
-router.post('/request/:ref/arrived', async (req, res) => {
+router.post('/request/:ref/arrived', requireAgentAuth, async (req, res) => {
   try {
     const { ref } = req.params;
     const { agentEmail, lat, lng } = req.body || {};
@@ -1546,12 +1782,13 @@ router.post('/request/:ref/arrived', async (req, res) => {
       });
     }
 
-    // 2. State validation: Job must be in On the way / En Route / Confirmed
+    // 2. Strict sequential state validation: Job must be in On the way and have on_the_way_at set
     const normStatus = (sr.status || '').toLowerCase().replace(/_/g, ' ');
-    if (normStatus !== 'on the way' && normStatus !== 'en route' && normStatus !== 'confirmed' && normStatus !== 'accepted') {
+    if (!['on the way', 'en route', 'on_the_way'].includes(normStatus) || !sr.on_the_way_at) {
       return res.status(400).json({
         success: false,
-        error: `Cannot mark arrival. Job is currently in '${sr.status}' state (must be 'On the way').`
+        code: 'INVALID_TRANSITION',
+        error: `Cannot mark arrival. Job is currently in '${sr.status}' state (requires sequential transition from 'On the way').`
       });
     }
 
@@ -1561,7 +1798,7 @@ router.post('/request/:ref/arrived', async (req, res) => {
       [agentEmail.toLowerCase().trim()]
     );
     if (agentRes.rows.length === 0) {
-      return res.status(403).json({ success: false, error: 'Professional account not found.' });
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', error: 'Professional account not found.' });
     }
     const agent = agentRes.rows[0];
 
@@ -1570,6 +1807,7 @@ router.post('/request/:ref/arrived', async (req, res) => {
     if (sr.assigned_professional_id && !isAssigned) {
       return res.status(403).json({
         success: false,
+        code: 'FORBIDDEN',
         error: 'Unauthorized: Only the assigned professional can mark arrival.'
       });
     }
@@ -1612,18 +1850,27 @@ router.post('/request/:ref/arrived', async (req, res) => {
       [sr.id, ref]
     );
 
-    // 6. Push realtime event & reveal door OTP to customer
-    notifyCustomer(ref, 'status.arrived', {
+    const progressPayload = {
+      request_id: updatedSr.id,
       requestRef: ref,
       status: 'Arrived',
+      confirmed_at: updatedSr.confirmed_at,
+      on_the_way_at: updatedSr.on_the_way_at,
+      arrived_at: updatedSr.arrived_at,
+      in_progress_at: updatedSr.in_progress_at,
+      completed_at: updatedSr.completed_at
+    };
+
+    // 6. Push realtime event & reveal door OTP to customer
+    notifyCustomer(ref, 'status.arrived', {
+      ...progressPayload,
       otpCode: updatedSr.otp_code,
       message: 'Professional has arrived at your doorstep. Please share your 4-digit door verification code.',
       timestamp: new Date().toISOString()
     });
 
     notifyProvider(agentEmail, 'status.arrived', {
-      requestRef: ref,
-      status: 'Arrived',
+      ...progressPayload,
       message: 'Status updated to Arrived. Please request the 4-digit door OTP from customer.',
       timestamp: new Date().toISOString()
     });
@@ -1631,7 +1878,10 @@ router.post('/request/:ref/arrived', async (req, res) => {
     return res.json({
       success: true,
       message: 'Status updated to Arrived.',
-      request: { requestRef: ref, status: 'Arrived', otpCode: updatedSr.otp_code }
+      request: {
+        ...progressPayload,
+        otpCode: updatedSr.otp_code
+      }
     });
   } catch (err) {
     console.error('Arrived error:', err);
@@ -1640,7 +1890,7 @@ router.post('/request/:ref/arrived', async (req, res) => {
 });
 
 // Location stream endpoint (HTTP fallback for location telemetry)
-router.post('/job/:ref/location', async (req, res) => {
+router.post('/job/:ref/location', requireAgentAuth, async (req, res) => {
   try {
     const { ref } = req.params;
     const { lat, lng, accuracy, heading, speed, email } = req.body || {};
@@ -1665,7 +1915,7 @@ router.get('/job/:ref/tracking', async (req, res) => {
 
     // If channel has no latest position yet, retrieve the assigned pro's last known coordinates from DB
     if (!channel.latestPosition && channel.assignedProId) {
-      const proRes = await pool.query('SELECT lat, lng, city FROM agent_login WHERE id = $1 LIMIT 1;', [channel.assignedProId]);
+      const proRes = await pool.query('SELECT lat, lng FROM agent_login WHERE id = $1 LIMIT 1;', [channel.assignedProId]);
       if (proRes.rows.length > 0 && proRes.rows[0].lat && proRes.rows[0].lng) {
         const pLat = parseFloat(proRes.rows[0].lat);
         const pLng = parseFloat(proRes.rows[0].lng);
@@ -1720,25 +1970,83 @@ router.get('/job/:ref/events', (req, res) => {
 // =========================================================================
 // 10. Provider Verifies Door OTP (Moves to In progress)
 // =========================================================================
-router.post('/request/:ref/verify-otp', async (req, res) => {
+router.post('/request/:ref/verify-otp', requireAgentAuth, async (req, res) => {
   try {
     const { ref } = req.params;
-    const { otp } = req.body;
+    const { otp, role, userRole, agentEmail } = req.body || {};
+
+    // 1. Actor authorization: Professional only
+    const callerRole = (role || userRole || '').toLowerCase();
+    if (callerRole === 'customer' || callerRole === 'user') {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Unauthorized: Only the assigned professional can verify door OTP.'
+      });
+    }
 
     if (!otp || otp.trim().length < 4) {
       return res.status(400).json({ success: false, error: 'A valid 4-digit OTP is required.' });
     }
 
     const srRes = await pool.query(
-      "SELECT * FROM service_requests WHERE (request_ref = $1 OR service_request_code = $1) AND LOWER(REPLACE(status, ' ', '_')) IN ('arrived', 'on_the_way', 'en_route', 'accepted', 'confirmed') LIMIT 1;",
+      "SELECT * FROM service_requests WHERE request_ref = $1 OR service_request_code = $1 LIMIT 1;",
       [ref]
     );
 
     if (srRes.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Request not found or not in Arrived state for OTP verification.' });
+      return res.status(404).json({ success: false, code: 'NOT_FOUND', error: 'Service request not found.' });
     }
 
     const sr = srRes.rows[0];
+
+    // Check caller is assigned professional if agentEmail is passed
+    if (agentEmail) {
+      const agentRes = await pool.query(
+        'SELECT a.id AS agent_id, p.id AS pro_id FROM agent_login a LEFT JOIN professionals p ON LOWER(p.email) = LOWER(a.email) WHERE LOWER(a.email) = $1 LIMIT 1;',
+        [agentEmail.toLowerCase().trim()]
+      );
+      if (agentRes.rows.length > 0) {
+        const agent = agentRes.rows[0];
+        const assignedId = String(sr.assigned_professional_id || '');
+        const isAssigned = (assignedId === String(agent.pro_id) || assignedId === String(agent.agent_id));
+        if (sr.assigned_professional_id && !isAssigned) {
+          return res.status(403).json({
+            success: false,
+            code: 'FORBIDDEN',
+            error: 'Unauthorized: Only the assigned professional can verify door OTP.'
+          });
+        }
+      }
+    }
+
+    // 2. Strict sequential step validation: Previous step must be Arrived (arrived_at IS NOT NULL)
+    const normStatus = (sr.status || '').toLowerCase().replace(/_/g, ' ');
+    if (normStatus === 'in progress') {
+      // Idempotent
+      return res.json({
+        success: true,
+        message: 'Job is already In progress.',
+        request: {
+          request_id: sr.id,
+          requestRef: ref,
+          status: 'In progress',
+          confirmed_at: sr.confirmed_at,
+          on_the_way_at: sr.on_the_way_at,
+          arrived_at: sr.arrived_at,
+          in_progress_at: sr.in_progress_at,
+          completed_at: sr.completed_at
+        }
+      });
+    }
+
+    if (normStatus !== 'arrived' || !sr.arrived_at) {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_TRANSITION',
+        error: `Cannot verify OTP. Current job status is '${sr.status}' (requires sequential transition from 'Arrived').`
+      });
+    }
 
     // Check if door OTP entry is temporarily locked due to 5 failed attempts
     if (sr.otp_locked_until && new Date(sr.otp_locked_until) > new Date()) {
@@ -1795,14 +2103,25 @@ router.post('/request/:ref/verify-otp', async (req, res) => {
       });
     }
 
-    // Success: Reset failed attempts & lockout, record start time and move to In progress
-    await pool.query(
-      "UPDATE service_requests SET status = 'In progress', otp_verified = true, started_at = CURRENT_TIMESTAMP, otp_attempts = 0, otp_locked_until = NULL, otp_verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1;",
+    // Success: Reset failed attempts & lockout, record start & in_progress_at and move to In progress
+    const updateSrRes = await pool.query(
+      `UPDATE service_requests 
+       SET status = 'In progress', 
+           otp_verified = true, 
+           started_at = CURRENT_TIMESTAMP, 
+           in_progress_at = CURRENT_TIMESTAMP, 
+           otp_attempts = 0, 
+           otp_locked_until = NULL, 
+           otp_verified_at = CURRENT_TIMESTAMP, 
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $1
+       RETURNING *;`,
       [sr.id]
     );
+    const updatedSr = updateSrRes.rows[0];
 
     await pool.query(
-      "UPDATE bookings SET status = 'In progress', started_at = CURRENT_TIMESTAMP, otp_verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE request_id = $1 OR booking_ref = $2;",
+      "UPDATE bookings SET status = 'In progress', started_at = CURRENT_TIMESTAMP, in_progress_at = CURRENT_TIMESTAMP, otp_verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE request_id = $1 OR booking_ref = $2;",
       [sr.id, ref]
     );
 
@@ -1811,9 +2130,19 @@ router.post('/request/:ref/verify-otp', async (req, res) => {
       VALUES ($1, 'provider', $2, 'OTP_VERIFIED', $3::jsonb);
     `, [sr.id, String(sr.accepted_quote_id || 'provider'), JSON.stringify({ verifiedAt: new Date().toISOString() })]);
 
-    notifyCustomer(ref, 'status.otp_verified', {
+    const progressPayload = {
+      request_id: updatedSr.id,
       requestRef: ref,
       status: 'In progress',
+      confirmed_at: updatedSr.confirmed_at,
+      on_the_way_at: updatedSr.on_the_way_at,
+      arrived_at: updatedSr.arrived_at,
+      in_progress_at: updatedSr.in_progress_at,
+      completed_at: updatedSr.completed_at
+    };
+
+    notifyCustomer(ref, 'status.otp_verified', {
+      ...progressPayload,
       message: 'OTP verified. Service is now In progress.',
       timestamp: new Date().toISOString()
     });
@@ -1821,8 +2150,7 @@ router.post('/request/:ref/verify-otp', async (req, res) => {
     const acceptedQuoteRes = await pool.query('SELECT agent_email FROM quotes WHERE id = $1', [sr.accepted_quote_id]);
     if (acceptedQuoteRes.rows.length > 0 && acceptedQuoteRes.rows[0].agent_email) {
       notifyProvider(acceptedQuoteRes.rows[0].agent_email, 'status.otp_verified', {
-        requestRef: ref,
-        status: 'In progress',
+        ...progressPayload,
         message: 'Door OTP verified successfully. Job in progress.',
         timestamp: new Date().toISOString()
       });
@@ -1831,7 +2159,7 @@ router.post('/request/:ref/verify-otp', async (req, res) => {
     return res.json({
       success: true,
       message: 'OTP verified. Job is now In progress.',
-      request: { requestRef: ref, status: 'In progress' }
+      request: progressPayload
     });
   } catch (err) {
     console.error('Verify OTP error:', err);
@@ -1842,20 +2170,84 @@ router.post('/request/:ref/verify-otp', async (req, res) => {
 // =========================================================================
 // 11. Provider Completes Job (Requires 1–4 photos & optional remarks, Credits Payout)
 // =========================================================================
-router.post('/request/:ref/complete', async (req, res) => {
+router.post('/request/:ref/complete', requireAgentAuth, async (req, res) => {
   try {
     const { ref } = req.params;
-    const { agentEmail, photos, remarks } = req.body;
+    const { agentEmail, photos, remarks, role, userRole } = req.body || {};
 
-    // Fetch the request and its accepted quote
+    // 1. Actor authorization check: Professional only
+    const callerRole = (role || userRole || '').toLowerCase();
+    if (callerRole === 'customer' || callerRole === 'user') {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Unauthorized: Only the assigned professional can complete this job.'
+      });
+    }
+
+    if (!agentEmail) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Professional email is required for authorization.'
+      });
+    }
+
+    // Fetch the request
     const srRes = await pool.query(
-      "SELECT * FROM service_requests WHERE (request_ref = $1 OR service_request_code = $1) AND LOWER(REPLACE(status, ' ', '_')) IN ('in_progress', 'otp_verified') LIMIT 1;",
+      "SELECT * FROM service_requests WHERE request_ref = $1 OR service_request_code = $1 LIMIT 1;",
       [ref]
     );
     if (srRes.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Request not found or not in In progress state.' });
+      return res.status(404).json({ success: false, code: 'NOT_FOUND', error: 'Service request not found.' });
     }
     const sr = srRes.rows[0];
+
+    // Verify caller is assigned professional
+    const agentRes = await pool.query(
+      'SELECT a.id AS agent_id, p.id AS pro_id FROM agent_login a LEFT JOIN professionals p ON LOWER(p.email) = LOWER(a.email) WHERE LOWER(a.email) = $1 LIMIT 1;',
+      [agentEmail.toLowerCase().trim()]
+    );
+    if (agentRes.rows.length === 0) {
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', error: 'Professional account not found.' });
+    }
+    const agent = agentRes.rows[0];
+    const assignedId = String(sr.assigned_professional_id || '');
+    const isAssigned = (assignedId === String(agent.pro_id) || assignedId === String(agent.agent_id));
+    if (sr.assigned_professional_id && !isAssigned) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Unauthorized: Only the assigned professional can complete this job.'
+      });
+    }
+
+    // 2. Strict sequential step validation: Previous step must be In progress (in_progress_at IS NOT NULL)
+    const normStatus = (sr.status || '').toLowerCase().replace(/_/g, ' ');
+    if (normStatus === 'completed') {
+      return res.json({
+        success: true,
+        message: 'Job is already Completed.',
+        request: {
+          request_id: sr.id,
+          requestRef: ref,
+          status: 'Completed',
+          confirmed_at: sr.confirmed_at,
+          on_the_way_at: sr.on_the_way_at,
+          arrived_at: sr.arrived_at,
+          in_progress_at: sr.in_progress_at,
+          completed_at: sr.completed_at
+        }
+      });
+    }
+
+    if (!['in progress', 'in_progress', 'otp verified'].includes(normStatus) || !sr.in_progress_at) {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_TRANSITION',
+        error: `Cannot complete job. Current job status is '${sr.status}' (requires sequential transition from 'In progress').`
+      });
+    }
 
     const photosArr = Array.isArray(photos) ? photos : [];
     if (photosArr.length < 1) {
@@ -1884,16 +2276,18 @@ router.post('/request/:ref/complete', async (req, res) => {
     const providerPayout = Math.round((grossAmount - platformFee) * 100) / 100;
 
     // Update request and booking status
-    await pool.query(
+    const updateSrRes = await pool.query(
       `UPDATE service_requests 
        SET status = 'Completed', 
            completion_photos = $1::jsonb, 
            completion_remarks = $2, 
            completed_at = CURRENT_TIMESTAMP, 
            updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $3;`,
+       WHERE id = $3
+       RETURNING *;`,
       [JSON.stringify(photosToStore), cleanRemarks, sr.id]
     );
+    const updatedSr = updateSrRes.rows[0];
 
     await pool.query(
       `UPDATE bookings 
@@ -1931,28 +2325,28 @@ router.post('/request/:ref/complete', async (req, res) => {
       console.warn('Provider dual-ID lookup notice:', lookupErr.message);
     }
 
-    // Credit provider wallet and unlock availability
+    // Update provider completed jobs count and unlock availability
+    // Note: Do NOT automatically inflate wallet_balance or create unverified wallet credits
+    // Job completion is decoupled from financial settlement pending payment provider integration
     const walletUpdate = await pool.query(`
       UPDATE agent_login
-      SET wallet_balance = wallet_balance + $1,
-          completed_jobs = completed_jobs + 1,
+      SET completed_jobs = completed_jobs + 1,
           availability_status = 'AVAILABLE',
           is_online = true,
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
+      WHERE id = $1
       RETURNING wallet_balance, completed_jobs, availability_status, is_online;
-    `, [providerPayout, agentLoginId]);
+    `, [agentLoginId]);
 
     try {
       await pool.query(`
         UPDATE professionals
-        SET wallet_balance = wallet_balance + $1,
-            completed_jobs = completed_jobs + 1,
+        SET completed_jobs = completed_jobs + 1,
             availability_status = 'available',
             is_online = true,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2;
-      `, [providerPayout, professionalId]);
+        WHERE id = $1;
+      `, [professionalId]);
     } catch (proErr) {
       // Ignored if table or row missing
     }
@@ -1960,34 +2354,31 @@ router.post('/request/:ref/complete', async (req, res) => {
     try {
       await pool.query(`
         UPDATE agents
-        SET wallet_balance = wallet_balance + $1,
-            completed_jobs = completed_jobs + 1,
+        SET completed_jobs = completed_jobs + 1,
             availability_status = 'AVAILABLE',
             is_online = true,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2;
-      `, [providerPayout, agentLoginId]);
+        WHERE id = $1;
+      `, [agentLoginId]);
     } catch (agentsErr) {
       // Legacy table agents may not exist in clean schema
     }
 
-    const newBalance = walletUpdate.rows.length > 0 ? parseFloat(walletUpdate.rows[0].wallet_balance) : providerPayout;
+    const currentBalance = walletUpdate.rows.length > 0 ? parseFloat(walletUpdate.rows[0].wallet_balance) : 0;
 
-    // Record wallet transaction
-    await pool.query(`
-      INSERT INTO wallet_transactions (agent_id, request_ref, type, amount, balance_after, description)
-      VALUES ($1, $2, 'credit', $3, $4, $5);
-    `, [
-      agentLoginId,
-      ref,
-      providerPayout,
-      newBalance,
-      `Job completed: ${sr.service_title}`
-    ]);
-
-    notifyCustomer(ref, 'status.completed', {
+    const progressPayload = {
+      request_id: updatedSr.id,
       requestRef: ref,
       status: 'Completed',
+      confirmed_at: updatedSr.confirmed_at,
+      on_the_way_at: updatedSr.on_the_way_at,
+      arrived_at: updatedSr.arrived_at,
+      in_progress_at: updatedSr.in_progress_at,
+      completed_at: updatedSr.completed_at
+    };
+
+    notifyCustomer(ref, 'status.completed', {
+      ...progressPayload,
       completionPhotos: photosToStore,
       completionRemarks: cleanRemarks,
       providerName: quote.agent_name,
@@ -1996,11 +2387,10 @@ router.post('/request/:ref/complete', async (req, res) => {
     });
 
     notifyProvider(quote.agent_email, 'status.completed', {
-      requestRef: ref,
-      status: 'Completed',
-      payout: providerPayout,
-      newBalance,
-      message: `Job completed! ₹${providerPayout.toFixed(2)} credited to your wallet.`,
+      ...progressPayload,
+      approvedCharges: grossAmount,
+      estimatedPayout: providerPayout,
+      message: `Job completed and verified. Settlement will occur via payment gateway.`,
       timestamp: new Date().toISOString()
     });
 
@@ -2008,17 +2398,21 @@ router.post('/request/:ref/complete', async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Job completed. ₹${providerPayout.toFixed(2)} credited to wallet.`,
+      message: 'Job completed successfully and verified. Settlement will occur through payment processing.',
       request: {
-        requestRef: ref,
-        status: 'Completed',
+        ...progressPayload,
         completionPhotos: photosToStore,
         completionRemarks: cleanRemarks
       },
-      wallet: {
-        payout: providerPayout,
+      payoutSummary: {
+        approvedCharges: grossAmount,
         platformFee,
-        newBalance,
+        commissionPercent: 15,
+        estimatedPayout: providerPayout,
+        status: 'PENDING_PAYMENT_GATEWAY_SETTLEMENT'
+      },
+      wallet: {
+        currentBalance,
         completedJobs: walletUpdate.rows.length > 0 ? walletUpdate.rows[0].completed_jobs : 1
       }
     });
@@ -2031,7 +2425,7 @@ router.post('/request/:ref/complete', async (req, res) => {
 // =========================================================================
 // 12. Customer Rates Completed Job (Recomputes rating ONLY from real feedback)
 // =========================================================================
-router.post('/request/:ref/rate', async (req, res) => {
+router.post('/request/:ref/rate', requireCustomerAuth, async (req, res) => {
   try {
     const { ref } = req.params;
     const { rating, feedback, tags = [] } = req.body;
@@ -2091,7 +2485,13 @@ router.post('/request/:ref/rate', async (req, res) => {
     if (agentId) {
       await pool.query(`
         INSERT INTO reviews (request_id, customer_id, provider_id, rating, feedback, tags)
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb);
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+        ON CONFLICT (request_id) DO UPDATE
+        SET rating = EXCLUDED.rating,
+            feedback = EXCLUDED.feedback,
+            tags = EXCLUDED.tags,
+            customer_id = EXCLUDED.customer_id,
+            provider_id = EXCLUDED.provider_id;
       `, [sr.id, validCustomerId || sr.user_id, agentId, numericRating, feedback || '', JSON.stringify(tags)]);
 
       // 4. Recompute professional rating ONLY from real feedback in reviews table
@@ -2194,6 +2594,11 @@ router.get('/provider/active-job', async (req, res) => {
         otpVerified: Boolean(sr.otp_verified),
         otpAttempts: sr.otp_attempts || 0,
         otpLockedUntil: sr.otp_locked_until,
+        confirmed_at: sr.confirmed_at,
+        on_the_way_at: sr.on_the_way_at,
+        arrived_at: sr.arrived_at,
+        in_progress_at: sr.in_progress_at,
+        completed_at: sr.completed_at,
         createdAt: sr.created_at
       }
     });
@@ -2204,12 +2609,21 @@ router.get('/provider/active-job', async (req, res) => {
 });
 
 // =========================================================================
-// 14. Provider Wallet & Transaction History
+// 14. Provider Wallet & Transaction History (Ownership Enforced)
 // =========================================================================
-router.get('/wallet/:email', async (req, res) => {
+router.get('/wallet/:email', requireAgentAuth, async (req, res) => {
   try {
     const { email } = req.params;
     const lowerEmail = email.toLowerCase();
+
+    // Verify ownership: authenticated agent can only view their own wallet
+    if (req.userRole === 'agent' && req.userEmail && req.userEmail.toLowerCase() !== lowerEmail) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        error: 'Access denied: You are not authorized to view another partner\'s wallet.'
+      });
+    }
 
     const agentRes = await pool.query(
       'SELECT id, wallet_balance, completed_jobs FROM agent_login WHERE email = $1 LIMIT 1;',
@@ -2283,15 +2697,7 @@ router.get('/wallet/:email', async (req, res) => {
       }
     }
 
-    // Keep DB tables in sync with positive balance
-    if (balance > 0) {
-      if (agentId && agentBalance < balance) {
-        await pool.query('UPDATE agent_login SET wallet_balance = $1 WHERE id = $2;', [balance, agentId]).catch(() => {});
-      }
-      if (proId && proBalance < balance) {
-        await pool.query('UPDATE professionals SET wallet_balance = $1 WHERE id = $2;', [balance, proId]).catch(() => {});
-      }
-    }
+    // GET endpoints are strictly read-only and must never perform database mutations
 
     return res.json({
       success: true,
@@ -2316,80 +2722,14 @@ router.get('/wallet/:email', async (req, res) => {
 });
 
 // =========================================================================
-// 15. Instant Provider Bank Withdrawal (IMPS)
+// 15. Provider Bank Withdrawal (Safely Disabled Pending Settlement Integration)
 // =========================================================================
-router.post('/withdraw', async (req, res) => {
-  try {
-    const { email, amount } = req.body;
-    if (!email) {
-      return res.status(400).json({ success: false, error: 'Provider email is required.' });
-    }
-    const withdrawAmt = parseFloat(amount);
-    if (isNaN(withdrawAmt) || withdrawAmt <= 0) {
-      return res.status(400).json({ success: false, error: 'Invalid withdrawal amount.' });
-    }
-
-    const lowerEmail = email.toLowerCase();
-    const agentRes = await pool.query(
-      'SELECT id, wallet_balance, completed_jobs FROM agent_login WHERE email = $1 LIMIT 1;',
-      [lowerEmail]
-    );
-    const proRes = await pool.query(
-      'SELECT id, wallet_balance, completed_jobs FROM professionals WHERE email = $1 LIMIT 1;',
-      [lowerEmail]
-    );
-
-    if (agentRes.rows.length === 0 && proRes.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Provider not found.' });
-    }
-
-    const agent = agentRes.rows[0];
-    const currentBalance = agent ? parseFloat(agent.wallet_balance || 0) : parseFloat(proRes.rows[0]?.wallet_balance || 0);
-
-    if (currentBalance < withdrawAmt) {
-      return res.status(400).json({ success: false, error: 'Insufficient wallet balance.' });
-    }
-
-    const newBalance = Math.max(0, currentBalance - withdrawAmt);
-    const agentId = agent?.id || null;
-    const proId = proRes.rows[0]?.id || null;
-
-    if (agentId) {
-      await pool.query(
-        'UPDATE agent_login SET wallet_balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;',
-        [newBalance, agentId]
-      );
-    }
-    if (proId) {
-      await pool.query(
-        'UPDATE professionals SET wallet_balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;',
-        [newBalance, proId]
-      );
-    }
-
-    // Record debit transaction in wallet_transactions
-    if (agentId) {
-      await pool.query(`
-        INSERT INTO wallet_transactions (agent_id, request_ref, type, amount, balance_after, description)
-        VALUES ($1, $2, 'debit', $3, $4, $5);
-      `, [
-        agentId,
-        'WTH-' + Date.now().toString(36).toUpperCase(),
-        withdrawAmt,
-        newBalance,
-        'Instant IMPS Bank Transfer Withdrawal'
-      ]);
-    }
-
-    return res.json({
-      success: true,
-      message: `₹${withdrawAmt.toLocaleString('en-IN')} transferred to primary bank account via Instant IMPS.`,
-      newBalance
-    });
-  } catch (err) {
-    console.error('Withdraw error:', err);
-    return res.status(500).json({ success: false, error: err.message });
-  }
+router.post('/withdraw', requireAgentAuth, async (req, res) => {
+  return res.status(503).json({
+    success: false,
+    code: 'PAYOUTS_NOT_CONFIGURED',
+    error: 'Automated bank payouts are currently disabled pending payment provider integration.'
+  });
 });
 
 export default router;

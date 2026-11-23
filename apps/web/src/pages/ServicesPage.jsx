@@ -7,7 +7,35 @@ import {
   problemFirstLinks,
   servicesDirectory
 } from '../data/servicesCatalogData';
-const electricianImg = '/images/electrician.jpg';
+const electricianSlides = [
+  {
+    src: '/images/electrician-mcb.jpg',
+    alt: 'Certified master electrician performing residential MCB distribution board diagnostics and repair',
+    badge: 'MCB & Distribution Panel',
+    objectPosition: 'center 26%'
+  },
+  {
+    src: '/images/electrician-ac.jpg',
+    alt: 'Certified electrician servicing indoor split air conditioner cooling unit',
+    badge: 'Electrical & Power Diagnostics',
+    objectPosition: 'center 24%'
+  }
+];
+
+const plumberSlides = [
+  {
+    src: '/images/plumber-tap.jpg',
+    alt: 'Master plumber installing and servicing bathroom angle valve, tap, and waterline fixtures',
+    badge: 'Tap, Valve & Waterline Repair',
+    objectPosition: 'center 42%'
+  },
+  {
+    src: '/images/plumber-basin.jpg',
+    alt: 'Certified plumber repairing washbasin drainage trap and resolving pipe leakages',
+    badge: 'Washbasin & Drain Diagnostics',
+    objectPosition: 'center 30%'
+  }
+];
 const plumberImg = '/images/plumber.png';
 
 export default function ServicesPage({
@@ -27,24 +55,93 @@ export default function ServicesPage({
   } = useBooking();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [placeholderIdx, setPlaceholderIdx] = useState(0);
-  const [isFocused, setIsFocused] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [panelMaxHeight, setPanelMaxHeight] = useState(null);
+  const [liveAnnouncement, setLiveAnnouncement] = useState('');
   const [showEmptyNotice, setShowEmptyNotice] = useState(false);
+
+  const searchContainerRef = useRef(null);
   const searchInputRef = useRef(null);
-  const placeholderTimerRef = useRef(null);
+  const dropdownRef = useRef(null);
 
-  // Rotating placeholder
+  // Auto-swapping photo showcase for Electrician (4.5s swap with pause on hover)
+  const [electricianSlideIdx, setElectricianSlideIdx] = useState(0);
+  const [isElectricianHovered, setIsElectricianHovered] = useState(false);
+
   useEffect(() => {
-    if (isFocused || searchQuery.trim().length > 0) return;
+    if (isElectricianHovered) return;
 
-    placeholderTimerRef.current = setInterval(() => {
-      setPlaceholderIdx((prev) => (prev + 1) % servicesSearchConfig.cyclingExamples.length);
-    }, 3000);
+    const timer = setInterval(() => {
+      setElectricianSlideIdx((prev) => (prev + 1) % electricianSlides.length);
+    }, 4500);
 
+    return () => clearInterval(timer);
+  }, [isElectricianHovered]);
+
+  // Auto-swapping photo showcase for Plumber (4.5s swap with pause on hover)
+  const [plumberSlideIdx, setPlumberSlideIdx] = useState(0);
+  const [isPlumberHovered, setIsPlumberHovered] = useState(false);
+
+  useEffect(() => {
+    if (isPlumberHovered) return;
+
+    const timer = setInterval(() => {
+      setPlumberSlideIdx((prev) => (prev + 1) % plumberSlides.length);
+    }, 4500);
+
+    return () => clearInterval(timer);
+  }, [isPlumberHovered]);
+
+  // Debounce search query ~120ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Calculate panel max-height based on remaining space in viewport (and visualViewport)
+  const updatePanelHeight = () => {
+    if (!searchContainerRef.current) return;
+    const rect = searchContainerRef.current.getBoundingClientRect();
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const spaceRemaining = vh - rect.bottom - 24;
+    const computed = Math.max(160, Math.min(400, spaceRemaining));
+    setPanelMaxHeight(computed);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePanelHeight();
+    const handleResize = () => updatePanelHeight();
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleResize, true);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      window.visualViewport.addEventListener('scroll', handleResize);
+    }
     return () => {
-      if (placeholderTimerRef.current) clearInterval(placeholderTimerRef.current);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleResize, true);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleResize);
+      }
     };
-  }, [isFocused, searchQuery]);
+  }, [isOpen]);
+
+  // Handle outside clicks to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Handle protected booking action (Triggers auth check)
   const handleBookService = (serviceSlug, issue = null) => {
@@ -71,33 +168,277 @@ export default function ServicesPage({
     }
   };
 
-  // Filter suggestions
-  const trimmedQuery = searchQuery.trim().toLowerCase();
-  const matchedSuggestions = trimmedQuery.length > 0
-    ? servicesSearchConfig.suggestions.filter((item) =>
-        item.query.includes(trimmedQuery) ||
-        item.label.toLowerCase().includes(trimmedQuery) ||
-        item.category.toLowerCase().includes(trimmedQuery)
-      )
-    : [];
+  // Normalization helper (case-insensitive, diacritics ignored, extra whitespace stripped)
+  const normalize = (str) =>
+    (str || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (matchedSuggestions.length > 0) {
-      handleExploreService(matchedSuggestions[0].serviceSlug, matchedSuggestions[0].label);
+  // Relevance ranking: startsWith -> word startsWith -> contains -> keyword/synonym
+  const getRank = (item, query) => {
+    const normLabel = normalize(item.label);
+    const normQuery = normalize(query);
+    if (!normQuery) return null;
+
+    if (normLabel.startsWith(normQuery)) {
+      return { tier: 1, index: 0 };
+    }
+
+    const words = normLabel.split(/\s+/);
+    const wordIdx = words.findIndex((w) => w.startsWith(normQuery));
+    if (wordIdx !== -1) {
+      return { tier: 2, index: wordIdx };
+    }
+
+    const containsIdx = normLabel.indexOf(normQuery);
+    if (containsIdx !== -1) {
+      return { tier: 3, index: containsIdx };
+    }
+
+    const keywords = item.keywords || [];
+    for (const kw of keywords) {
+      const normKw = normalize(kw);
+      if (normKw.startsWith(normQuery) || normKw.includes(normQuery)) {
+        return { tier: 4, index: 0, matchedKeyword: kw };
+      }
+    }
+
+    return null;
+  };
+
+  const trimmedQuery = debouncedQuery.trim();
+  const isQueryActive = trimmedQuery.length >= 2;
+
+  // Filter & rank suggestions
+  let filteredResults = [];
+  if (isQueryActive) {
+    const scored = [];
+    for (const item of servicesSearchConfig.suggestions) {
+      const rank = getRank(item, trimmedQuery);
+      if (rank) {
+        scored.push({ item, rank });
+      }
+    }
+
+    const nameMatches = scored.filter((s) => s.rank.tier <= 3);
+    let finalMatches = [];
+    if (nameMatches.length > 0) {
+      nameMatches.sort((a, b) => {
+        if (a.rank.tier !== b.rank.tier) return a.rank.tier - b.rank.tier;
+        return a.rank.index - b.rank.index;
+      });
+      finalMatches = nameMatches;
+    } else {
+      // Show synonym match only when no name match exists in the first 6
+      const synonymMatches = scored.filter((s) => s.rank.tier === 4);
+      finalMatches = synonymMatches;
+    }
+
+    // Limit to 6 results total, at most 4 per category
+    const categoryCounts = {};
+    for (const { item, rank } of finalMatches) {
+      const cat = item.category;
+      categoryCounts[cat] = categoryCounts[cat] || 0;
+      if (categoryCounts[cat] < 4 && filteredResults.length < 6) {
+        categoryCounts[cat]++;
+        filteredResults.push({ ...item, matchTier: rank.tier });
+      }
+    }
+  }
+
+  // Grouping: Popular services when < 2 chars, or Category groups when >= 2 chars
+  const displayGroups = [];
+  if (!isQueryActive) {
+    displayGroups.push({
+      id: 'popular-services-group',
+      category: 'Popular services',
+      items: (servicesSearchConfig.popularServices || []).slice(0, 6)
+    });
+  } else if (filteredResults.length > 0) {
+    const catMap = new Map();
+    for (const item of filteredResults) {
+      if (!catMap.has(item.category)) {
+        const group = {
+          id: `category-${normalize(item.category).replace(/\s+/g, '-')}`,
+          category: item.category,
+          items: []
+        };
+        catMap.set(item.category, group);
+        displayGroups.push(group);
+      }
+      catMap.get(item.category).items.push(item);
+    }
+  }
+
+  // Flat list of selectable options for keyboard navigation
+  const selectableOptions = [];
+  for (const group of displayGroups) {
+    for (const item of group.items) {
+      selectableOptions.push({
+        type: 'service',
+        domId: `option-${item.id || item.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+        data: item
+      });
+    }
+  }
+
+  // Last row: Search for “<typed text>” (always present when there is text)
+  if (searchQuery.trim().length > 0) {
+    selectableOptions.push({
+      type: 'freetext',
+      domId: 'option-search-freetext',
+      query: searchQuery.trim()
+    });
+  }
+
+  // Reset activeIndex when query updates
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [debouncedQuery]);
+
+  // Screen reader announcements
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isQueryActive) {
+      if (filteredResults.length > 0) {
+        setLiveAnnouncement(`${filteredResults.length} suggestions available`);
+      } else {
+        setLiveAnnouncement('No suggestions');
+      }
+    } else {
+      setLiveAnnouncement(`${(servicesSearchConfig.popularServices || []).length} suggestions available`);
+    }
+  }, [filteredResults.length, isQueryActive, isOpen]);
+
+  // Selection handler
+  const handleSelectOption = (option) => {
+    if (!option) return;
+    if (option.type === 'service') {
+      handleExploreService(option.data.serviceSlug, option.data.label);
+      setIsOpen(false);
       setShowEmptyNotice(false);
-    } else if (trimmedQuery.includes('plumb') || trimmedQuery.includes('tap') || trimmedQuery.includes('pipe') || trimmedQuery.includes('leak') || trimmedQuery.includes('drain')) {
-      handleExploreService('plumber');
-      setShowEmptyNotice(false);
-    } else if (trimmedQuery.includes('elect') || trimmedQuery.includes('mcb') || trimmedQuery.includes('switch') || trimmedQuery.includes('wire') || trimmedQuery.includes('fan')) {
-      handleExploreService('electrician');
-      setShowEmptyNotice(false);
-    } else if (trimmedQuery.length > 0) {
-      setShowEmptyNotice(true);
+    } else if (option.type === 'freetext') {
+      handleSearchSubmit(null, option.query);
     }
   };
 
-  const currentPlaceholder = servicesSearchConfig.cyclingExamples[placeholderIdx] || servicesSearchConfig.defaultPlaceholder;
+  const handleSearchSubmit = (e, customQuery = null) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const q = (customQuery !== null ? customQuery : searchQuery).trim();
+    if (!q) return;
+
+    const qLower = q.toLowerCase();
+    const exact = servicesSearchConfig.suggestions.find(
+      (s) => s.label.toLowerCase() === qLower
+    );
+    if (exact) {
+      handleExploreService(exact.serviceSlug, exact.label);
+      setIsOpen(false);
+      setShowEmptyNotice(false);
+      return;
+    }
+
+    if (filteredResults.length > 0) {
+      handleExploreService(filteredResults[0].serviceSlug, filteredResults[0].label);
+      setIsOpen(false);
+      setShowEmptyNotice(false);
+    } else if (
+      qLower.includes('plumb') ||
+      qLower.includes('tap') ||
+      qLower.includes('pipe') ||
+      qLower.includes('leak') ||
+      qLower.includes('drain')
+    ) {
+      handleExploreService('plumber');
+      setIsOpen(false);
+      setShowEmptyNotice(false);
+    } else if (
+      qLower.includes('elect') ||
+      qLower.includes('mcb') ||
+      qLower.includes('switch') ||
+      qLower.includes('wire') ||
+      qLower.includes('fan')
+    ) {
+      handleExploreService('electrician');
+      setIsOpen(false);
+      setShowEmptyNotice(false);
+    } else {
+      setShowEmptyNotice(true);
+      setIsOpen(false);
+    }
+  };
+
+  // Keyboard navigation for combobox
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        setActiveIndex(0);
+      } else if (selectableOptions.length > 0) {
+        setActiveIndex((prev) => (prev + 1) % selectableOptions.length);
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        setActiveIndex(selectableOptions.length - 1);
+      } else if (selectableOptions.length > 0) {
+        setActiveIndex((prev) => (prev - 1 + selectableOptions.length) % selectableOptions.length);
+      }
+    } else if (e.key === 'Home') {
+      if (isOpen && selectableOptions.length > 0) {
+        e.preventDefault();
+        setActiveIndex(0);
+      }
+    } else if (e.key === 'End') {
+      if (isOpen && selectableOptions.length > 0) {
+        e.preventDefault();
+        setActiveIndex(selectableOptions.length - 1);
+      }
+    } else if (e.key === 'Enter') {
+      if (isOpen && activeIndex >= 0 && selectableOptions[activeIndex]) {
+        e.preventDefault();
+        handleSelectOption(selectableOptions[activeIndex]);
+      } else {
+        handleSearchSubmit(e);
+      }
+    } else if (e.key === 'Escape') {
+      if (isOpen) {
+        e.preventDefault();
+        setIsOpen(false);
+      } else if (searchQuery.length > 0) {
+        e.preventDefault();
+        setSearchQuery('');
+        setDebouncedQuery('');
+      }
+    } else if (e.key === 'Tab') {
+      setIsOpen(false);
+    }
+  };
+
+  // Text highlighting: matched characters render at weight 600, rest regular
+  const renderHighlightedText = (label, query) => {
+    if (!query || query.trim().length < 2) {
+      return <span>{label}</span>;
+    }
+    const q = query.trim();
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    const parts = label.split(regex);
+    return parts.map((part, i) => {
+      if (part.toLowerCase() === q.toLowerCase()) {
+        return <strong key={i}>{part}</strong>;
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  const activeOption = activeIndex >= 0 ? selectableOptions[activeIndex] : null;
+  const activeDomId = activeOption ? activeOption.domId : undefined;
 
   return (
     <div className="services-page-wrapper" role="main">
@@ -105,26 +446,27 @@ export default function ServicesPage({
         
         {/* 1. Services Hero Introduction (Compact Editorial) */}
         <header className="services-hero-section">
-          <div className="services-eyebrow">
-            OUR SERVICES
-          </div>
+          <div className="services-eyebrow">OUR SERVICES</div>
 
           <h1 className="services-hero-headline">
-            Expert help for<br className="services-break-desktop" /> what matters at home.
+            Expert help for<br className="services-break-desktop" />what matters at home.
           </h1>
 
           <p className="services-hero-lead">
-            Describe what's wrong or explore a service to find the right way forward.
+            Describe the problem, or browse by service.
           </p>
         </header>
 
         {/* 2. Main Creative Interaction — Problem Search */}
         <section className="services-search-area" aria-label="Find service by problem">
-          <div className="services-search-label">
-            WHAT NEEDS FIXING?
-          </div>
+          <div className="services-search-label">WHAT NEEDS FIXING?</div>
 
-          <div className="services-search-container">
+          <div ref={searchContainerRef} className="services-search-container">
+            {/* Screen Reader Live Announcement */}
+            <div className="services-search-sr-only" aria-live="polite" aria-atomic="true">
+              {liveAnnouncement}
+            </div>
+
             <form onSubmit={handleSearchSubmit} className="services-search-form" role="search">
               <div className="services-search-input-box">
                 <svg
@@ -146,52 +488,140 @@ export default function ServicesPage({
                 <input
                   ref={searchInputRef}
                   type="text"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={isOpen}
+                  aria-controls="services-suggestions-listbox"
+                  aria-activedescendant={activeDomId}
+                  enterKeyHint="search"
                   className="services-search-field"
-                  placeholder={currentPlaceholder}
+                  placeholder='Try “MCB keeps tripping” or “tap leaking”'
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
+                    setIsOpen(true);
                     if (showEmptyNotice) setShowEmptyNotice(false);
                   }}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                  onFocus={() => {
+                    setIsOpen(true);
+                    updatePanelHeight();
+                  }}
+                  onClick={() => {
+                    setIsOpen(true);
+                    updatePanelHeight();
+                  }}
+                  onKeyDown={handleKeyDown}
                   aria-label="Describe what needs fixing at home"
                   autoComplete="off"
                 />
 
-                <button
-                  type="submit"
-                  className="services-search-arrow-btn"
-                  aria-label="Search service"
-                >
-                  →
-                </button>
+                {searchQuery.length > 0 && (
+                  <button
+                    type="button"
+                    className="services-search-clear-btn"
+                    aria-label="Clear search"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setDebouncedQuery('');
+                      searchInputRef.current?.focus();
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
               </div>
             </form>
 
-            {/* Suggestions Dropdown */}
-            {isFocused && matchedSuggestions.length > 0 && (
-              <div className="services-suggestions-dropdown" role="listbox">
-                {matchedSuggestions.map((sug) => (
-                  <button
-                    key={`${sug.serviceSlug}-${sug.label}`}
-                    type="button"
-                    className="suggestion-item"
-                    onClick={() => {
-                      handleExploreService(sug.serviceSlug, sug.label);
-                    }}
-                    role="option"
-                    aria-selected="false"
+            {/* Suggestions Dropdown Panel */}
+            {isOpen && (
+              <div
+                ref={dropdownRef}
+                id="services-suggestions-listbox"
+                className="services-suggestions-dropdown"
+                role="listbox"
+                style={{ maxHeight: panelMaxHeight ? `${panelMaxHeight}px` : undefined }}
+              >
+                {/* Quiet no results message when query >= 2 and zero results */}
+                {isQueryActive && filteredResults.length === 0 && (
+                  <div className="services-no-results" role="status">
+                    <p className="services-no-results-primary">No matching service.</p>
+                    <p className="services-no-results-secondary">Press Enter to describe the problem instead.</p>
+                  </div>
+                )}
+
+                {/* Groups */}
+                {displayGroups.map((group) => (
+                  <div
+                    key={group.id}
+                    className="services-group-container"
+                    role="group"
+                    aria-labelledby={`${group.id}-heading`}
                   >
-                    <div className="suggestion-meta">
-                      <span className="suggestion-icon">{sug.icon}</span>
-                      <span className="suggestion-cat">{sug.category}</span>
-                      <span className="suggestion-dot">·</span>
-                      <span className="suggestion-label">{sug.label}</span>
+                    <div id={`${group.id}-heading`} className="services-group-heading">
+                      {group.category}
                     </div>
-                    <span className="suggestion-arrow" aria-hidden="true">→</span>
-                  </button>
+
+                    {group.items.map((item) => {
+                      const domId = `option-${item.id || item.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                      const optIndex = selectableOptions.findIndex((o) => o.domId === domId);
+                      const isSelected = activeIndex === optIndex;
+
+                      return (
+                        <button
+                          key={domId}
+                          id={domId}
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected ? 'true' : 'false'}
+                          className={`services-suggestion-row ${isSelected ? 'is-active' : ''}`}
+                          onMouseEnter={() => setActiveIndex(optIndex)}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleSelectOption(selectableOptions[optIndex])}
+                        >
+                          <span className="services-suggestion-text">
+                            {isQueryActive ? renderHighlightedText(item.label, trimmedQuery) : item.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 ))}
+
+                {/* Last row: Search for “<typed text>” (always present when there is text) */}
+                {searchQuery.trim().length > 0 && (() => {
+                  const freeTextOptIndex = selectableOptions.findIndex((o) => o.type === 'freetext');
+                  const isFreeTextSelected = activeIndex === freeTextOptIndex;
+
+                  return (
+                    <button
+                      id="option-search-freetext"
+                      type="button"
+                      role="option"
+                      aria-selected={isFreeTextSelected ? 'true' : 'false'}
+                      className={`services-suggestion-row ${isFreeTextSelected ? 'is-active' : ''}`}
+                      onMouseEnter={() => setActiveIndex(freeTextOptIndex)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSelectOption(selectableOptions[freeTextOptIndex])}
+                    >
+                      <span className="services-suggestion-text">
+                        Search for “{searchQuery.trim()}”
+                      </span>
+                    </button>
+                  );
+                })()}
               </div>
             )}
 
@@ -300,23 +730,56 @@ export default function ServicesPage({
               </div>
 
               <div
-                className="editorial-row-media"
+                className="editorial-row-media editorial-row-media-carousel"
                 onClick={() => handleExploreService('electrician')}
                 onKeyDown={(e) => e.key === 'Enter' && handleExploreService('electrician')}
+                onMouseEnter={() => setIsElectricianHovered(true)}
+                onMouseLeave={() => setIsElectricianHovered(false)}
                 tabIndex={0}
                 role="button"
                 aria-label="View electrical service details"
               >
-                <img
-                  src={electricianImg}
-                  alt="Professional electrician conducting diagnostics and electrical maintenance"
-                  className="editorial-row-photo"
-                  loading="lazy"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = '/images/electrician.jpg';
-                  }}
-                />
+                {/* Crossfading High-Res Photos */}
+                {electricianSlides.map((slide, idx) => {
+                  const isActive = idx === electricianSlideIdx;
+                  return (
+                    <img
+                      key={slide.src}
+                      src={slide.src}
+                      alt={slide.alt}
+                      className={`editorial-row-photo editorial-carousel-photo ${isActive ? 'active' : ''}`}
+                      style={{ objectPosition: slide.objectPosition }}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = '/images/electrician.jpg';
+                      }}
+                    />
+                  );
+                })}
+
+                {/* Minimal Segmented Frosted Indicators */}
+                <div
+                  className="editorial-swap-indicators"
+                  role="tablist"
+                  aria-label="Photo carousel pagination"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {electricianSlides.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`editorial-swap-dot ${idx === electricianSlideIdx ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setElectricianSlideIdx(idx);
+                      }}
+                      aria-label={`Show photo ${idx + 1}`}
+                      aria-selected={idx === electricianSlideIdx}
+                      role="tab"
+                    />
+                  ))}
+                </div>
               </div>
             </article>
 
@@ -326,23 +789,56 @@ export default function ServicesPage({
             {/* Row 2: Plumber (Left: Photo, Right: Info) */}
             <article className="services-editorial-row reverse complementary-plumber" aria-labelledby="service-title-plumber">
               <div
-                className="editorial-row-media"
+                className="editorial-row-media editorial-row-media-carousel"
                 onClick={() => handleExploreService('plumber')}
                 onKeyDown={(e) => e.key === 'Enter' && handleExploreService('plumber')}
+                onMouseEnter={() => setIsPlumberHovered(true)}
+                onMouseLeave={() => setIsPlumberHovered(false)}
                 tabIndex={0}
                 role="button"
                 aria-label="View plumbing service details"
               >
-                <img
-                  src={plumberImg}
-                  alt="Certified plumber performing residential pipe and fixture maintenance"
-                  className="editorial-row-photo"
-                  loading="lazy"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = '/images/plumber.png';
-                  }}
-                />
+                {/* Crossfading High-Res Photos */}
+                {plumberSlides.map((slide, idx) => {
+                  const isActive = idx === plumberSlideIdx;
+                  return (
+                    <img
+                      key={slide.src}
+                      src={slide.src}
+                      alt={slide.alt}
+                      className={`editorial-row-photo editorial-carousel-photo ${isActive ? 'active' : ''}`}
+                      style={{ objectPosition: slide.objectPosition }}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = '/images/plumber.png';
+                      }}
+                    />
+                  );
+                })}
+
+                {/* Minimal Segmented Frosted Indicators */}
+                <div
+                  className="editorial-swap-indicators"
+                  role="tablist"
+                  aria-label="Plumbing photo carousel pagination"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {plumberSlides.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`editorial-swap-dot ${idx === plumberSlideIdx ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPlumberSlideIdx(idx);
+                      }}
+                      aria-label={`Show plumbing photo ${idx + 1}`}
+                      aria-selected={idx === plumberSlideIdx}
+                      role="tab"
+                    />
+                  ))}
+                </div>
               </div>
 
               <div className="editorial-row-info">
